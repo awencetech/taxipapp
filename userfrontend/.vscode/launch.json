@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "User Frontend (Chrome - Port 8000)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8000"
+      ],
+      "flutterMode": "debug"
+    },
+    {
+      "name": "User Frontend (Profile Mode)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8000"
+      ],
+      "flutterMode": "profile"
+    },
+    {
+      "name": "User Frontend (Release Mode)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8000"
+      ],
+      "flutterMode": "release"
+    }
+  ]
+}

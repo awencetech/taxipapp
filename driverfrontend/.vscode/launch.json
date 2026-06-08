@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Driver Frontend (Chrome - Port 8080)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8080"
+      ],
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Driver Frontend (Profile Mode)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8080"
+      ],
+      "flutterMode": "profile"
+    },
+    {
+      "name": "Driver Frontend (Release Mode)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "8080"
+      ],
+      "flutterMode": "release"
+    }
+  ]
+}
