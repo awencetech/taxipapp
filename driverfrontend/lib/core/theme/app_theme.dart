@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFFFF6D00); // Orange branding
+  static const Color primaryColor = Color(0xFF1565C0); // Dark blue
   static const Color secondaryColor = Color(0xFF2D2D2D); // Dark gray
-  static const Color accentColor = Color(0xFFFF8A00); // Lighter orange
+  static const Color accentColor = Color(0xFF42A5F5); // Lighter blue
   static const Color errorColor = Color(0xFFE53935);
   static const Color successColor = Color(0xFF43A047);
   static const Color backgroundColor = Color(0xFFF8F9FA);
@@ -12,7 +12,7 @@ class AppTheme {
   static const LinearGradient headerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [secondaryColor, Color(0xFFE65100)],
+    colors: [secondaryColor, Color(0xFF1565C0)],
   );
 
   static ThemeData lightTheme = ThemeData(

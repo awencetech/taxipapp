@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/ride_viewmodel.dart';
 import '../../providers/location_provider.dart';
+import '../../core/theme/app_theme.dart';
 import '../../widgets/map_layers_control.dart';
 import '../../widgets/ride_request_popup.dart';
 import '../earnings/earnings_screen.dart';
@@ -59,7 +60,7 @@ class HomeScreenState extends State<HomeScreen> {
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: const Color(0xFFFF6D00),
+          selectedItemColor: AppTheme.primaryColor,
           unselectedItemColor: Colors.grey,
           selectedFontSize: 12,
           unselectedFontSize: 12,
