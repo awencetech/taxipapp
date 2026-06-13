@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'signup_screen.dart';
 import 'google_onboarding_screen.dart';
+import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -89,8 +90,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
-      debugPrint('LoginScreen: Login success reported by AuthViewModel');
-      // No manual navigation here - AuthCheck in main.dart will handle it
+      debugPrint('LoginScreen: Login successful, navigating to HomeScreen');
+      // Explicitly navigate to HomeScreen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+        (route) => false,
+      );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authViewModel.error ?? 'Action Failed')),
@@ -108,8 +113,11 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const GoogleOnboardingScreen()),
         );
       } else {
-        debugPrint('LoginScreen: Google Login success reported by AuthViewModel');
-        // No manual navigation here - AuthCheck in main.dart will handle it
+        debugPrint('LoginScreen: Google login successful, navigating to HomeScreen');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => HomeScreen()),
+          (route) => false,
+        );
       }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
