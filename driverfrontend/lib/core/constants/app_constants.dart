@@ -1,6 +1,7 @@
 class AppConstants {
   static const String appName = 'Taxi Nanban Driver';
 
+  // Use 10.0.2.2 for Android Emulator, 127.0.0.1 for iOS Simulator or Web
   static const String baseUrl = 'http://127.0.0.1:5000/api/v1';
   static const String socketUrl = 'http://127.0.0.1:5000';
 
@@ -9,10 +10,11 @@ class AppConstants {
   static const String registerUrl = '/auth/register';
   static const String googleLoginUrl = '/auth/google-login';
   static const String completeProfileUrl = '/auth/complete-profile';
+  static const String changePasswordUrl = '/auth/change-password';
 
   // Driver APIs
-  static const String driverSignupUrl = '/driver/signup';
-  static const String driverLoginUrl = '/driver/login';
+  static const String driverSignupUrl = '/auth/register';
+  static const String driverLoginUrl = '/auth/login';
   static const String driverRegisterUrl = '/drivers/register';
   static const String driverStatusUrl = '/drivers/status';
   static const String updateLocationUrl = '/drivers/location';
@@ -21,6 +23,9 @@ class AppConstants {
   static const String getDriverProfileUrl = '/drivers/profile';
   static const String updateDriverProfileUrl = '/drivers/profile';
   static const String driverProfileCreateUrl = '/driver/profile/create';
+  static const String uploadDocumentUrl = '/drivers/documents';
+  static const String editDocumentUrl = '/drivers/documents/:docId';
+  static const String deleteDocumentUrl = '/drivers/documents/:docId';
 
   static const String nearbyRidesUrl = '/rides/nearby';
   static const String acceptRideUrl = '/rides/accept';

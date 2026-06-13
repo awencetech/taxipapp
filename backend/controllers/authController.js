@@ -386,4 +386,55 @@ const completeProfile = async (req, res) => {
   }
 };
 
-module.exports = { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile };
+const changePassword = async (req, res) => {
+  try {
+    console.log('Change Password Request Body:', req.body);
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide current password and new password' 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'New password must be at least 6 characters' 
+      });
+    }
+
+    // Get user with password (since select is false by default)
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Current password is incorrect' 
+      });
+    }
+
+    // Update password (pre-save hook will hash it)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change Password Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword };

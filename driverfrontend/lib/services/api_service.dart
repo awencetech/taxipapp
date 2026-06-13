@@ -22,27 +22,49 @@ class ApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          debugPrint('API Request: ${options.method} ${options.uri}');
+          debugPrint('=== API Service: On Request ===');
+          debugPrint('Method: ${options.method}');
+          debugPrint('URI: ${options.uri}');
+          debugPrint('Path: ${options.path}');
           debugPrint('Request Data: ${options.data}');
+          debugPrint('Initial Headers: ${options.headers}');
 
-          final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString(AppConstants.tokenKey);
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-            debugPrint('Authorization header added');
+          // Skip Authorization header for login and register endpoints
+          final path = options.path;
+          final isPublicRoute = path.contains('/login') || 
+                               path.contains('/signup') || 
+                               path.contains('/register');
+          debugPrint('Is public route: $isPublicRoute');
+
+          if (!isPublicRoute) {
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString(AppConstants.tokenKey);
+            debugPrint('Token from prefs: $token');
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+              debugPrint('Authorization header added: Bearer $token');
+            } else {
+              debugPrint('⚠️ Token is null in prefs!');
+            }
+          } else {
+            debugPrint('Skipping auth header for public route');
           }
+          debugPrint('Final Headers: ${options.headers}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          debugPrint('API Response: ${response.statusCode}');
+          debugPrint('=== API Service: On Response ===');
+          debugPrint('Response Status: ${response.statusCode}');
           debugPrint('Response Data: ${response.data}');
           return handler.next(response);
         },
         onError: (error, handler) {
-          debugPrint('API Error: ${error.message}');
+          debugPrint('=== API Service: On Error ===');
+          debugPrint('Error: ${error.message}');
           if (error.response != null) {
             debugPrint('Error Status: ${error.response?.statusCode}');
             debugPrint('Error Data: ${error.response?.data}');
+            debugPrint('Error Headers: ${error.response?.headers}');
           }
           return handler.next(error);
         },
@@ -71,6 +93,7 @@ class ApiService {
 
   Future<Response> put(String path, {dynamic data}) async {
     try {
+      // If data is FormData, use it directly; otherwise proceed as normal
       return await _dio.put(path, data: data);
     } on DioException catch (e) {
       throw _handleError(e);

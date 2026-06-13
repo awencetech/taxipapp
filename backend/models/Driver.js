@@ -46,12 +46,30 @@ const driverSchema = new mongoose.Schema({
   },
   documents: [
     {
-      name: String,
-      url: String,
+      title: {
+        type: String,
+        required: true,
+      },
+      category: {
+        type: String,
+        enum: ['vehicle', 'personal'],
+        default: 'vehicle',
+      },
+      url: {
+        type: String,
+        default: '',
+      },
       status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected'],
-        default: 'pending',
+        enum: ['Verified', 'Pending', 'Rejected', 'Expiring Soon'],
+        default: 'Pending',
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      expiryDate: {
+        type: Date,
       },
     },
   ],
@@ -71,6 +89,57 @@ const driverSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // New fields for address and bank details
+  address: {
+    type: String,
+    default: '',
+  },
+  // Backward compatibility for old single bank account
+  bankName: {
+    type: String,
+    default: '',
+  },
+  accountHolderName: {
+    type: String,
+    default: '',
+  },
+  accountNumber: {
+    type: String,
+    default: '',
+  },
+  ifscCode: {
+    type: String,
+    default: '',
+  },
+  branchName: {
+    type: String,
+    default: '',
+  },
+  // New: Multiple bank accounts (max 3)
+  bankAccounts: [
+    {
+      bankName: {
+        type: String,
+        required: true,
+      },
+      accountHolderName: {
+        type: String,
+        required: true,
+      },
+      accountNumber: {
+        type: String,
+        required: true,
+      },
+      ifscCode: {
+        type: String,
+        required: true,
+      },
+      branchName: {
+        type: String,
+        default: '',
+      },
+    },
+  ],
 }, { timestamps: true });
 
 driverSchema.index({ currentLocation: '2dsphere' });

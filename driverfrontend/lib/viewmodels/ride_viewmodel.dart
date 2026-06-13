@@ -15,6 +15,8 @@ class RideViewModel extends ChangeNotifier {
   RideRequestModel? _incomingRequest;
   bool _isOnline = false;
   bool _isLoading = false;
+  int _onlineSeconds = 0;
+  Timer? _onlineTimer;
   StreamSubscription<Position>? _positionStream;
   final List<RideRequestModel> _nearbyRides = [];
   List<RideRequestModel> _rideHistory = [];
@@ -26,6 +28,14 @@ class RideViewModel extends ChangeNotifier {
   RideRequestModel? get incomingRequest => _incomingRequest;
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
+  int get onlineSeconds => _onlineSeconds;
+  
+  String get onlineDuration {
+    int minutes = _onlineSeconds ~/ 60;
+    int seconds = _onlineSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   List<RideRequestModel> get nearbyRides => _nearbyRides;
   List<RideRequestModel> get rideHistory => _rideHistory;
   List<NotificationModel> get notifications => _notifications;
@@ -47,11 +57,28 @@ class RideViewModel extends ChangeNotifier {
 
     if (_isOnline) {
       _startLocationUpdates();
+      _startOnlineTimer();
     } else {
       _stopLocationUpdates();
+      _stopOnlineTimer();
     }
 
     notifyListeners();
+  }
+
+  void _startOnlineTimer() {
+    _onlineSeconds = 0;
+    _onlineTimer?.cancel();
+    _onlineTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _onlineSeconds++;
+      notifyListeners();
+    });
+  }
+
+  void _stopOnlineTimer() {
+    _onlineTimer?.cancel();
+    _onlineTimer = null;
+    _onlineSeconds = 0;
   }
 
   void _startLocationUpdates() async {

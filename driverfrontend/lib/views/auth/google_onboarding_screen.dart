@@ -90,7 +90,19 @@ class _GoogleOnboardingScreenState extends State<GoogleOnboardingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.arrow_back, color: Colors.black, size: 20),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 const Text(
                   "Confirm your information",
                   style: TextStyle(
@@ -305,3 +317,4 @@ class _GoogleOnboardingScreenState extends State<GoogleOnboardingScreen> {
     );
   }
 }
+

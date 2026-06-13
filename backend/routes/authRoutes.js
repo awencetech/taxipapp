@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile } = require('../controllers/authController');
+const { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword } = require('../controllers/authController');
+const { protect } = require('../middleware/authMiddleware');
 
 /**
  * @swagger
@@ -60,5 +61,8 @@ router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
 router.post('/google-login', googleLogin);
 router.post('/complete-profile', completeProfile);
+
+// Protected route for changing password
+router.put('/change-password', protect, changePassword);
 
 module.exports = router;

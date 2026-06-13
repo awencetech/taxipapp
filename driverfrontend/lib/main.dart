@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/ride_viewmodel.dart';
+import 'viewmodels/theme_viewmodel.dart';
 import 'providers/location_provider.dart';
 import 'views/auth/login_screen.dart';
 import 'views/home/home_screen.dart';
@@ -14,6 +15,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => RideViewModel()),
+        ChangeNotifierProvider(create: (_) => ThemeViewModel()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
       ],
       child: const DriverApp(),
@@ -26,12 +28,14 @@ class DriverApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeViewModel = Provider.of<ThemeViewModel>(context);
+
     return MaterialApp(
       title: 'Nanban Driver',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: themeViewModel.themeMode,
       home: const AuthCheck(),
     );
   }
@@ -59,6 +63,7 @@ class _AuthCheckState extends State<AuthCheck> {
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
+    debugPrint('AuthCheck Build: isLoggedIn=${authViewModel.isLoggedIn}, isLoading=${authViewModel.isLoading}');
 
     if (authViewModel.isLoading) {
       return const Scaffold(
@@ -68,6 +73,10 @@ class _AuthCheckState extends State<AuthCheck> {
       );
     }
 
-    return authViewModel.isLoggedIn ? const HomeScreen() : const LoginScreen();
+    final target = authViewModel.isLoggedIn 
+        ? const HomeScreen(key: ValueKey('home')) 
+        : const LoginScreen(key: ValueKey('login'));
+    debugPrint('AuthCheck: Returning ${target.runtimeType} with key ${target.key}');
+    return target;
   }
 }

@@ -23,58 +23,192 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rideViewModel = context.watch<RideViewModel>();
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-        actions: [
-          if (rideViewModel.unreadCount > 0)
-            TextButton(
-              onPressed: () => rideViewModel.markAllAsRead(),
-              child: const Text(
-                'Mark All Read',
-                style: TextStyle(color: Colors.white),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Column(
+        children: [
+          // Top Header with Gradient
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(top: 60, left: 16, right: 24, bottom: 40),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2D2D2D), Color(0xFFE65100)],
               ),
             ),
-        ],
-      ),
-      body: rideViewModel.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : rideViewModel.notifications.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '2 unread',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: Transform.translate(
+              offset: const Offset(0, -20),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 children: [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 80,
-                    color: Colors.grey[300],
+                  _buildNotificationItem(
+                    title: "New Ride Request",
+                    message: "Passenger waiting at MG Road",
+                    time: "2 min ago",
+                    icon: Icons.notifications_none,
+                    iconColor: Colors.blue,
+                    isNew: true,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No notifications yet',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                  _buildNotificationItem(
+                    title: "Payment Received",
+                    message: "₹285 credited to your wallet",
+                    time: "1 hour ago",
+                    icon: Icons.attach_money,
+                    iconColor: Colors.green,
+                    isNew: true,
+                  ),
+                  _buildNotificationItem(
+                    title: "Daily Target Achieved!",
+                    message: "You've earned ₹200 bonus",
+                    time: "3 hours ago",
+                    icon: Icons.card_giftcard,
+                    iconColor: Colors.purple,
+                    isNew: false,
+                  ),
+                  _buildNotificationItem(
+                    title: "Document Expiring Soon",
+                    message: "Your insurance expires in 15 days",
+                    time: "Yesterday",
+                    icon: Icons.error_outline,
+                    iconColor: Colors.red,
+                    isNew: false,
+                  ),
+                  _buildNotificationItem(
+                    title: "New Feature Available",
+                    message: "Try our new in-app navigation",
+                    time: "Yesterday",
+                    icon: Icons.info_outline,
+                    iconColor: Colors.grey,
+                    isNew: false,
                   ),
                 ],
               ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: rideViewModel.notifications.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final notification = rideViewModel.notifications[index];
-                return NotificationCard(
-                  notification: notification,
-                  onMarkRead: () => rideViewModel.markAsRead(notification.id),
-                  onDelete: () =>
-                      rideViewModel.deleteNotification(notification.id),
-                );
-              },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem({
+    required String title,
+    required String message,
+    required String time,
+    required IconData icon,
+    required Color iconColor,
+    required bool isNew,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (isNew)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF8A00).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFF8A00).withValues(alpha: 0.2)),
+                        ),
+                        child: const Text(
+                          "New",
+                          style: TextStyle(
+                            color: Color(0xFFFF8A00),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(color: theme.hintColor, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  time,
+                  style: TextStyle(color: theme.hintColor.withValues(alpha: 0.7), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -209,3 +343,5 @@ class NotificationCard extends StatelessWidget {
     }
   }
 }
+
+

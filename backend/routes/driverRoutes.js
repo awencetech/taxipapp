@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } = require('../controllers/driverController');
+const { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead, uploadDocument, editDocument, deleteDocument } = require('../controllers/driverController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 router.use(protect);
 
 router.get('/profile', getDriverProfile);
-router.put('/profile', updateDriverProfile);
+router.put('/profile', upload.single('profilePic'), updateDriverProfile); // Add upload middleware for profile pic
 router.post('/register', registerDriver);
 router.put('/status', updateStatus);
 router.put('/location', updateLocation);
@@ -18,5 +19,10 @@ router.get('/notifications', getNotifications);
 router.put('/notifications/:id/read', markNotificationAsRead);
 router.delete('/notifications/:id', deleteNotification);
 router.put('/notifications/mark-all-read', markAllNotificationsAsRead);
+
+// Document routes
+router.post('/documents', upload.single('document'), uploadDocument);
+router.put('/documents/:docId', upload.single('document'), editDocument);
+router.delete('/documents/:docId', deleteDocument);
 
 module.exports = router;
