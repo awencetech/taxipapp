@@ -167,7 +167,10 @@ class NotificationCard extends StatelessWidget {
     }
   }
 
-  String _formatTime(DateTime dateTime) {
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) {
+      return 'Unknown time';
+    }
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
