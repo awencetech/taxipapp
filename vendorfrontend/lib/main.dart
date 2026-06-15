@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
-import 'core/di/injection_container.dart' as di;
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
 import 'viewmodels/driver_viewmodel.dart';
@@ -14,13 +12,6 @@ import 'views/dashboard/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Load environment variables - default to .env.dev
-  const String environment = String.fromEnvironment('ENVIRONMENT', defaultValue: 'dev');
-  await dotenv.load(fileName: '.env.$environment');
-  
-  // Initialize dependency injection
-  await di.init();
   
   runApp(
     MultiProvider(
