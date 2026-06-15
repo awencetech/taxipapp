@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   registerVendor,
   loginVendor,
+  sendVendorOTP,
+  verifyVendorOTP,
   getDashboard,
   getDrivers,
   addDriver,
@@ -16,6 +18,8 @@ const {
 
 router.post('/register', registerVendor);
 router.post('/login', loginVendor);
+router.post('/send-otp', sendVendorOTP);
+router.post('/verify-otp', verifyVendorOTP);
 router.get('/dashboard', getDashboard);
 router.get('/drivers', getDrivers);
 router.post('/drivers', addDriver);

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFFD32F2F);
-  static const Color secondaryColor = Colors.black;
-  static const Color accentColor = Colors.white;
+  static const Color primaryColor = Color(0xFFFF6D00); // Orange
+  static const Color secondaryColor = Color(0xFF2D2D2D); // Dark gray
+  static const Color accentColor = Color(0xFFFF8A00); // Light orange
   static const Color errorColor = Colors.red;
   static const Color successColor = Colors.green;
+  static const Color backgroundColor = Color(0xFFF5F5F5); // Light gray
+  static const Color textColor = Color(0xFF1A1A1A); // Dark text
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -14,16 +16,31 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: primaryColor,
       primary: primaryColor,
-      secondary: secondaryColor,
+      secondary: accentColor,
       surface: Colors.white,
-      onSurface: Colors.black,
+      onSurface: textColor,
       error: errorColor,
     ),
-    scaffoldBackgroundColor: Colors.grey[50],
-    textTheme: GoogleFonts.poppinsTextTheme(),
+    scaffoldBackgroundColor: backgroundColor,
+    textTheme: GoogleFonts.poppinsTextTheme(
+      TextTheme(
+        displayLarge: GoogleFonts.poppins(color: textColor),
+        displayMedium: GoogleFonts.poppins(color: textColor),
+        displaySmall: GoogleFonts.poppins(color: textColor),
+        headlineLarge: GoogleFonts.poppins(color: textColor),
+        headlineMedium: GoogleFonts.poppins(color: textColor),
+        headlineSmall: GoogleFonts.poppins(color: textColor),
+        titleLarge: GoogleFonts.poppins(color: textColor),
+        titleMedium: GoogleFonts.poppins(color: textColor),
+        titleSmall: GoogleFonts.poppins(color: textColor),
+        bodyLarge: GoogleFonts.poppins(color: textColor),
+        bodyMedium: GoogleFonts.poppins(color: textColor),
+        bodySmall: GoogleFonts.poppins(color: textColor),
+      ),
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+      foregroundColor: textColor,
       elevation: 0,
       centerTitle: true,
     ),
@@ -33,18 +50,18 @@ class AppTheme {
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 56),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
         ),
         textStyle: const TextStyle(
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1,
+          letterSpacing: 0.5,
         ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.grey[100],
+      fillColor: const Color(0xFFF5F5F5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
@@ -69,7 +86,7 @@ class AppTheme {
       brightness: Brightness.dark,
       seedColor: primaryColor,
       primary: primaryColor,
-      secondary: secondaryColor,
+      secondary: accentColor,
       surface: const Color(0xFF121212),
       onSurface: Colors.white,
       error: errorColor,
@@ -88,12 +105,12 @@ class AppTheme {
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 56),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
         ),
         textStyle: const TextStyle(
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1,
+          letterSpacing: 0.5,
         ),
       ),
     ),

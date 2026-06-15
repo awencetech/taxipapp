@@ -16,25 +16,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      icon: Icons.location_on,
-      title: "Book Rides Instantly",
+      icon: Icons.trending_up,
+      title: "Earn More with",
+      highlightedText: "TaxiNanban",
       description:
-          "Find and book rides near you in seconds. Quick, easy, and reliable service.",
-      gradientColors: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
+          "Maximize your earnings with our premium platform. Connect with more riders and grow your business every day.",
     ),
     OnboardingPage(
-      icon: Icons.access_time,
-      title: "Track in Real-Time",
+      icon: Icons.location_on,
+      title: "Find Rides Nearby",
+      highlightedText: null,
       description:
-          "See your driver's location and arrival time with live GPS tracking.",
-      gradientColors: const [AppColors.secondary, Color(0xFFEA580C)],
+          "Get ride requests instantly from riders in your area. Smart algorithms help you maximize your income.",
     ),
     OnboardingPage(
       icon: Icons.shield,
-      title: "Safe & Affordable",
+      title: "Safe & Secure",
+      highlightedText: null,
       description:
-          "Verified drivers, secure payments, and competitive prices for your journey.",
-      gradientColors: const [AppColors.accent, Color(0xFF16A34A)],
+          "Drive with confidence. Verified riders, secure payments, and 24/7 support for your peace of mind.",
     ),
   ];
 
@@ -67,76 +67,138 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
+  void _skip() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _pages.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  final page = _pages[index];
-                  return OnboardingPageContent(page: page);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(_pages.length, (index) {
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 8,
-                        width: index == _currentPage ? 32 : 8,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          color: index == _currentPage
-                              ? AppColors.secondary
-                              : AppColors.border,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF5F7FF),
+              Color(0xFFE8ECFF),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Skip button
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextButton(
+                      onPressed: _skip,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        "Skip",
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _nextPage,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _currentPage == _pages.length - 1
-                                ? "Get Started"
-                                : "Next",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.chevron_right),
-                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+
+              // Page view
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _pages.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final page = _pages[index];
+                    return OnboardingPageContent(page: page);
+                  },
+                ),
+              ),
+
+              // Bottom section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(_pages.length, (index) {
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 8,
+                          width: index == _currentPage ? 32 : 8,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: index == _currentPage
+                                ? AppColors.secondary
+                                : const Color(0xFFD1D5DB),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _nextPage,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _currentPage == _pages.length - 1
+                                  ? "Get Started"
+                                  : "Next",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_forward, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -151,56 +213,53 @@ class OnboardingPageContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 128,
-                height: 128,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: page.gradientColors,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: page.gradientColors.first.withValues(alpha: 0.3),
-                      blurRadius: 24,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  page.icon,
-                  size: 64,
-                  color: AppColors.card,
-                ),
-              ),
-            ],
+          Container(
+            width: 200,
+            height: 200,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.secondary,
+            ),
+            child: Icon(
+              page.icon,
+              size: 100,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 48),
-          Text(
-            page.title,
-            style: const TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-              color: AppColors.foreground,
-            ),
+          RichText(
             textAlign: TextAlign.center,
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+              ),
+              children: [
+                TextSpan(text: page.title),
+                if (page.highlightedText != null) ...[
+                  const TextSpan(text: " "),
+                  TextSpan(
+                    text: page.highlightedText,
+                    style: const TextStyle(
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Text(
             page.description,
             style: const TextStyle(
               fontSize: 18,
-              color: AppColors.mutedForeground,
+              color: Color(0xFF64748B),
+              height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),
@@ -213,13 +272,13 @@ class OnboardingPageContent extends StatelessWidget {
 class OnboardingPage {
   final IconData icon;
   final String title;
+  final String? highlightedText;
   final String description;
-  final List<Color> gradientColors;
 
   OnboardingPage({
     required this.icon,
     required this.title,
+    this.highlightedText,
     required this.description,
-    required this.gradientColors,
   });
 }

@@ -3,11 +3,143 @@ const Driver = require('../models/Driver');
 const Vehicle = require('../models/Vehicle');
 const Ride = require('../models/Ride');
 const jwt = require('jsonwebtoken');
+const { getCache, setCache, deleteCache } = require('../utils/cache');
+
+// In-memory OTP store (fallback for when Redis is not available)
+const otpStore = new Map();
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE,
   });
+};
+
+// Generate 6-digit OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const sendVendorOTP = async (req, res) => {
+  try {
+    let { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide phone number',
+      });
+    }
+
+    phone = phone.trim();
+    const vendor = await Vendor.findOne({ phone });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found with this phone number',
+      });
+    }
+
+    const otp = generateOTP();
+    const otpKey = `vendor_otp:${phone}`;
+    const ttl = 300; // 5 minutes
+
+    // Store OTP in cache/ memory
+    try {
+      await setCache(otpKey, otp, ttl);
+    } catch (e) {
+      otpStore.set(otpKey, { otp, expires: Date.now() + ttl * 1000 });
+    }
+
+    // For testing purposes, we'll return OTP in response (remove in production!)
+    // In production, integrate with SMS service here
+    console.log(`OTP for ${phone} is ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent successfully',
+      otp: process.env.NODE_ENV === 'production' ? undefined : otp,
+    });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const verifyVendorOTP = async (req, res) => {
+  try {
+    let { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide phone number and OTP',
+      });
+    }
+
+    phone = phone.trim();
+    const otpKey = `vendor_otp:${phone}`;
+    let storedOTP = null;
+
+    // Check cache first, then in-memory
+    storedOTP = await getCache(otpKey);
+    if (!storedOTP) {
+      const inMemory = otpStore.get(otpKey);
+      if (inMemory && inMemory.expires > Date.now()) {
+        storedOTP = inMemory.otp;
+      }
+    }
+
+    if (!storedOTP || storedOTP !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP',
+      });
+    }
+
+    const vendor = await Vendor.findOne({ phone });
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Clear OTP from storage
+    try {
+      await deleteCache(otpKey);
+    } catch (e) {}
+    otpStore.delete(otpKey);
+
+    const totalDrivers = await Driver.countDocuments();
+    const totalVehicles = await Vehicle.countDocuments();
+    const token = generateToken(vendor._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor logged in successfully via OTP',
+      token,
+      vendor: {
+        _id: vendor._id,
+        name: vendor.name,
+        email: vendor.email,
+        phone: vendor.phone,
+        companyName: vendor.companyName,
+        totalDrivers,
+        totalVehicles,
+        createdAt: vendor.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
 const registerVendor = async (req, res) => {
@@ -68,17 +200,24 @@ const registerVendor = async (req, res) => {
 
 const loginVendor = async (req, res) => {
   try {
-    let { email, password } = req.body;
+    let { email, phone, password } = req.body;
 
-    if (!email || !password) {
+    if ((!email && !phone) || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and password',
+        message: 'Please provide email/phone and password',
       });
     }
 
-    email = email.trim().toLowerCase();
-    const vendor = await Vendor.findOne({ email }).select('+password');
+    const query = {};
+    if (email) {
+      query.email = email.trim().toLowerCase();
+    }
+    if (phone) {
+      query.phone = phone.trim();
+    }
+
+    const vendor = await Vendor.findOne(query).select('+password');
 
     if (!vendor) {
       return res.status(401).json({
@@ -323,6 +462,8 @@ const getEarnings = async (req, res) => {
 module.exports = {
   registerVendor,
   loginVendor,
+  sendVendorOTP,
+  verifyVendorOTP,
   getDashboard,
   getDrivers,
   addDriver,

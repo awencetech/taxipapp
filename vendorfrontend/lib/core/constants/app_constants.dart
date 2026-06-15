@@ -7,6 +7,8 @@ class AppConstants {
   // Vendor APIs
   static const String vendorLoginUrl = '/vendor/login';
   static const String vendorRegisterUrl = '/vendor/register';
+  static const String vendorSendOtpUrl = '/vendor/send-otp';
+  static const String vendorVerifyOtpUrl = '/vendor/verify-otp';
   static const String vendorDashboardUrl = '/vendor/dashboard';
   static const String vendorProfileUrl = '/vendor/profile';
 
