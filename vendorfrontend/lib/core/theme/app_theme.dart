@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFFD32F2F);
-  static const Color secondaryColor = Colors.black;
-  static const Color accentColor = Colors.white;
-  static const Color errorColor = Colors.red;
-  static const Color successColor = Colors.green;
+  static const Color primaryColor = Color(0xFF1565C0); // Dark blue
+  static const Color secondaryColor = Color(0xFF2D2D2D); // Dark gray
+  static const Color accentColor = Color(0xFF42A5F5); // Lighter blue
+  static const Color errorColor = Color(0xFFE53935);
+  static const Color successColor = Color(0xFF43A047);
+  static const Color backgroundColor = Color(0xFFF8F9FA);
+
+  static const LinearGradient headerGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [secondaryColor, Color(0xFF1565C0)],
+  );
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -19,7 +26,7 @@ class AppTheme {
       onSurface: Colors.black,
       error: errorColor,
     ),
-    scaffoldBackgroundColor: Colors.grey[50],
+    scaffoldBackgroundColor: backgroundColor,
     textTheme: GoogleFonts.poppinsTextTheme(),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,
@@ -33,7 +40,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 56),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
         ),
         textStyle: const TextStyle(
           fontSize: 16,
@@ -44,7 +51,7 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.grey[100],
+      fillColor: const Color(0xFFF5F5F5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
@@ -88,7 +95,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 56),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
         ),
         textStyle: const TextStyle(
           fontSize: 16,
