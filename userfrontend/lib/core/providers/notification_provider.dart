@@ -64,23 +64,11 @@ class NotificationProvider extends ChangeNotifier {
       case 'rideUpdates':
         _settings.rideUpdates = value;
         break;
-      case 'promotionalOffers':
-        _settings.promotionalOffers = value;
-        break;
       case 'walletNotifications':
         _settings.walletNotifications = value;
         break;
-      case 'referralNotifications':
-        _settings.referralNotifications = value;
-        break;
       case 'smsAlerts':
         _settings.smsAlerts = value;
-        break;
-      case 'emailAlerts':
-        _settings.emailAlerts = value;
-        break;
-      case 'pushNotifications':
-        _settings.pushNotifications = value;
         break;
     }
     notifyListeners();

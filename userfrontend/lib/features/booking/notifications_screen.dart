@@ -71,15 +71,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       notificationProvider.updateSetting('rideUpdates', value),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionTitle('Promotions'),
-                _buildSwitchTile(
-                  title: 'Promotional Offers',
-                  subtitle: 'Get notified about offers and discounts',
-                  value: notificationProvider.settings.promotionalOffers,
-                  onChanged: (value) =>
-                      notificationProvider.updateSetting('promotionalOffers', value),
-                ),
-                const SizedBox(height: 24),
                 _buildSectionTitle('Wallet'),
                 _buildSwitchTile(
                   title: 'Wallet Notifications',
@@ -89,38 +80,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       notificationProvider.updateSetting('walletNotifications', value),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionTitle('Referral'),
-                _buildSwitchTile(
-                  title: 'Referral Notifications',
-                  subtitle: 'Get updates about your referrals',
-                  value: notificationProvider.settings.referralNotifications,
-                  onChanged: (value) =>
-                      notificationProvider.updateSetting('referralNotifications', value),
-                ),
-                const SizedBox(height: 24),
                 _buildSectionTitle('Alert Types'),
-                _buildSwitchTile(
-                  title: 'Push Notifications',
-                  subtitle: 'Receive push notifications',
-                  value: notificationProvider.settings.pushNotifications,
-                  onChanged: (value) =>
-                      notificationProvider.updateSetting('pushNotifications', value),
-                ),
-                const SizedBox(height: 12),
                 _buildSwitchTile(
                   title: 'SMS Alerts',
                   subtitle: 'Receive SMS notifications',
                   value: notificationProvider.settings.smsAlerts,
                   onChanged: (value) =>
                       notificationProvider.updateSetting('smsAlerts', value),
-                ),
-                const SizedBox(height: 12),
-                _buildSwitchTile(
-                  title: 'Email Alerts',
-                  subtitle: 'Receive email notifications',
-                  value: notificationProvider.settings.emailAlerts,
-                  onChanged: (value) =>
-                      notificationProvider.updateSetting('emailAlerts', value),
                 ),
               ],
             ),
