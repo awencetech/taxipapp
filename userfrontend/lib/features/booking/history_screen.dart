@@ -4,16 +4,15 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/models/ride_model.dart';
-import 'history_screen.dart';
 
-class RideHistoryScreen extends StatefulWidget {
-  const RideHistoryScreen({super.key});
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({super.key});
 
   @override
-  State<RideHistoryScreen> createState() => _RideHistoryScreenState();
+  State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _RideHistoryScreenState extends State<RideHistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
@@ -29,9 +28,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       body: SafeArea(
         child: Consumer<BookingProvider>(
           builder: (context, provider, child) {
-            // Only upcoming rides
-            final upcomingRides = provider.rideHistory
-                .where((ride) => ['pending', 'accepted', 'arrived', 'started']
+            // Only completed and cancelled rides
+            final historyRides = provider.rideHistory
+                .where((ride) => ['completed', 'cancelled']
                     .contains(ride.status.toLowerCase()))
                 .toList();
 
@@ -43,31 +42,16 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: Row(
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, size: 30),
+                        onPressed: () => Navigator.pop(context),
+                      ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Rides',
+                        'History',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HistoryScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'History',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.secondary,
-                          ),
                         ),
                       ),
                     ],
@@ -75,9 +59,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 ),
                 const SizedBox(height: 24),
                 Expanded(
-                  child: provider.isLoading && upcomingRides.isEmpty
+                  child: provider.isLoading && historyRides.isEmpty
                       ? const Center(child: CircularProgressIndicator())
-                      : provider.error != null && upcomingRides.isEmpty
+                      : provider.error != null && historyRides.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -96,16 +80,16 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                                 ],
                               ),
                             )
-                          : upcomingRides.isEmpty
+                          : historyRides.isEmpty
                               ? const Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.directions_car_outlined,
+                                      Icon(Icons.history_outlined,
                                           size: 64, color: Colors.grey),
                                       SizedBox(height: 16),
                                       Text(
-                                        'No upcoming rides found!',
+                                        'No ride history found!',
                                         style: TextStyle(
                                             fontSize: 18, color: Colors.grey),
                                       ),
@@ -115,9 +99,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                               : ListView.builder(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16),
-                                  itemCount: upcomingRides.length,
+                                  itemCount: historyRides.length,
                                   itemBuilder: (context, index) {
-                                    final ride = upcomingRides[index];
+                                    final ride = historyRides[index];
                                     return _buildRideCard(ride);
                                   },
                                 ),
@@ -131,6 +115,17 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   }
 
   Widget _buildRideCard(RideModel ride) {
+    // Get status color
+    Color statusColor;
+    String statusText;
+    if (ride.status.toLowerCase() == 'completed') {
+      statusColor = Colors.green;
+      statusText = 'Completed';
+    } else {
+      statusColor = Colors.red;
+      statusText = 'Cancelled';
+    }
+
     // Format date and time
     String dateStr = 'Unknown';
     String timeStr = '';
@@ -176,8 +171,8 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               Container(
                 width: 10,
                 height: 10,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFF9500),
+                decoration: BoxDecoration(
+                  color: statusColor,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -191,12 +186,19 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                   ),
                 ),
               ),
-              Text(
-                '₹${ride.fare.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.secondary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -251,105 +253,19 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                   color: AppColors.grey600,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: const BorderSide(color: Colors.red),
-                  ),
-                  icon: const Icon(
-                    Icons.cancel,
-                    color: Colors.red,
-                  ),
-                  onPressed: () async {
-                    // Show cancellation reason dialog
-                    String? reason = await showDialog<String>(
-                      context: context,
-                      builder: (context) => const CancelReasonDialog(),
-                    );
-                    if (reason != null && mounted) {
-                      await context
-                          .read<BookingProvider>()
-                          .cancelRide(ride.id, reason);
-                    }
-                  },
-                  label: const Text(
-                    'Cancel Ride',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              const Spacer(),
+              Text(
+                '₹${ride.fare.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.secondary,
                 ),
               ),
             ],
           ),
         ],
       ),
-    );
-  }
-}
-
-class CancelReasonDialog extends StatefulWidget {
-  const CancelReasonDialog({super.key});
-
-  @override
-  State<CancelReasonDialog> createState() => _CancelReasonDialogState();
-}
-
-class _CancelReasonDialogState extends State<CancelReasonDialog> {
-  final List<String> reasons = [
-    'Changed my mind',
-    'Found another ride',
-    'Pickup time too long',
-    'Driver not responding',
-    'Other'
-  ];
-  String? selectedReason;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Cancel Ride'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: reasons.map((reason) {
-          return ListTile(
-            title: Text(reason),
-            leading: Radio<String>(
-              value: reason,
-              groupValue: selectedReason,
-              onChanged: (value) {
-                setState(() {
-                  selectedReason = value;
-                });
-              },
-            ),
-          );
-        }).toList(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Back'),
-        ),
-        ElevatedButton(
-          onPressed: selectedReason == null
-              ? null
-              : () => Navigator.pop(context, selectedReason),
-          child: const Text('Confirm'),
-        ),
-      ],
     );
   }
 }

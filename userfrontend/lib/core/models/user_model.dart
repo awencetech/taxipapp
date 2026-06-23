@@ -8,6 +8,11 @@ class UserModel {
   final String? gender;
   final DateTime? dateOfBirth;
   final String? referralCode;
+  final double ratings;
+  final int numReviews;
+  final int totalRides;
+  final int rewards;
+  final String membershipStatus;
 
   UserModel({
     required this.id,
@@ -19,6 +24,11 @@ class UserModel {
     this.gender,
     this.dateOfBirth,
     this.referralCode,
+    this.ratings = 5.0,
+    this.numReviews = 0,
+    this.totalRides = 0,
+    this.rewards = 0,
+    this.membershipStatus = 'Bronze',
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -32,6 +42,11 @@ class UserModel {
       gender: map['gender'],
       dateOfBirth: map['dateOfBirth'] != null ? DateTime.parse(map['dateOfBirth']) : null,
       referralCode: map['referralCode'],
+      ratings: (map['ratings'] as num?)?.toDouble() ?? 5.0,
+      numReviews: (map['numReviews'] as num?)?.toInt() ?? 0,
+      totalRides: (map['totalRides'] as num?)?.toInt() ?? 0,
+      rewards: (map['rewards'] as num?)?.toInt() ?? 0,
+      membershipStatus: map['membershipStatus'] ?? 'Bronze',
     );
   }
 
@@ -46,6 +61,11 @@ class UserModel {
       'gender': gender,
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'referralCode': referralCode,
+      'ratings': ratings,
+      'numReviews': numReviews,
+      'totalRides': totalRides,
+      'rewards': rewards,
+      'membershipStatus': membershipStatus,
     };
   }
 
@@ -59,6 +79,11 @@ class UserModel {
     String? gender,
     DateTime? dateOfBirth,
     String? referralCode,
+    double? ratings,
+    int? numReviews,
+    int? totalRides,
+    int? rewards,
+    String? membershipStatus,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -70,6 +95,11 @@ class UserModel {
       gender: gender ?? this.gender,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       referralCode: referralCode ?? this.referralCode,
+      ratings: ratings ?? this.ratings,
+      numReviews: numReviews ?? this.numReviews,
+      totalRides: totalRides ?? this.totalRides,
+      rewards: rewards ?? this.rewards,
+      membershipStatus: membershipStatus ?? this.membershipStatus,
     );
   }
 }

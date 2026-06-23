@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../screens/google_onboarding_screen.dart';
+import '../booking/home_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -18,6 +22,38 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   late Animation<Offset> _slideAnimation;
+
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.loginWithGoogle();
+
+    if (mounted) {
+      if (result['success'] == true) {
+        if (result['isNewUser'] == true) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GoogleOnboardingScreen(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Google sign in failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -35,8 +71,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
 
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero)
-        .animate(
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
@@ -87,8 +123,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      Colors.black.withValues(alpha: 0.25),
+                                  color: Colors.black.withValues(alpha: 0.25),
                                   blurRadius: 32,
                                   offset: const Offset(0, 16),
                                 ),
@@ -218,8 +253,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               color: AppColors.card.withValues(alpha: 0.2),
                             ),
                           ),
-                          icon: const Icon(FontAwesomeIcons.google),
-                          onPressed: () {},
+                          icon: const FaIcon(FontAwesomeIcons.google),
+                          onPressed: _handleGoogleSignIn,
                           label: const Text(
                             "Continue with Google",
                             style: TextStyle(
@@ -229,28 +264,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.card,
-                            side: BorderSide(
-                              color: AppColors.card.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          icon: const Icon(FontAwesomeIcons.apple),
-                          onPressed: () {},
-                          label: const Text(
-                            "Continue with Apple",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
+
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: () {},

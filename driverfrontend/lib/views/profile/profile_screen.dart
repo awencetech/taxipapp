@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'edit_profile_screen.dart';
 import '../vehicle/vehicle_management_screen.dart';
@@ -12,6 +13,33 @@ import 'bank_details_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<XFile?> _cropImage(BuildContext context, String imagePath) async {
+    CroppedFile? croppedFile = await ImageCropper().cropImage(
+      sourcePath: imagePath,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      compressQuality: 100,
+      maxWidth: 500,
+      maxHeight: 500,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Image',
+          toolbarColor: const Color(0xFFFF6D00),
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(title: 'Crop Image'),
+        WebUiSettings(context: context),
+      ],
+    );
+
+    if (croppedFile != null) {
+      return XFile(croppedFile.path);
+    }
+
+    return null;
+  }
 
   Future<void> _showImagePickerOptions(BuildContext context) async {
     final picker = ImagePicker();
@@ -41,9 +69,19 @@ class ProfileScreen extends StatelessWidget {
                   label: 'Camera',
                   onTap: () async {
                     Navigator.pop(context);
-                    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
                     if (image != null) {
-                      await authViewModel.updateDriverProfile(profilePicFile: image);
+                      final XFile? croppedImage = await _cropImage(
+                        context,
+                        image.path,
+                      );
+                      if (croppedImage != null) {
+                        await authViewModel.updateDriverProfile(
+                          profilePicFile: croppedImage,
+                        );
+                      }
                     }
                   },
                 ),
@@ -53,9 +91,19 @@ class ProfileScreen extends StatelessWidget {
                   label: 'Gallery',
                   onTap: () async {
                     Navigator.pop(context);
-                    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
                     if (image != null) {
-                      await authViewModel.updateDriverProfile(profilePicFile: image);
+                      final XFile? croppedImage = await _cropImage(
+                        context,
+                        image.path,
+                      );
+                      if (croppedImage != null) {
+                        await authViewModel.updateDriverProfile(
+                          profilePicFile: croppedImage,
+                        );
+                      }
                     }
                   },
                 ),
@@ -67,7 +115,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPickerOption(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildPickerOption(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -126,7 +179,11 @@ class ProfileScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       onPressed: () {
                         // For tabbed navigation, we want to go back to the home tab
                         // or if it's pushed, just pop.
@@ -158,13 +215,24 @@ class ProfileScreen extends StatelessWidget {
                         child: CircleAvatar(
                           radius: 65,
                           backgroundColor: Colors.white,
-                          backgroundImage: (driver?.profilePic != null && driver!.profilePic!.isNotEmpty)
+                          backgroundImage:
+                              (driver?.profilePic != null &&
+                                  driver!.profilePic!.isNotEmpty)
                               ? (driver.profilePic!.startsWith('http')
-                                  ? CachedNetworkImageProvider(driver.profilePic!)
-                                  : FileImage(File(driver.profilePic!)) as ImageProvider)
+                                    ? CachedNetworkImageProvider(
+                                        driver.profilePic!,
+                                      )
+                                    : FileImage(File(driver.profilePic!))
+                                          as ImageProvider)
                               : null,
-                          child: (driver?.profilePic == null || driver!.profilePic!.isEmpty)
-                              ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                          child:
+                              (driver?.profilePic == null ||
+                                  driver!.profilePic!.isEmpty)
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: Colors.grey,
+                                )
                               : null,
                         ),
                       ),
@@ -195,7 +263,6 @@ class ProfileScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 100), // Space for the overlapping avatar
-
             // Profile Info Card
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -242,7 +309,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFF6D00),
                       borderRadius: BorderRadius.circular(20),
@@ -289,7 +359,9 @@ class ProfileScreen extends StatelessWidget {
                     context,
                     Icons.location_on_outlined,
                     'Address',
-                    driver?.address.isNotEmpty == true ? driver!.address : 'Koramangala, Bangalore,\nKarnataka',
+                    driver?.address.isNotEmpty == true
+                        ? driver!.address
+                        : 'Koramangala, Bangalore,\nKarnataka',
                     Colors.purple,
                   ),
                   _buildDetailItem(
@@ -317,10 +389,15 @@ class ProfileScreen extends StatelessWidget {
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => BankDetailsScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => BankDetailsScreen(),
+                              ),
                             );
                           },
-                          child: const Text('View/Edit', style: TextStyle(color: Color(0xFFFF6D00))),
+                          child: const Text(
+                            'View/Edit',
+                            style: TextStyle(color: Color(0xFFFF6D00)),
+                          ),
                         ),
                       ],
                     ),
@@ -333,9 +410,15 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          _buildBankInfoRow(Icons.account_balance, driver?.bankName ?? ''),
+                          _buildBankInfoRow(
+                            Icons.account_balance,
+                            driver?.bankName ?? '',
+                          ),
                           const SizedBox(height: 12),
-                          _buildBankInfoRow(Icons.numbers, '**** **** ${driver?.accountNumber.substring(driver.accountNumber.length - 4)}'),
+                          _buildBankInfoRow(
+                            Icons.numbers,
+                            '**** **** ${driver?.accountNumber.substring(driver.accountNumber.length - 4)}',
+                          ),
                         ],
                       ),
                     ),
@@ -349,7 +432,9 @@ class ProfileScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.edit_note, color: Colors.white),
@@ -375,24 +460,28 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   _buildBottomAction(
                     context,
-                    Icons.directions_car_filled_outlined, 
+                    Icons.directions_car_filled_outlined,
                     'Vehicle Management',
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const VehicleManagementScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const VehicleManagementScreen(),
+                        ),
                       );
                     },
                   ),
                   const SizedBox(height: 12),
                   _buildBottomAction(
                     context,
-                    Icons.star_outline, 
+                    Icons.star_outline,
                     'Ratings & Reviews',
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const RatingsReviewsScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const RatingsReviewsScreen(),
+                        ),
                       );
                     },
                   ),
@@ -419,15 +508,18 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(color: theme.hintColor, fontSize: 11),
-        ),
+        Text(label, style: TextStyle(color: theme.hintColor, fontSize: 11)),
       ],
     );
   }
 
-  Widget _buildDetailItem(BuildContext context, IconData icon, String label, String value, Color iconColor) {
+  Widget _buildDetailItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    Color iconColor,
+  ) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -468,7 +560,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomAction(BuildContext context, IconData icon, String title, {required VoidCallback onTap}) {
+  Widget _buildBottomAction(
+    BuildContext context,
+    IconData icon,
+    String title, {
+    required VoidCallback onTap,
+  }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return GestureDetector(
@@ -519,5 +616,3 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-
-

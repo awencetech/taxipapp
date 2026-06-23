@@ -26,18 +26,68 @@ class RideModel {
   });
 
   factory RideModel.fromMap(Map<String, dynamic> map) {
+    // Helper function to parse double
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        return double.tryParse(value) ?? 0.0;
+      }
+      return 0.0;
+    }
+
+    // Helper function to get address from location
+    String getAddress(dynamic location) {
+      if (location is Map) {
+        if (location['address'] != null) return location['address'].toString();
+        if (location['locationAddress'] != null) return location['locationAddress'].toString();
+      }
+      return '';
+    }
+
+    // Get userId
+    String userId = '';
+    String? userName;
+    if (map['user'] is Map) {
+      userId = map['user']['_id']?.toString() ?? '';
+      userName = map['user']['name']?.toString();
+    } else if (map['user'] != null) {
+      userId = map['user'].toString();
+    }
+
+    // Get driverId
+    String? driverId;
+    if (map['driver'] is Map) {
+      driverId = map['driver']['_id']?.toString();
+    } else if (map['driver'] != null) {
+      driverId = map['driver'].toString();
+    }
+
+    // Get pickup and drop addresses
+    String pickupAddress = getAddress(map['pickupLocation']);
+    String dropAddress = getAddress(map['dropLocation']);
+
+    // Fallback to direct address fields if needed
+    if (pickupAddress.isEmpty && map['pickupAddress'] != null) {
+      pickupAddress = map['pickupAddress'].toString();
+    }
+    if (dropAddress.isEmpty && map['dropAddress'] != null) {
+      dropAddress = map['dropAddress'].toString();
+    }
+
     return RideModel(
-      id: map['_id'] ?? map['id'] ?? '',
-      userId: map['user'] is Map ? map['user']['_id'] : (map['user'] ?? ''),
-      userName: map['user'] is Map ? map['user']['name'] : null,
-      driverId: map['driver'] is Map ? map['driver']['_id'] : map['driver'],
-      pickupAddress: map['pickupLocation']?['address'] ?? '',
-      dropAddress: map['dropLocation']?['address'] ?? '',
-      fare: (map['fare'] ?? 0.0).toDouble(),
-      distance: (map['distance'] ?? 0.0).toDouble(),
-      status: map['status'] ?? 'pending',
-      otp: map['otp'],
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
+      id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
+      userId: userId,
+      userName: userName,
+      driverId: driverId,
+      pickupAddress: pickupAddress,
+      dropAddress: dropAddress,
+      fare: parseDouble(map['fare']),
+      distance: map['distance'] != null ? parseDouble(map['distance']) : null,
+      status: map['status']?.toString().toLowerCase() ?? 'pending',
+      otp: map['otp']?.toString(),
+      createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'].toString()) : null,
     );
   }
 

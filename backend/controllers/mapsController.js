@@ -1,4 +1,4 @@
-const { getAutocompleteSuggestions, getPlaceDetails } = require('../services/mapsService');
+const { getAutocompleteSuggestions, getPlaceDetails, getDistanceMatrix, getDirections } = require('../services/mapsService');
 
 const autocomplete = async (req, res) => {
   try {
@@ -28,4 +28,38 @@ const placeDetails = async (req, res) => {
   }
 };
 
-module.exports = { autocomplete, placeDetails };
+const distance = async (req, res) => {
+  try {
+    const { originLat, originLng, destLat, destLng } = req.query;
+    if (!originLat || !originLng || !destLat || !destLng) {
+      return res.status(400).json({ success: false, message: 'Origin and destination coordinates are required' });
+    }
+
+    const data = await getDistanceMatrix(
+      { lat: parseFloat(originLat), lng: parseFloat(originLng) },
+      { lat: parseFloat(destLat), lng: parseFloat(destLng) }
+    );
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const directions = async (req, res) => {
+  try {
+    const { originLat, originLng, destLat, destLng } = req.query;
+    if (!originLat || !originLng || !destLat || !destLng) {
+      return res.status(400).json({ success: false, message: 'Origin and destination coordinates are required' });
+    }
+
+    const data = await getDirections(
+      { lat: parseFloat(originLat), lng: parseFloat(originLng) },
+      { lat: parseFloat(destLat), lng: parseFloat(destLng) }
+    );
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { autocomplete, placeDetails, distance, directions };

@@ -1,39 +1,47 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
+import 'dart:developer';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/place_prediction_model.dart';
 import '../models/place_details_model.dart';
+import 'api_service.dart';
 
 class GooglePlacesService {
-  static const String _apiKey = 'AIzaSyAZ0IMMHkEXG6PfafxQpkp38O3AgBRKZRg';
-  static const String _baseUrl = 'https://maps.googleapis.com/maps/api';
-  final Dio _dio = Dio();
+  final ApiService _apiService = ApiService();
+  final String _sessionToken = DateTime.now().millisecondsSinceEpoch.toString();
 
-  GooglePlacesService() {
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          return handler.next(options);
-        },
-      ),
-    );
-  }
+  GooglePlacesService();
 
   Future<List<PlacePrediction>> getPlacePredictions(
     String input,
   ) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/place/autocomplete/json',
+      log('Calling Backend Maps Autocomplete API for: $input',
+          name: 'GooglePlacesService');
+
+      final response = await _apiService.dio.get(
+        '/maps/autocomplete',
         queryParameters: {
           'input': input,
-          'key': _apiKey,
-          'types': '(cities)',
+          'sessionToken': _sessionToken,
         },
       );
 
+      log('Backend Maps API Response Status: ${response.statusCode}',
+          name: 'GooglePlacesService');
+      log('Backend Maps API Response Data: ${response.data}',
+          name: 'GooglePlacesService');
+
       if (response.statusCode == 200) {
+        // Check if there are any API errors
+        if (response.data['status'] != 'OK') {
+          throw Exception(
+              'Google Places API Error: ${response.data['status']}');
+        }
+
         final List predictions = response.data['predictions'];
+        log('Number of predictions found: ${predictions.length}',
+            name: 'GooglePlacesService');
+
         return predictions
             .map((json) => PlacePrediction.fromJson(json))
             .toList();
@@ -41,17 +49,17 @@ class GooglePlacesService {
         throw Exception('Failed to fetch predictions');
       }
     } catch (e) {
+      log('Error in getPlacePredictions: $e', name: 'GooglePlacesService');
       rethrow;
     }
   }
 
   Future<PlaceDetails> getPlaceDetails(String placeId) async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/place/details/json',
+      final response = await _apiService.dio.get(
+        '/maps/place-details',
         queryParameters: {
-          'place_id': placeId,
-          'key': _apiKey,
+          'placeId': placeId,
         },
       );
 

@@ -83,4 +83,27 @@ class GoogleMapsService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> getDirections(LatLng origin, LatLng destination) async {
+    final String url =
+        '${baseUrl.replaceAll('/api/v1', '')}/api/v1/maps/directions?originLat=${origin.latitude}&originLng=${origin.longitude}&destLat=${destination.latitude}&destLng=${destination.longitude}';
+
+    try {
+      developer.log('Fetching directions via proxy');
+      final headers = await _getHeaders();
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data;
+      } else {
+        developer.log('Proxy HTTP Error: ${response.statusCode}');
+        throw Exception(
+            'Failed to connect to Maps Proxy (${response.statusCode})');
+      }
+    } catch (e) {
+      developer.log('Proxy Directions Exception: $e');
+      rethrow;
+    }
+  }
 }

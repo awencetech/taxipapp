@@ -24,7 +24,7 @@ const estimateFare = async (req, res) => {
 
 const createRide = async (req, res) => {
   try {
-    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType } = req.body;
+    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod } = req.body;
     
     const ride = await Ride.create({
       user: req.user._id,
@@ -33,6 +33,8 @@ const createRide = async (req, res) => {
       fare,
       distance,
       duration,
+      vehicleType: vehicleType || 'standard',
+      paymentMethod: paymentMethod || 'cash',
       status: 'pending',
       otp: Math.floor(1000 + Math.random() * 9000).toString(),
     });
@@ -69,6 +71,40 @@ const createRide = async (req, res) => {
     res.status(201).json({
       status: 'success',
       data: { ride, nearbyDriversCount: nearbyDrivers.length, notificationsCount: notifications.length },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const cancelRide = async (req, res) => {
+  try {
+    const { rideId } = req.params;
+    const { reason } = req.body;
+    
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    // Check if ride is already cancelled or completed
+    if (['completed', 'cancelled'].includes(ride.status)) {
+      return res.status(400).json({ status: 'error', message: 'Ride cannot be cancelled' });
+    }
+
+    ride.status = 'cancelled';
+    ride.cancellationReason = reason;
+    await ride.save();
+
+    // Notify driver if assigned
+    if (ride.driver) {
+      const io = req.app.get('io');
+      io.to(ride.driver.toString()).emit('rideCancelled', { rideId: ride._id });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
     });
   } catch (error) {
     res.status(400).json({ status: 'error', message: error.message });
@@ -119,10 +155,24 @@ const getRide = async (req, res) => {
 const getDriverRides = async (req, res) => {
   try {
     const Driver = require('../models/Driver');
-    const driver = await Driver.findOne({ user: req.user._id });
+    let driver = await Driver.findOne({ user: req.user._id });
     
     if (!driver) {
-      return res.status(404).json({ status: 'fail', message: 'Driver not found' });
+      console.log('Driver not found, creating new driver for user:', req.user._id);
+      const uniqueTempLicense = `TEMP-LICENSE-${Date.now()}`;
+      driver = await Driver.create({
+        user: req.user._id,
+        licenseNumber: uniqueTempLicense,
+        vehicleType: 'Car',
+        vehicleNumber: 'TN 01 AB 1234',
+        address: '',
+        bankName: '',
+        accountHolderName: '',
+        accountNumber: '',
+        ifscCode: '',
+        branchName: '',
+      });
+      console.log('New driver created:', driver._id);
     }
 
     const rides = await Ride.find({ driver: driver._id })
@@ -135,4 +185,272 @@ const getDriverRides = async (req, res) => {
   }
 };
 
-module.exports = { estimateFare, createRide, updateRideStatus, getRide, getDriverRides };
+const getUserRides = async (req, res) => {
+  try {
+    const rides = await Ride.find({ user: req.user._id })
+      .populate('driver')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ status: 'success', data: { rides } });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+// ---------------------------
+// New Driver Specific APIs
+// ---------------------------
+
+const getDriverHistory = async (req, res) => {
+  try {
+    const Driver = require('../models/Driver');
+    let driver = await Driver.findOne({ user: req.user._id });
+
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
+    const rides = await Ride.find({
+      driver: driver._id
+    })
+      .populate('user')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      status: 'success',
+      data: { rides },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const getDriverCurrentRide = async (req, res) => {
+  try {
+    const Driver = require('../models/Driver');
+    let driver = await Driver.findOne({ user: req.user._id });
+
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
+    const ride = await Ride.findOne({
+      driver: driver._id,
+      status: { $in: ['accepted', 'arrived', 'started'] },
+    }).populate('user');
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const driverAcceptRide = async (req, res) => {
+  try {
+    const Driver = require('../models/Driver');
+    let driver = await Driver.findOne({ user: req.user._id });
+
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
+    const { rideId } = req.body;
+    const ride = await Ride.findById(rideId);
+
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    if (ride.status !== 'pending') {
+      return res.status(400).json({ status: 'error', message: 'Ride is not available' });
+    }
+
+    ride.driver = driver._id;
+    ride.status = 'accepted';
+    await ride.save();
+
+    const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('user');
+    io.to(populatedRide.user._id.toString()).emit('rideAccepted', populatedRide);
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride: populatedRide },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const driverRejectRide = async (req, res) => {
+  try {
+    const { rideId, reason } = req.body;
+    const ride = await Ride.findById(rideId);
+
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    if (['completed', 'cancelled'].includes(ride.status)) {
+      return res.status(400).json({ status: 'error', message: 'Ride cannot be rejected' });
+    }
+
+    ride.status = 'cancelled';
+    ride.cancellationReason = reason || 'Rejected by driver';
+    await ride.save();
+
+    if (ride.user) {
+      const io = req.app.get('io');
+      io.to(ride.user.toString()).emit('rideCancelled', { rideId: ride._id });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const driverArrived = async (req, res) => {
+  try {
+    const { rideId } = req.body;
+    const ride = await Ride.findById(rideId);
+
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    if (ride.status !== 'accepted') {
+      return res.status(400).json({ status: 'error', message: 'Ride not in accepted status' });
+    }
+
+    ride.status = 'arrived';
+    await ride.save();
+
+    const io = req.app.get('io');
+    if (ride.user) {
+      io.to(ride.user.toString()).emit('driverArrived', { rideId: ride._id });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const driverStartTrip = async (req, res) => {
+  try {
+    const { rideId } = req.body;
+    const ride = await Ride.findById(rideId);
+
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    if (ride.status !== 'arrived') {
+      return res.status(400).json({ status: 'error', message: 'Driver not at pickup' });
+    }
+
+    ride.status = 'started';
+    ride.startTime = Date.now();
+    await ride.save();
+
+    const io = req.app.get('io');
+    if (ride.user) {
+      io.to(ride.user.toString()).emit('tripStarted', { rideId: ride._id });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+const driverCompleteTrip = async (req, res) => {
+  try {
+    const { rideId } = req.body;
+    const ride = await Ride.findById(rideId);
+
+    if (!ride) {
+      return res.status(404).json({ status: 'error', message: 'Ride not found' });
+    }
+
+    if (ride.status !== 'started') {
+      return res.status(400).json({ status: 'error', message: 'Trip not started' });
+    }
+
+    ride.status = 'completed';
+    ride.endTime = Date.now();
+    await ride.save();
+
+    // Create notifications for both user and driver
+    const Driver = require('../models/Driver');
+    const driver = await Driver.findById(ride.driver);
+
+    // Notification for user
+    await Notification.create({
+      user: ride.user,
+      title: 'Trip Completed!',
+      message: 'Your trip has been completed successfully!',
+      type: 'ride',
+      data: { rideId: ride._id }
+    });
+
+    // Notification for driver
+    if (driver) {
+      await Notification.create({
+        user: driver.user,
+        title: 'Trip Completed!',
+        message: 'You have successfully completed a trip!',
+        type: 'ride',
+        data: { rideId: ride._id }
+      });
+    }
+
+    const io = req.app.get('io');
+    if (ride.user) {
+      io.to(ride.user.toString()).emit('tripCompleted', { rideId: ride._id });
+    }
+
+    if (driver && driver.user) {
+      io.to(driver.user.toString()).emit('tripCompleted', { rideId: ride._id });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { ride },
+    });
+  } catch (error) {
+    console.error('Complete Trip Error:', error);
+    res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+module.exports = {
+  estimateFare,
+  createRide,
+  cancelRide,
+  updateRideStatus,
+  getRide,
+  getDriverRides,
+  getUserRides,
+  getDriverHistory,
+  getDriverCurrentRide,
+  driverAcceptRide,
+  driverRejectRide,
+  driverArrived,
+  driverStartTrip,
+  driverCompleteTrip
+};
+// End of file

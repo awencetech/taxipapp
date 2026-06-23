@@ -13,6 +13,7 @@ class RideViewModel extends ChangeNotifier {
   StreamSubscription<Map<String, dynamic>>? _rideRequestSubscription;
 
   RideRequestModel? _incomingRequest;
+  RideRequestModel? _currentRide;
   bool _isOnline = false;
   bool _isLoading = false;
   int _onlineSeconds = 0;
@@ -26,10 +27,11 @@ class RideViewModel extends ChangeNotifier {
   String? _driverId;
 
   RideRequestModel? get incomingRequest => _incomingRequest;
+  RideRequestModel? get currentRide => _currentRide;
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
   int get onlineSeconds => _onlineSeconds;
-  
+
   String get onlineDuration {
     int minutes = _onlineSeconds ~/ 60;
     int seconds = _onlineSeconds % 60;
@@ -135,33 +137,155 @@ class RideViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      if (_driverId != null) {
-        _socketService.emit('acceptRide', {
-          'rideId': rideId,
-          'driverId': _driverId,
-        });
-      }
-
-      _incomingRequest = null;
-      notifyListeners();
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const TripNavigationScreen(isToPickup: true),
-        ),
+      final response = await _apiService.post(
+        AppConstants.driverAcceptRideUrl,
+        data: {'rideId': rideId},
       );
+
+      if (response.data['status'] == 'success') {
+        _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+        _incomingRequest = null;
+        await fetchRideHistory(); // Refresh ride history to remove from pending
+        notifyListeners();
+
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TripNavigationScreen(isToPickup: true),
+            ),
+          );
+        }
+      }
     } catch (e) {
       debugPrint('Accept Ride Error: $e');
+      _error = e.toString();
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to accept ride: $e')));
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  void rejectRide() {
-    _incomingRequest = null;
+  Future<void> rejectRide(
+    String rideId, {
+    String reason = 'Rejected by driver',
+  }) async {
+    _isLoading = true;
     notifyListeners();
+    try {
+      await _apiService.post(
+        AppConstants.driverRejectRideUrl,
+        data: {'rideId': rideId, 'reason': reason},
+      );
+
+      _incomingRequest = null;
+      await fetchRideHistory(); // Refresh ride history
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Reject Ride Error: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> arrivedAtPickup() async {
+    if (_currentRide == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.post(
+        AppConstants.driverArrivedUrl,
+        data: {'rideId': _currentRide!.id},
+      );
+
+      if (response.data['status'] == 'success') {
+        _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Arrived Error: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> startTrip() async {
+    if (_currentRide == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.post(
+        AppConstants.driverStartTripUrl,
+        data: {'rideId': _currentRide!.id},
+      );
+
+      if (response.data['status'] == 'success') {
+        _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Start Trip Error: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> completeTrip(BuildContext context) async {
+    if (_currentRide == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.post(
+        AppConstants.driverCompleteTripUrl,
+        data: {'rideId': _currentRide!.id},
+      );
+
+      if (response.data['status'] == 'success') {
+        _currentRide = null;
+        await fetchRideHistory();
+        notifyListeners();
+
+        if (context.mounted) {
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('Complete Trip Error: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchCurrentRide() async {
+    try {
+      final response = await _apiService.get(AppConstants.driverCurrentRideUrl);
+      if (response.data['status'] == 'success' &&
+          response.data['data']['ride'] != null) {
+        _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Fetch Current Ride Error: $e');
+    }
   }
 
   Future<void> fetchRideHistory() async {
@@ -170,10 +294,22 @@ class RideViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.get(AppConstants.driverRidesUrl);
+      final response = await _apiService.get(AppConstants.driverHistoryUrl);
+      debugPrint('Ride history response: ${response.data}');
 
-      if (response.data['success'] == true) {
-        final List<dynamic>? ridesData = response.data['data']?['rides'];
+      // Handle both response formats
+      bool isSuccess = false;
+      List<dynamic>? ridesData;
+
+      if (response.data['status'] == 'success') {
+        isSuccess = true;
+        ridesData = response.data['data']?['rides'];
+      } else if (response.data['success'] == true) {
+        isSuccess = true;
+        ridesData = response.data['data']?['rides'];
+      }
+
+      if (isSuccess) {
         _rideHistory = ridesData != null
             ? ridesData.map((ride) => RideRequestModel.fromJson(ride)).toList()
             : [];
@@ -182,6 +318,7 @@ class RideViewModel extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
+      debugPrint('Ride history error: $e');
       _error = e.toString();
     } finally {
       _isLoading = false;

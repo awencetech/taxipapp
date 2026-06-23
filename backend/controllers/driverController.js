@@ -237,76 +237,72 @@ const deleteDocument = async (req, res) => {
 };
 
 const getDriverProfile = async (req, res) => {
-  try {
-    let driver = await Driver.findOne({ user: req.user._id });
-    
-    // If driver doesn't exist, create a new one
-    if (!driver) {
-      console.log('Driver not found, creating new driver for user:', req.user._id);
-      driver = await Driver.create({
-        user: req.user._id,
-        licenseNumber: 'TEMP-LICENSE-123',
-        vehicleType: 'Car',
-        vehicleNumber: 'TN 01 AB 1234',
-        address: '',
-        bankName: '',
-        accountHolderName: '',
-        accountNumber: '',
-        ifscCode: '',
-        branchName: '',
-      });
-      console.log('New driver created:', driver._id);
-    }
-    
-    const user = await User.findById(req.user._id);
-
-    // Backward compatibility: if old single fields exist and bankAccounts is empty, migrate to bankAccounts
-    if (driver && (!driver.bankAccounts || driver.bankAccounts.length === 0)) {
-      if (driver.bankName && driver.accountNumber) {
-        driver.bankAccounts = [{
-          bankName: driver.bankName,
-          accountHolderName: driver.accountHolderName,
-          accountNumber: driver.accountNumber,
-          ifscCode: driver.ifscCode,
-          branchName: driver.branchName
-        }];
-        await driver.save();
+    try {
+      let driver = await Driver.findOne({ user: req.user._id });
+      
+      if (!driver) {
+        console.log('Driver not found, creating new driver for user:', req.user._id);
+        const uniqueTempLicense = `TEMP-LICENSE-${Date.now()}`;
+        driver = await Driver.create({
+          user: req.user._id,
+          licenseNumber: uniqueTempLicense,
+          vehicleType: 'Car',
+          vehicleNumber: 'TN 01 AB 1234',
+          address: '',
+          bankName: '',
+          accountHolderName: '',
+          accountNumber: '',
+          ifscCode: '',
+          branchName: '',
+        });
+        console.log('New driver created:', driver._id);
       }
-    }
+      
+      const user = await User.findById(req.user._id);
 
-    res.status(200).json({
-      success: true,
-      data: {
-        user: {
-          _id: user._id,
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          profilePic: user.profilePic,
-          isOnline: driver?.isOnline || false,
-          vehicleType: driver?.vehicleType || 'Car',
-          vehicleNumber: driver?.vehicleNumber || 'TN 01 AB 1234',
-          ratings: driver?.ratings || 5.0,
-          address: driver?.address || '',
-          // For backward compatibility
-          bankName: driver?.bankName || '',
-          accountHolderName: driver?.accountHolderName || '',
-          accountNumber: driver?.accountNumber || '',
-          ifscCode: driver?.ifscCode || '',
-          branchName: driver?.branchName || '',
-          // New: Multiple bank accounts
-          bankAccounts: driver?.bankAccounts || [],
-          // Documents
-          documents: driver?.documents || []
+      if (driver && (!driver.bankAccounts || driver.bankAccounts.length === 0)) {
+        if (driver.bankName && driver.accountNumber) {
+          driver.bankAccounts = [{
+            bankName: driver.bankName,
+            accountHolderName: driver.accountHolderName,
+            accountNumber: driver.accountNumber,
+            ifscCode: driver.ifscCode,
+            branchName: driver.branchName
+          }];
+          await driver.save();
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user: {
+            _id: user._id,
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            mobile: user.mobile,
+            profilePic: user.profilePic,
+            isOnline: driver?.isOnline || false,
+            vehicleType: driver?.vehicleType || 'Car',
+            vehicleNumber: driver?.vehicleNumber || 'TN 01 AB 1234',
+            ratings: driver?.ratings || 5.0,
+            address: driver?.address || '',
+            bankName: driver?.bankName || '',
+            accountHolderName: driver?.accountHolderName || '',
+            accountNumber: driver?.accountNumber || '',
+            ifscCode: driver?.ifscCode || '',
+            branchName: driver?.branchName || '',
+            bankAccounts: driver?.bankAccounts || [],
+            documents: driver?.documents || []
+          },
         },
-      },
-    });
-  } catch (error) {
-    console.error('getDriverProfile error:', error);
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+      });
+    } catch (error) {
+      console.error('getDriverProfile error:', error);
+      res.status(400).json({ success: false, message: error.message });
+    }
+  };
 
 const updateStatus = async (req, res) => {
   try {
@@ -393,8 +389,13 @@ const registerDriver = async (req, res) => {
 const getDriverRideHistory = async (req, res) => {
   // Trigger nodemon
   try {
-    // For testing, return all rides without requiring driver record
-    const rides = await Ride.find()
+    const driver = await Driver.findOne({ user: req.user._id });
+    
+    if (!driver) {
+      return res.status(404).json({ success: false, message: 'Driver not found' });
+    }
+
+    const rides = await Ride.find({ driver: driver._id })
       .populate('user')
       .sort('-createdAt');
     

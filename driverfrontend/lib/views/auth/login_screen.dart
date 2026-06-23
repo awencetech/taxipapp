@@ -337,9 +337,9 @@ class _LoginScreenState extends State<LoginScreen> {
         // Social Buttons
         Row(
           children: [
-            _buildSocialButton('Google', Icons.g_mobiledata, Colors.red, _handleGoogleLogin),
-            const SizedBox(width: 16),
-            _buildSocialButton('Apple', Icons.apple, Colors.black, () {}),
+            Expanded(
+              child: _buildSocialButton('Google', Icons.g_mobiledata, Colors.red, _handleGoogleLogin),
+            ),
           ],
         ),
 

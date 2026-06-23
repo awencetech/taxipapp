@@ -18,20 +18,23 @@ class ApiService {
     }
   }
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      validateStatus: (status) => status! < 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ),
-  );
+  late final Dio _dio;
+
+  Dio get dio => _dio;
 
   ApiService() {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        validateStatus: (status) => status! < 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -253,7 +256,7 @@ class ApiService {
   // Rides
   Future<Response> bookRide(Map<String, dynamic> data) async {
     try {
-      return await _dio.post('/rides/create', data: data);
+      return await _dio.post('/rides/create', data: jsonEncode(data));
     } catch (e) {
       developer.log('BookRide error: $e');
       rethrow;
@@ -274,9 +277,22 @@ class ApiService {
     Map<String, dynamic> data,
   ) async {
     try {
-      return await _dio.put('/rides/$rideId/status', data: data);
+      return await _dio.put('/rides/$rideId/status', data: jsonEncode(data));
     } catch (e) {
       developer.log('UpdateRideStatus error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Response> cancelRide(
+    String rideId,
+    String reason,
+  ) async {
+    try {
+      return await _dio.put('/rides/$rideId/cancel',
+          data: jsonEncode({'reason': reason}));
+    } catch (e) {
+      developer.log('CancelRide error: $e');
       rethrow;
     }
   }
@@ -420,6 +436,42 @@ class ApiService {
     }
   }
 
+  Future<Response> getNotifications() async {
+    try {
+      return await _dio.get('/users/notifications');
+    } catch (e) {
+      developer.log('GetNotifications error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Response> markNotificationAsRead(String id) async {
+    try {
+      return await _dio.put('/users/notifications/$id/read');
+    } catch (e) {
+      developer.log('MarkNotificationAsRead error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Response> markAllNotificationsAsRead() async {
+    try {
+      return await _dio.put('/users/notifications/mark-all-read');
+    } catch (e) {
+      developer.log('MarkAllNotificationsAsRead error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Response> deleteNotification(String id) async {
+    try {
+      return await _dio.delete('/users/notifications/$id');
+    } catch (e) {
+      developer.log('DeleteNotification error: $e');
+      rethrow;
+    }
+  }
+
   // Security
   Future<Response> changePassword(Map<String, dynamic> data) async {
     try {
@@ -504,7 +556,8 @@ class ApiService {
     }
   }
 
-  Future<Response> sendTicketMessage(String id, Map<String, dynamic> data) async {
+  Future<Response> sendTicketMessage(
+      String id, Map<String, dynamic> data) async {
     try {
       return await _dio.post('/users/tickets/$id/messages', data: data);
     } catch (e) {

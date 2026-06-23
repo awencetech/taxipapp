@@ -5,6 +5,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/primary_button.dart';
 import '../../features/booking/home_screen.dart';
+import '../../screens/google_onboarding_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +20,39 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.loginWithGoogle();
+
+    if (mounted) {
+      if (result['success'] == true) {
+        if (result['isNewUser'] == true) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GoogleOnboardingScreen(),
+            ),
+          );
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+            (route) => false,
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Google sign in failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
   void _signup() async {
     final authProvider = context.read<AuthProvider>();
@@ -187,7 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: _handleGoogleSignIn,
                 icon: const FaIcon(FontAwesomeIcons.google,
                     color: AppColors.black, size: 20),
                 label: const Text('Sign up with Google',

@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/providers/address_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'search_destination_screen.dart';
 import 'ride_history_screen.dart';
 import 'wallet_screen.dart';
 import 'support_screen.dart';
 import 'profile_screen.dart';
+import 'saved_addresses_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   GoogleMapController? _mapController;
   int _selectedIndex = 0;
   bool _isDraggingBottomSheet = false; // Track bottom sheet drag state
+  bool _hasClearedRecentDestinations = false;
 
   // Ride options data
   final List<Map<String, dynamic>> rideOptions = const [
@@ -106,7 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _getCurrentLocation();
+      if (mounted) {
+        _getCurrentLocation();
+        Provider.of<BookingProvider>(context, listen: false).fetchRideHistory();
+      }
     });
   }
 
@@ -364,96 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 24),
                         // Ride Options
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Ride Options',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.black,
-                              ),
-                            ),
-                            Text(
-                              'View All',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Ride options grid
-                        GridView.count(
-                          crossAxisCount: 3,
-                          shrinkWrap: true,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          padding: EdgeInsets.zero,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio:
-                              0.9, // Adjust aspect ratio to prevent overflow
-                          children: rideOptions.map((ride) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.grey100,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: ride['color'],
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      ride['icon'],
-                                      color: AppColors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    ride['name'],
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.black,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    ride['price'],
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.black,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 24),
-                        // Saved Places
-                        const Text(
-                          'Saved Places',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ...savedPlaces.map((place) {
+                        ...rideOptions.map((ride) {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(16),
@@ -463,41 +380,97 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             child: Row(
                               children: [
+                                // Vehicle Image
                                 Container(
-                                  width: 52,
-                                  height: 52,
+                                  width: 70,
+                                  height: 70,
                                   decoration: BoxDecoration(
-                                    color: place['color'],
-                                    shape: BoxShape.circle,
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Icon(
-                                    place['icon'],
-                                    color: AppColors.white,
-                                    size: 28,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      'https://picsum.photos/seed/${ride['name']}/200/200',
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          decoration: BoxDecoration(
+                                            color: ride['color'],
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(
+                                            ride['icon'],
+                                            color: AppColors.white,
+                                            size: 36,
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
+                                // Details
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        place['name'],
+                                        ride['name'],
                                         style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
+                                          color: AppColors.black,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        place['address'],
+                                        'For groups & luggage',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: AppColors.grey600,
                                         ),
                                       ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.people,
+                                              size: 16,
+                                              color: AppColors.grey400),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '6 passengers',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.grey400,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Icon(Icons.timer,
+                                              size: 16,
+                                              color: AppColors.grey400),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '13 min',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.grey400,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ],
+                                  ),
+                                ),
+                                // Price
+                                Text(
+                                  ride['price'],
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.black,
                                   ),
                                 ),
                               ],
@@ -505,152 +478,269 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }),
                         const SizedBox(height: 24),
-                        // Special Offer
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFFFF6B35), Color(0xFFEC4400)],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 12,
-                                offset: Offset(0, 6),
+                        // Saved Places
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Saved Places',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Special Offer!',
-                                      style: TextStyle(
-                                        color: AppColors.white,
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Get 50% off on your next ride',
-                                      style: TextStyle(
-                                        color: AppColors.white
-                                            .withValues(alpha: 0.9),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 24, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.white,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'View Offers',
-                                        style: TextStyle(
-                                          color: Color(0xFFFF6B35),
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const SavedAddressesScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Add',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Consumer<AddressProvider>(
+                          builder: (context, addressProvider, child) {
+                            if (addressProvider.addresses.isEmpty) {
+                              return Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey100,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'No saved addresses yet. Tap "Add" to add one!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: AppColors.grey600),
+                                  ),
+                                ),
+                              );
+                            }
+                            return Column(
+                              children:
+                                  addressProvider.addresses.map((address) {
+                                IconData icon;
+                                Color color;
+                                switch (address.type) {
+                                  case 'home':
+                                    icon = Icons.home;
+                                    color = AppColors.secondary;
+                                    break;
+                                  case 'work':
+                                    icon = Icons.work;
+                                    color = const Color(0xFF4A90E2);
+                                    break;
+                                  default:
+                                    icon = Icons.location_on;
+                                    color = const Color(0xFF9B59B6);
+                                    break;
+                                }
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.grey100,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          color: color,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          icon,
+                                          color: AppColors.white,
+                                          size: 28,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: AppColors.white.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.local_offer,
-                                  color: AppColors.white,
-                                  size: 32,
-                                ),
-                              ),
-                            ],
-                          ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              address.label,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              address.address,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.grey600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
                         ),
                         const SizedBox(height: 24),
                         // Recent Destinations
-                        const Text(
-                          'Recent Destinations',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Recent Destinations',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (!_hasClearedRecentDestinations)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _hasClearedRecentDestinations = true;
+                                  });
+                                },
+                                child: const Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.grey600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 16),
-                        ...recentDestinations.map((dest) {
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
+                        Consumer<BookingProvider>(
+                          builder: (context, bookingProvider, child) {
+                            if (_hasClearedRecentDestinations) {
+                              return Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey100,
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 52,
-                                  height: 52,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.grey100,
-                                    shape: BoxShape.circle,
+                                child: const Center(
+                                  child: Text(
+                                    'No recent destinations yet. Start booking rides!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: AppColors.grey600),
                                   ),
-                                  child: const Icon(Icons.location_pin,
-                                      color: AppColors.secondary, size: 28),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        dest['name'],
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                              );
+                            }
+
+                            // Get completed rides as recent destinations
+                            final completedRides = bookingProvider.rideHistory
+                                .where((ride) => ['completed', 'cancelled']
+                                    .contains(ride.status.toLowerCase()))
+                                .toList()
+                              ..sort((a, b) =>
+                                  b.createdAt != null && a.createdAt != null
+                                      ? b.createdAt!.compareTo(a.createdAt!)
+                                      : 0);
+                            // Take last 3
+                            final recentRides = completedRides.take(3).toList();
+
+                            if (recentRides.isEmpty) {
+                              return Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey100,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'No recent destinations yet. Start booking rides!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: AppColors.grey600),
+                                  ),
+                                ),
+                              );
+                            }
+                            return Column(
+                              children: recentRides.map((ride) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black12,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${dest['distance']} • ${dest['duration']}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.grey600,
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.grey100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.location_pin,
+                                            color: AppColors.secondary,
+                                            size: 28),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              ride.dropAddress,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              ride.distance != null
+                                                  ? '${ride.distance!.toStringAsFixed(1)} km • 10 min'
+                                                  : 'N/A',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.grey600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                if (dest['isFavorite'] == true)
-                                  const Icon(Icons.star,
-                                      color: Color(0xFFFFD300), size: 28),
-                              ],
-                            ),
-                          );
-                        }),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   );

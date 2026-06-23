@@ -27,12 +27,16 @@ class AppConstants {
   static const String editDocumentUrl = '/drivers/documents/:docId';
   static const String deleteDocumentUrl = '/drivers/documents/:docId';
 
+  // Ride APIs
   static const String nearbyRidesUrl = '/rides/nearby';
-  static const String acceptRideUrl = '/rides/accept';
-  static const String rejectRideUrl = '/rides/reject';
-  static const String startTripUrl = '/trip/start';
-  static const String endTripUrl = '/trip/end';
-  static const String driverRidesUrl = '/drivers/rides';
+  static const String driverAcceptRideUrl = '/rides/driver/accept';
+  static const String driverRejectRideUrl = '/rides/driver/reject';
+  static const String driverArrivedUrl = '/rides/driver/arrived';
+  static const String driverStartTripUrl = '/rides/driver/start-trip';
+  static const String driverCompleteTripUrl = '/rides/driver/complete-trip';
+  static const String driverCurrentRideUrl = '/rides/driver/current-ride';
+  static const String driverHistoryUrl = '/rides/driver/history';
+  static const String driverRidesUrl = '/rides/driver/my-rides';
 
   // Notification APIs
   static const String notificationsUrl = '/drivers/notifications';

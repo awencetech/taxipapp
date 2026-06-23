@@ -8,6 +8,7 @@ const { isMongoConnected } = require('../config/db');
 const GOOGLE_CLIENT_IDS = [
   '841081778086-uml93fplvoc5je0fgj1b1hfn8of0r1i3.apps.googleusercontent.com',
   '853680153976-bcn1s55141qhvn240c294qa5i85dva3o.apps.googleusercontent.com',
+  '1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com',
 ];
 const client = new OAuth2Client();
 
@@ -234,52 +235,61 @@ const resetPassword = async (req, res) => {
 
 const googleLogin = async (req, res) => {
   try {
+    let email, name, googleId, photoUrl;
     const { googleToken } = req.body;
 
-    if (!googleToken) {
-      return res.status(400).json({ success: false, message: 'Google token is required' });
-    }
-
-    let payload;
-    let lastError;
-    
-    for (const clientId of GOOGLE_CLIENT_IDS) {
-      try {
-        let ticket;
+    if (googleToken) {
+      let payload;
+      let lastError;
+      
+      for (const clientId of GOOGLE_CLIENT_IDS) {
         try {
-          ticket = await client.verifyIdToken({
-            idToken: googleToken,
-            audience: clientId,
-          });
-          payload = ticket.getPayload();
+          let ticket;
+          try {
+            ticket = await client.verifyIdToken({
+              idToken: googleToken,
+              audience: clientId,
+            });
+            payload = ticket.getPayload();
+          } catch (err) {
+            lastError = err;
+            const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${googleToken}`);
+            if (response.ok) {
+              payload = await response.json();
+              payload.sub = payload.sub || payload.id;
+              payload.email = payload.email;
+              payload.name = payload.name;
+              payload.picture = payload.picture;
+            }
+          }
+          
+          if (payload && payload.email) break;
         } catch (err) {
           lastError = err;
-          const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${googleToken}`);
-          if (response.ok) {
-            payload = await response.json();
-            payload.sub = payload.sub || payload.id;
-            payload.email = payload.email;
-            payload.name = payload.name;
-            payload.picture = payload.picture;
-          }
+          continue;
         }
-        
-        if (payload && payload.email) break;
-      } catch (err) {
-        lastError = err;
-        continue;
+      }
+
+      if (!payload || !payload.email) {
+        console.error('Google token verification failed:', lastError);
+        return res.status(400).json({ success: false, message: 'Invalid Google token' });
+      }
+
+      email = payload.email.toLowerCase();
+      name = payload.name || '';
+      googleId = payload.sub || payload.id;
+      photoUrl = payload.picture || payload.photoUrl;
+    } else {
+      // Fallback for when frontend sends data directly
+      email = req.body.email?.toLowerCase();
+      name = req.body.name;
+      googleId = req.body.googleId;
+      photoUrl = req.body.photoUrl;
+
+      if (!email || !googleId) {
+        return res.status(400).json({ success: false, message: 'Either googleToken or email+googleId are required' });
       }
     }
-
-    if (!payload || !payload.email) {
-      console.error('Google token verification failed:', lastError);
-      return res.status(400).json({ success: false, message: 'Invalid Google token' });
-    }
-
-    const email = payload.email.toLowerCase();
-    const name = payload.name || '';
-    const googleId = payload.sub || payload.id;
-    const photoUrl = payload.picture || payload.photoUrl;
 
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
@@ -333,7 +343,7 @@ const googleLogin = async (req, res) => {
 
 const completeProfile = async (req, res) => {
   try {
-    const { name, email, googleId, mobile, photoUrl } = req.body;
+    const { name, email, googleId, mobile, photoUrl, role = 'user' } = req.body;
 
     if (!email || !googleId || !name || !mobile) {
       return res.status(400).json({ 
@@ -350,6 +360,7 @@ const completeProfile = async (req, res) => {
       user.mobile = mobile;
       if (googleId) user.googleId = googleId;
       if (photoUrl) user.profilePic = photoUrl;
+      user.role = role;
       user.isVerified = true;
       await user.save();
     } else {
@@ -359,7 +370,7 @@ const completeProfile = async (req, res) => {
         googleId,
         mobile,
         profilePic: photoUrl || 'default-profile.png',
-        role: 'user',
+        role: role,
         isVerified: true
       });
       isNewUser = true;

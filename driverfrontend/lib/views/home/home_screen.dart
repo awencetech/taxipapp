@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/ride_viewmodel.dart';
+import '../../models/driver_models.dart';
 import '../../providers/location_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/map_layers_control.dart';
@@ -95,11 +96,7 @@ class HomeScreenState extends State<HomeScreen> {
     } catch (e, stack) {
       debugPrint('HomeScreen: Build Error: $e');
       debugPrint('HomeScreen: Stack Trace: $stack');
-      return Scaffold(
-        body: Center(
-          child: Text('Error rendering Home: $e'),
-        ),
-      );
+      return Scaffold(body: Center(child: Text('Error rendering Home: $e')));
     }
   }
 }
@@ -121,6 +118,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         if (authViewModel.driver != null) {
           context.read<RideViewModel>().initialize(authViewModel.driver!.id);
           context.read<RideViewModel>().fetchNotifications();
+          context.read<RideViewModel>().fetchRideHistory();
         }
       }
     });
@@ -131,7 +129,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     try {
       final rideViewModel = context.watch<RideViewModel>();
       debugPrint('HomeDashboard: Building. isOnline=${rideViewModel.isOnline}');
-      
+
       return rideViewModel.isOnline ? _buildOnlineUI() : _buildOfflineUI();
     } catch (e, stack) {
       debugPrint('HomeDashboard: Build Error: $e');
@@ -145,10 +143,265 @@ class _HomeDashboardState extends State<HomeDashboard> {
     }
   }
 
+  Widget _buildRideCard(RideRequestModel ride, {bool showActions = false}) {
+    final List<Color> avatarColors = [
+      Colors.amber,
+      Colors.orange,
+      Colors.blue,
+      Colors.teal,
+      Colors.purple,
+      Colors.pink,
+    ];
+    final colorIndex = ride.id.hashCode % avatarColors.length;
+    final avatarColor = avatarColors[colorIndex];
+
+    // Format time
+    String time = 'Unknown';
+    if (ride.createdAt != null) {
+      final now = DateTime.now();
+      final difference = now.difference(ride.createdAt!);
+      if (difference.inDays == 0) {
+        time =
+            'Today, ${ride.createdAt!.hour}:${ride.createdAt!.minute.toString().padLeft(2, '0')}';
+      } else if (difference.inDays == 1) {
+        time =
+            'Yesterday, ${ride.createdAt!.hour}:${ride.createdAt!.minute.toString().padLeft(2, '0')}';
+      } else {
+        time = '${difference.inDays} days ago';
+      }
+    }
+
+    // Format distance and duration
+    String distance = ride.distance > 0
+        ? '${ride.distance.toStringAsFixed(1)} km'
+        : '0 km';
+    String duration = ride.estimatedTime > 0
+        ? '${ride.estimatedTime} min'
+        : '0 min';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: avatarColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(Icons.person_outline, color: avatarColor, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ride.passengerName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    Text(
+                      time,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                "₹${ride.fare.toInt()}",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Color(0xFF2EBD59),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                children: [
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2EBD59),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 35,
+                    decoration: BoxDecoration(color: Colors.grey[300]),
+                  ),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF8A00),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "PICKUP",
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      ride.pickupAddress,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      "DROPOFF",
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      ride.dropAddress,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildTripStat(Icons.directions, distance, "Distance"),
+                _buildTripStat(Icons.access_time, duration, "Duration"),
+              ],
+            ),
+          ),
+          if (showActions) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Accept ride
+                      context.read<RideViewModel>().acceptRide(
+                        context,
+                        ride.id,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2EBD59),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "ACCEPT",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Cancel/Reject ride
+                      context.read<RideViewModel>().rejectRide(ride.id);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE53935)),
+                      foregroundColor: const Color(0xFFE53935),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "REJECT",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildOfflineUI() {
     final authViewModel = context.watch<AuthViewModel>();
     final rideViewModel = context.watch<RideViewModel>();
     final driver = authViewModel.driver;
+
+    // Filter pending/accepted rides
+    final pendingRides = rideViewModel.rideHistory
+        .where((ride) => ride.status == 'pending' || ride.status == 'accepted')
+        .toList();
 
     return SingleChildScrollView(
       child: Column(
@@ -157,7 +410,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
           // Top Header with Gradient
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 40),
+            padding: const EdgeInsets.only(
+              top: 60,
+              left: 24,
+              right: 24,
+              bottom: 40,
+            ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -175,7 +433,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         onPressed: () {
                           if (Navigator.canPop(context)) {
                             Navigator.pop(context);
@@ -187,13 +449,22 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     CircleAvatar(
                       radius: 30,
                       backgroundColor: Colors.white,
-                      backgroundImage: (driver?.profilePic != null && driver!.profilePic!.isNotEmpty)
+                      backgroundImage:
+                          (driver?.profilePic != null &&
+                              driver!.profilePic!.isNotEmpty)
                           ? (driver.profilePic!.startsWith('http')
-                              ? CachedNetworkImageProvider(driver.profilePic!)
-                              : FileImage(File(driver.profilePic!)) as ImageProvider)
+                                ? CachedNetworkImageProvider(driver.profilePic!)
+                                : FileImage(File(driver.profilePic!))
+                                      as ImageProvider)
                           : null,
-                      child: (driver?.profilePic == null || driver!.profilePic!.isEmpty)
-                          ? const Icon(Icons.person, size: 35, color: Colors.grey)
+                      child:
+                          (driver?.profilePic == null ||
+                              driver!.profilePic!.isEmpty)
+                          ? const Icon(
+                              Icons.person,
+                              size: 35,
+                              color: Colors.grey,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 15),
@@ -211,7 +482,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           ),
                           Row(
                             children: [
-                              const Icon(Icons.star, color: Colors.yellow, size: 16),
+                              const Icon(
+                                Icons.star,
+                                color: Colors.yellow,
+                                size: 16,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${driver?.rating ?? 4.8} • ${driver?.vehicleNumber ?? "KA 05 MX 1234"}',
@@ -233,11 +508,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       child: Stack(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.notifications_none, color: Colors.white),
+                            icon: const Icon(
+                              Icons.notifications_none,
+                              color: Colors.white,
+                            ),
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationsScreen(),
+                                ),
                               );
                             },
                           ),
@@ -263,9 +544,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                        icon: const Icon(
+                          Icons.settings_outlined,
+                          color: Colors.white,
+                        ),
                         onPressed: () {
-                          HomeScreen.of(context)?.setSelectedIndex(4); // Index for More (SettingsScreen)
+                          HomeScreen.of(context)?.setSelectedIndex(
+                            4,
+                          ); // Index for More (SettingsScreen)
                         },
                       ),
                     ),
@@ -278,7 +564,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -306,7 +594,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       ),
                       Switch(
                         value: rideViewModel.isOnline,
-                        onChanged: (value) => rideViewModel.toggleOnlineOffline(),
+                        onChanged: (value) =>
+                            rideViewModel.toggleOnlineOffline(),
                         activeThumbColor: Colors.white,
                         activeTrackColor: Colors.green,
                       ),
@@ -316,6 +605,29 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ],
             ),
           ),
+
+          // Pending/Accepted Rides Section
+          if (pendingRides.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Pending Rides",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...pendingRides.map(
+                    (ride) => _buildRideCard(ride, showActions: true),
+                  ),
+                ],
+              ),
+            ),
 
           // Earnings Summary Card
           Transform.translate(
@@ -344,7 +656,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         children: [
                           Text(
                             "Today's Earnings",
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
                           ),
                           Text(
                             "₹2850",
@@ -362,7 +677,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(Icons.attach_money, color: Colors.white, size: 30),
+                        child: const Icon(
+                          Icons.attach_money,
+                          color: Colors.white,
+                          size: 30,
+                        ),
                       ),
                     ],
                   ),
@@ -375,15 +694,39 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("This Week", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Text("₹15420", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text(
+                            "This Week",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            "₹15420",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("This Month", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Text("₹58900", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text(
+                            "This Month",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            "₹58900",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -399,7 +742,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.black,
                       minimumSize: const Size(double.infinity, 45),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],
@@ -408,7 +753,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ),
 
           const SizedBox(height: 10),
-          
+
           if (driver != null && driver.bankAccounts.isNotEmpty)
             // Show saved bank details
             Padding(
@@ -417,7 +762,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => BankDetailsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => BankDetailsScreen(),
+                    ),
                   );
                 },
                 child: Container(
@@ -426,10 +773,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Colors.teal[50]!,
-                        Colors.teal[100]!,
-                      ],
+                      colors: [Colors.teal[50]!, Colors.teal[100]!],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.teal[200]!),
@@ -443,7 +787,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           color: Colors.teal[600],
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.account_balance, color: Colors.white),
+                        child: const Icon(
+                          Icons.account_balance,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -461,7 +808,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             const SizedBox(height: 4),
                             Text(
                               () {
-                                final accNo = driver.bankAccounts[0].accountNumber;
+                                final accNo =
+                                    driver.bankAccounts[0].accountNumber;
                                 if (accNo.length >= 4) {
                                   return '**** **** **** ${accNo.substring(accNo.length - 4)}';
                                 }
@@ -490,7 +838,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
               children: [
                 const Text(
                   "Performance Metrics",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 GridView.count(
@@ -544,50 +896,60 @@ class _HomeDashboardState extends State<HomeDashboard> {
               children: [
                 const Text(
                   "Quick Actions",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     _buildQuickAction(
-                      Icons.send, 
-                      "Go Online", 
+                      Icons.send,
+                      "Go Online",
                       Colors.green,
                       onTap: () => rideViewModel.toggleOnlineOffline(),
                     ),
                     const SizedBox(width: 12),
                     _buildQuickAction(
-                      Icons.account_balance_wallet, 
-                      "Wallet", 
+                      Icons.account_balance_wallet,
+                      "Wallet",
                       Colors.blue,
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const WalletScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const WalletScreen(),
+                          ),
                         );
                       },
                     ),
                     const SizedBox(width: 12),
                     _buildQuickAction(
-                      Icons.card_membership, 
-                      "Incentives", 
+                      Icons.card_membership,
+                      "Incentives",
                       Colors.purple,
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const IncentivesScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const IncentivesScreen(),
+                          ),
                         );
                       },
                     ),
                     const SizedBox(width: 12),
                     _buildQuickAction(
-                      Icons.support_agent, 
-                      "Support", 
+                      Icons.support_agent,
+                      "Support",
                       Colors.red,
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const SupportScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const SupportScreen(),
+                          ),
                         );
                       },
                     ),
@@ -609,37 +971,82 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   children: [
                     const Text(
                       "Recent Activity",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const RecentActivityScreen()),
-                        );
-                      },
-                      child: const Text("View All", style: TextStyle(color: Color(0xFFFF6D00))),
-                    ),
+                    if (rideViewModel.rideHistory.isNotEmpty)
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const RecentActivityScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          "View All",
+                          style: TextStyle(color: Color(0xFFFF6D00)),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                _buildActivityItem(
-                  "Priya Sharma",
-                  "2 hours ago",
-                  "MG Road → Koramangala",
-                  "₹285",
-                  "5",
-                  Colors.amber,
-                ),
-                const SizedBox(height: 12),
-                _buildActivityItem(
-                  "Amit Patel",
-                  "4 hours ago",
-                  "HSR Layout → Electronic City",
-                  "₹420",
-                  "4",
-                  Colors.orange,
-                ),
+                if (rideViewModel.rideHistory.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Column(
+                        children: [
+                          Icon(Icons.history, size: 48, color: Colors.grey),
+                          SizedBox(height: 12),
+                          Text(
+                            "No recent activities yet",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...rideViewModel.rideHistory.take(2).map((ride) {
+                    final List<Color> avatarColors = [
+                      Colors.amber,
+                      Colors.orange,
+                      Colors.blue,
+                      Colors.teal,
+                      Colors.purple,
+                      Colors.pink,
+                    ];
+                    final colorIndex = ride.id.hashCode % avatarColors.length;
+                    final avatarColor = avatarColors[colorIndex];
+
+                    String time = 'Unknown';
+                    if (ride.createdAt != null) {
+                      final now = DateTime.now();
+                      final difference = now.difference(ride.createdAt!);
+                      if (difference.inMinutes < 60) {
+                        time = "${difference.inMinutes} minutes ago";
+                      } else if (difference.inHours < 24) {
+                        time = "${difference.inHours} hours ago";
+                      } else {
+                        time = "${difference.inDays} days ago";
+                      }
+                    }
+
+                    return _buildActivityItem(
+                      ride.passengerName,
+                      time,
+                      "${ride.pickupAddress.split(' ').take(2).join(' ')} → ${ride.dropAddress.split(' ').take(2).join(' ')}",
+                      "₹${ride.fare.toInt()}",
+                      "5",
+                      avatarColor,
+                    );
+                  }).toList(),
               ],
             ),
           ),
@@ -686,7 +1093,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                               color: Colors.white.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                           ),
                         ),
                       ),
@@ -700,7 +1111,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         child: Center(
                           child: Transform.rotate(
                             angle: -0.5, // Slight tilt like in navigation icons
-                            child: const Icon(Icons.navigation, color: Colors.white, size: 55),
+                            child: const Icon(
+                              Icons.navigation,
+                              color: Colors.white,
+                              size: 55,
+                            ),
                           ),
                         ),
                       ),
@@ -711,16 +1126,25 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             rideViewModel.toggleOnlineOffline();
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.power_settings_new, color: Colors.white, size: 16),
+                                Icon(
+                                  Icons.power_settings_new,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                                 SizedBox(width: 6),
                                 Text(
                                   "Go Offline",
@@ -758,7 +1182,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 const SizedBox(height: 24),
                 // Timer Pill
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(30),
@@ -792,258 +1219,316 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ),
 
           Expanded(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Background with subtle pattern or gradient if needed
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0xFFF8F9FA),
-                          Colors.white.withValues(alpha: 0.5),
-                          Colors.white,
-                        ],
+            child: SingleChildScrollView(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Background with subtle pattern or gradient if needed
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            const Color(0xFFF8F9FA),
+                            Colors.white.withValues(alpha: 0.5),
+                            Colors.white,
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                // Content under header
-                Column(
-                  children: [
-                    const SizedBox(height: 100), // Space for the overlapping card
-                    // Live Map View Pulse
-                    Center(
-                      child: Column(
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Pulsing effect
-                              ...List.generate(3, (index) => 
-                                Container(
-                                  width: 80.0 + (index * 20),
-                                  height: 80.0 + (index * 20),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2EBD59).withValues(alpha: 0.1 / (index + 1)),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF2EBD59),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Color(0x402EBD59),
-                                      blurRadius: 15,
-                                      spreadRadius: 8,
-                                    )
-                                  ],
-                                ),
-                                child: const Icon(Icons.my_location, color: Colors.white, size: 24),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            "Live Map View",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF444444),
-                            ),
-                          ),
-                          const Text(
-                            "Your current location",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    // Bottom Stats and Actions
-                    Container(
-                      padding: const EdgeInsets.only(left: 24, right: 24, top: 30, bottom: 40),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x0A000000),
-                            blurRadius: 20,
-                            offset: Offset(0, -10),
-                          )
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildOnlineStat("₹0", "Today's Earnings", const Color(0xFF2EBD59)),
-                              _buildOnlineStat("0", "Trips", const Color(0xFF1A1A1A)),
-                              _buildOnlineStat(rideViewModel.onlineDuration, "Online Time", const Color(0xFF1A1A1A)),
-                            ],
-                          ),
-                          const SizedBox(height: 30),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: OutlinedButton(
-                              onPressed: () => rideViewModel.toggleOnlineOffline(),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                "Go Offline",
-                                style: TextStyle(
-                                  color: Color(0xFFE53935), 
-                                  fontSize: 18, 
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Earning Tip Card
-                          Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F7FF),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
+                  // Content under header
+                  Column(
+                    children: [
+                      const SizedBox(
+                        height: 100,
+                      ), // Space for the overlapping card
+                      // Live Map View Pulse
+                      Center(
+                        child: Column(
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
+                                // Pulsing effect
+                                ...List.generate(
+                                  3,
+                                  (index) => Container(
+                                    width: 80.0 + (index * 20),
+                                    height: 80.0 + (index * 20),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF2EBD59,
+                                      ).withValues(alpha: 0.1 / (index + 1)),
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                  child: const Icon(Icons.bolt, color: Color(0xFF2196F3), size: 20),
                                 ),
-                                const SizedBox(width: 15),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Earning Tip",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold, 
-                                          fontSize: 15,
-                                          color: Color(0xFF1A1A1A),
-                                        ),
-                                      ),
-                                      Text(
-                                        "Head to MG Road for higher demand and better earnings!",
-                                        style: TextStyle(
-                                          fontSize: 13, 
-                                          color: Color(0xFF666666),
-                                          height: 1.4,
-                                        ),
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2EBD59),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Color(0x402EBD59),
+                                        blurRadius: 15,
+                                        spreadRadius: 8,
                                       ),
                                     ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.my_location,
+                                    color: Colors.white,
+                                    size: 24,
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              "Live Map View",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF444444),
+                              ),
+                            ),
+                            const Text(
+                              "Your current location",
+                              style: TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      // Bottom Stats and Actions
+                      Container(
+                        padding: const EdgeInsets.only(
+                          left: 24,
+                          right: 24,
+                          top: 30,
+                          bottom: 40,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(35),
                           ),
-                          const SizedBox(height: 24),
-                          // Offline Shortcut
-                          GestureDetector(
-                            onTap: () => rideViewModel.toggleOnlineOffline(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x0A000000),
+                              blurRadius: 20,
+                              offset: Offset(0, -10),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildOnlineStat(
+                                  "₹0",
+                                  "Today's Earnings",
+                                  const Color(0xFF2EBD59),
+                                ),
+                                _buildOnlineStat(
+                                  "0",
+                                  "Trips",
+                                  const Color(0xFF1A1A1A),
+                                ),
+                                _buildOnlineStat(
+                                  rideViewModel.onlineDuration,
+                                  "Online Time",
+                                  const Color(0xFF1A1A1A),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 30),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    rideViewModel.toggleOnlineOffline(),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                    color: Color(0xFFE53935),
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Text(
+                                  "Go Offline",
+                                  style: TextStyle(
+                                    color: Color(0xFFE53935),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            // Earning Tip Card
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F7FF),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.power_settings_new, color: Colors.grey[400], size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "SWITCH TO OFFLINE MODE",
-                                    style: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.bolt,
+                                      color: Color(0xFF2196F3),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 15),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Earning Tip",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: Color(0xFF1A1A1A),
+                                          ),
+                                        ),
+                                        Text(
+                                          "Head to MG Road for higher demand and better earnings!",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF666666),
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                // High Demand Areas Overlapping Card
-                Positioned(
-                  top: -45,
-                  left: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 25,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.trending_up, color: Color(0xFFFF8A00), size: 22),
-                            SizedBox(width: 10),
-                            Text(
-                              "High Demand Areas",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 17,
-                                color: Color(0xFF1A1A1A),
+                            const SizedBox(height: 24),
+                            // Offline Shortcut
+                            GestureDetector(
+                              onTap: () => rideViewModel.toggleOnlineOffline(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.power_settings_new,
+                                      color: Colors.grey[400],
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "SWITCH TO OFFLINE MODE",
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          child: Row(
+                      ),
+                    ],
+                  ),
+                  // High Demand Areas Overlapping Card
+                  Positioned(
+                    top: -45,
+                    left: 20,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 25,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
                             children: [
-                              _buildDemandArea("MG Road", "2.3 km", const Color(0xFFE53935)),
-                              const SizedBox(width: 14),
-                              _buildDemandArea("Koramangala", "3.5 km", const Color(0xFFFFB300)),
-                              const SizedBox(width: 14),
-                              _buildDemandArea("Indiranagar", "4.1 km", const Color(0xFFE53935)),
+                              Icon(
+                                Icons.trending_up,
+                                color: Color(0xFFFF8A00),
+                                size: 22,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                "High Demand Areas",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 18),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                _buildDemandArea(
+                                  "MG Road",
+                                  "2.3 km",
+                                  const Color(0xFFE53935),
+                                ),
+                                const SizedBox(width: 14),
+                                _buildDemandArea(
+                                  "Koramangala",
+                                  "3.5 km",
+                                  const Color(0xFFFFB300),
+                                ),
+                                const SizedBox(width: 14),
+                                _buildDemandArea(
+                                  "Indiranagar",
+                                  "4.1 km",
+                                  const Color(0xFFE53935),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -1072,7 +1557,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   color: statusColor.withValues(alpha: 0.3),
                   blurRadius: 4,
                   spreadRadius: 1,
-                )
+                ),
               ],
             ),
           ),
@@ -1081,18 +1566,18 @@ class _HomeDashboardState extends State<HomeDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                name, 
+                name,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold, 
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
                   color: Color(0xFF1A1A1A),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                distance, 
+                distance,
                 style: const TextStyle(
-                  color: Color(0xFF757575), 
+                  color: Color(0xFF757575),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1110,8 +1595,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
         Text(
           value,
           style: TextStyle(
-            fontSize: 26, 
-            fontWeight: FontWeight.bold, 
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
             color: valueColor,
             letterSpacing: -0.5,
           ),
@@ -1120,7 +1605,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 13, 
+            fontSize: 13,
             color: Color(0xFF757575),
             fontWeight: FontWeight.w500,
           ),
@@ -1129,7 +1614,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String label, Color color, {VoidCallback? onTap}) {
+  Widget _buildTripStat(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: const Color(0xFF1A1A1A), size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+      ],
+    );
+  }
+
+  Widget _buildQuickAction(
+    IconData icon,
+    String label,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -1159,7 +1663,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
               const SizedBox(height: 8),
               Text(
                 label,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -1169,7 +1676,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildActivityItem(String name, String time, String route, String amount, String rating, Color avatarColor) {
+  Widget _buildActivityItem(
+    String name,
+    String time,
+    String route,
+    String amount,
+    String rating,
+    Color avatarColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1200,11 +1714,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     Text(
                       amount,
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                   ],
                 ),
@@ -1220,7 +1740,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         const Icon(Icons.star, color: Colors.amber, size: 12),
                         Text(
                           " $rating",
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -1239,7 +1762,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildMetricCard(String value, String label, IconData icon, Color bgColor, Color iconColor) {
+  Widget _buildMetricCard(
+    String value,
+    String label,
+    IconData icon,
+    Color bgColor,
+    Color iconColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1271,7 +1800,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
                 Text(
                   label,
@@ -1629,5 +2162,3 @@ class _MapViewState extends State<MapView> {
     );
   }
 }
-
-

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'login_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../dashboard/dashboard_screen.dart';
@@ -66,10 +65,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 8),
               Text(
                 'Join TaxiNanban as a vendor',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
@@ -170,7 +166,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       });
                     },
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                   ),
                   filled: true,
@@ -195,6 +193,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       height: 56,
                       child: ElevatedButton(
                         onPressed: () async {
+                          final scaffoldMessenger = ScaffoldMessenger.of(context);
                           final success = await authViewModel.register(
                             _nameController.text,
                             _emailController.text,
@@ -202,9 +201,13 @@ class _SignupScreenState extends State<SignupScreen> {
                             _passwordController.text,
                             _companyNameController.text,
                           );
-                          if (!success && authViewModel.errorMessage != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(authViewModel.errorMessage!)),
+                          if (mounted &&
+                              !success &&
+                              authViewModel.errorMessage != null) {
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(authViewModel.errorMessage!),
+                              ),
                             );
                           }
                         },
@@ -234,10 +237,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   Text(
                     "Already have an account? ",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   GestureDetector(
                     onTap: () {

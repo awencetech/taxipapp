@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/models/user_model.dart';
+import '../auth/welcome_screen.dart';
 import 'edit_profile_screen.dart';
 import 'saved_addresses_screen.dart';
 import 'payment_methods_screen.dart';
@@ -10,9 +12,14 @@ import 'privacy_security_screen.dart';
 import 'referral_program_screen.dart';
 import 'support_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -147,7 +154,7 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _buildStatCard(
-                      value: '127',
+                      value: '${user?.totalRides ?? 0}',
                       label: 'Total Rides',
                       icon: Icons.directions_car,
                       color: const Color(0xFFFF6B35),
@@ -156,7 +163,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
-                      value: '4.8',
+                      value: '${user?.ratings ?? 5.0}',
                       label: 'Rating',
                       icon: Icons.star,
                       color: const Color(0xFFFFD300),
@@ -165,7 +172,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
-                      value: '2,450',
+                      value: '${user?.rewards ?? 0}',
                       label: 'Rewards',
                       icon: Icons.card_giftcard,
                       color: const Color(0xFFFF6B35),
@@ -177,116 +184,7 @@ class ProfileScreen extends StatelessWidget {
             // Membership status
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Membership Status',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFFD300),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                'Gold Member',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFFFD300),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          // Progress bar
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '40 rides to Platinum status',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.grey600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: AppColors.grey100,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FractionallySizedBox(
-                                    widthFactor: 0.75,
-                                    child: Container(
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFFFFD300),
-                                            Color(0xFFFF9500)
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD300).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.emoji_events,
-                        size: 32,
-                        color: Color(0xFFFFD300),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _buildMembershipCard(user),
             ),
             // Menu items
             Padding(
@@ -409,6 +307,14 @@ class ProfileScreen extends StatelessWidget {
 
                       if (confirm == true) {
                         await authProvider.logout();
+                        if (mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const WelcomeScreen()),
+                            (route) => false,
+                          );
+                        }
                       }
                     },
                     child: Container(
@@ -565,6 +471,171 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMembershipCard(UserModel? user) {
+    final membership = user?.membershipStatus ?? 'Bronze';
+    final totalRides = user?.totalRides ?? 0;
+
+    Map<String, dynamic> getMembershipInfo(String status) {
+      switch (status) {
+        case 'Bronze':
+          return {
+            'color': const Color(0xFFCD7F32),
+            'next': 'Silver',
+            'ridesNeeded': 10,
+            'progress': (totalRides / 10).clamp(0.0, 1.0),
+          };
+        case 'Silver':
+          return {
+            'color': const Color(0xFFC0C0C0),
+            'next': 'Gold',
+            'ridesNeeded': 30,
+            'progress': (totalRides / 30).clamp(0.0, 1.0),
+          };
+        case 'Gold':
+          return {
+            'color': const Color(0xFFFFD700),
+            'next': 'Platinum',
+            'ridesNeeded': 60,
+            'progress': (totalRides / 60).clamp(0.0, 1.0),
+          };
+        case 'Platinum':
+          return {
+            'color': const Color(0xFFE5E4E2),
+            'next': 'Diamond',
+            'ridesNeeded': 100,
+            'progress': (totalRides / 100).clamp(0.0, 1.0),
+          };
+        case 'Diamond':
+        default:
+          return {
+            'color': const Color(0xFFB9F2FF),
+            'next': 'Max Level',
+            'ridesNeeded': 0,
+            'progress': 1.0,
+          };
+      }
+    }
+
+    final info = getMembershipInfo(membership);
+    final color = info['color'] as Color;
+    final nextStatus = info['next'] as String;
+    final ridesNeeded = info['ridesNeeded'] as int;
+    final progress = info['progress'] as double;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Membership Status',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '$membership Member',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (ridesNeeded > 0)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${ridesNeeded - totalRides} rides to $nextStatus status',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.grey600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: progress,
+                            child: Container(
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  const Text(
+                    'You have reached the highest level!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.grey600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.emoji_events,
+              size: 32,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

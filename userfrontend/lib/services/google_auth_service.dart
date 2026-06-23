@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 class GoogleAuthService {
   static const String _clientId =
-      "841081778086-uml93fplvoc5je0fgj1b1hfn8of0r1i3.apps.googleusercontent.com";
+      "1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com";
 
   late final GoogleSignIn _googleSignIn;
 

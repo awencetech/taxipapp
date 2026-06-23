@@ -76,7 +76,17 @@ class SearchProvider with ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = e.toString();
-      if (e.toString().contains('DioExceptionType.connectionError')) {
+      // Check for Google API errors first
+      if (e.toString().contains('REQUEST_DENIED') ||
+          e.toString().contains('API_KEY_INVALID') ||
+          e.toString().contains('API_KEY_EXPIRED')) {
+        _errorMessage = 'Google API key error - please check your API key';
+        _status = SearchStatus.error;
+      }
+      // Check for common connection error patterns
+      else if (e.toString().toLowerCase().contains('connection') ||
+          e.toString().toLowerCase().contains('no internet') ||
+          e.toString().toLowerCase().contains('network')) {
         _status = SearchStatus.noInternet;
       } else {
         _status = SearchStatus.error;

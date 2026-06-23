@@ -49,6 +49,24 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  addresses: [
+    {
+      type: {
+        type: String,
+        enum: ['home', 'work', 'other'],
+        default: 'other'
+      },
+      label: String,
+      address: String,
+      landmark: String,
+      city: String,
+      state: String,
+      pincode: String,
+      latitude: { type: Number, default: 0.0 },
+      longitude: { type: Number, default: 0.0 },
+      isDefault: { type: Boolean, default: false }
+    }
+  ],
   favoriteLocations: [
     {
       name: String,
@@ -72,6 +90,19 @@ const userSchema = new mongoose.Schema({
   numReviews: {
     type: Number,
     default: 0,
+  },
+  totalRides: {
+    type: Number,
+    default: 0,
+  },
+  rewards: {
+    type: Number,
+    default: 0,
+  },
+  membershipStatus: {
+    type: String,
+    enum: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'],
+    default: 'Bronze',
   },
   resetPasswordOTP: String,
   resetPasswordExpires: Date,

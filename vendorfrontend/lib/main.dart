@@ -64,7 +64,7 @@ class _AuthCheckState extends State<AuthCheck> {
   }
 
   Future<void> _checkOnboardingStatus() async {
-    final prefs = await SharedPreferences.getInstance();
+    await SharedPreferences.getInstance();
     setState(() {
       // Always show onboarding for now
       _showOnboarding = true;

@@ -52,14 +52,12 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
       body: Consumer<AuthViewModel>(
         builder: (context, authViewModel, child) {
           if (authViewModel.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
-          
+
           final vehicleDocs = authViewModel.getDocumentsByCategory('vehicle');
           final personalDocs = authViewModel.getDocumentsByCategory('personal');
-          
+
           debugPrint('Vehicle docs length: ${vehicleDocs.length}');
           debugPrint('Personal docs length: ${personalDocs.length}');
           debugPrint('All docs: ${authViewModel.documents}');
@@ -77,7 +75,6 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
             padding: const EdgeInsets.all(24),
             children: [
               _buildDocSection(
-                context,
                 'Vehicle Documents',
                 vehicleDocs,
                 'vehicle',
@@ -85,7 +82,6 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
               ),
               const SizedBox(height: 32),
               _buildDocSection(
-                context,
                 'Personal Documents',
                 personalDocs,
                 'personal',
@@ -98,7 +94,12 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
     );
   }
 
-  Widget _buildDocSection(BuildContext context, String title, List<DocumentModel> docs, String category, AuthViewModel authViewModel) {
+  Widget _buildDocSection(
+    String title,
+    List<DocumentModel> docs,
+    String category,
+    AuthViewModel authViewModel,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -107,12 +108,16 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        ...docs.map((doc) => _buildDocItem(context, doc, category, authViewModel)),
+        ...docs.map((doc) => _buildDocItem(doc, category, authViewModel)),
       ],
     );
   }
 
-  Widget _buildDocItem(BuildContext context, DocumentModel doc, String category, AuthViewModel authViewModel) {
+  Widget _buildDocItem(
+    DocumentModel doc,
+    String category,
+    AuthViewModel authViewModel,
+  ) {
     final theme = Theme.of(context);
     final color = _getStatusColor(doc.status);
 
@@ -122,7 +127,7 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
           final uri = Uri.parse(doc.url!);
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
+          } else if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Could not open: ${doc.url}')),
             );
@@ -152,11 +157,11 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                doc.status == 'Verified' 
-                    ? Icons.verified_user_outlined 
-                    : (doc.status == 'Pending' 
-                        ? Icons.pending_actions_outlined 
-                        : Icons.error_outline),
+                doc.status == 'Verified'
+                    ? Icons.verified_user_outlined
+                    : (doc.status == 'Pending'
+                          ? Icons.pending_actions_outlined
+                          : Icons.error_outline),
                 color: color,
                 size: 20,
               ),
@@ -168,7 +173,10 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
                 children: [
                   Text(
                     doc.title,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
                   ),
                   if (doc.uploadedAt != null)
                     Text(
@@ -191,13 +199,18 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
               ),
               child: Text(
                 doc.status,
-                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.edit, color: Color(0xFFFF6D00)),
               onPressed: () async {
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -208,8 +221,8 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
                     ),
                   ),
                 );
-                if (result == true && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (result == true && mounted) {
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(
                       content: Text('Document updated successfully!'),
                       backgroundColor: Colors.green,
@@ -222,11 +235,14 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () async {
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Delete Document?'),
-                    content: const Text('Are you sure you want to remove this document?'),
+                    content: const Text(
+                      'Are you sure you want to remove this document?',
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
@@ -234,7 +250,9 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(true),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
                         child: const Text('Delete'),
                       ),
                     ],
@@ -242,9 +260,11 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
                 );
 
                 if (confirm == true) {
-                  final success = await authViewModel.deleteDocument(docId: doc.id);
-                  if (context.mounted && success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                  final success = await authViewModel.deleteDocument(
+                    docId: doc.id,
+                  );
+                  if (mounted && success) {
+                    scaffoldMessenger.showSnackBar(
                       const SnackBar(
                         content: Text('Document deleted successfully!'),
                         backgroundColor: Colors.green,
@@ -261,4 +281,3 @@ class _ViewDocumentsScreenState extends State<ViewDocumentsScreen> {
     );
   }
 }
-

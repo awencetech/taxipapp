@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
-import '../../core/theme/app_theme.dart';
 import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {

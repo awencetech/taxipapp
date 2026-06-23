@@ -109,8 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           _loginState == LoginState.phone
                               ? 'Sign in to continue driving'
                               : _loginState == LoginState.otp
-                                  ? 'Enter OTP sent to your phone'
-                                  : 'Enter your email and password',
+                              ? 'Enter OTP sent to your phone'
+                              : 'Enter your email and password',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white.withValues(alpha: 0.9),
@@ -199,30 +199,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             // Send OTP Button
                             authViewModel.isLoading
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 : SizedBox(
                                     width: double.infinity,
                                     height: 56,
                                     child: ElevatedButton(
                                       onPressed: () async {
+                                        final scaffoldMessenger =
+                                            ScaffoldMessenger.of(context);
                                         final success = await authViewModel
                                             .sendOTP(_phoneController.text);
                                         if (success) {
                                           setState(() {
-                                            _currentPhone = _phoneController.text;
+                                            _currentPhone =
+                                                _phoneController.text;
                                             _loginState = LoginState.otp;
                                           });
-                                          if (authViewModel.errorMessage != null) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    authViewModel.errorMessage!,
-                                                  ),
+                                          if (mounted &&
+                                              authViewModel.errorMessage !=
+                                                  null) {
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  authViewModel.errorMessage!,
                                                 ),
-                                              );
-                                            }
+                                              ),
+                                            );
                                           }
                                         }
                                       },
@@ -230,7 +234,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                         backgroundColor: AppTheme.primaryColor,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                         elevation: 0,
                                       ),
@@ -313,33 +319,41 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 24),
                             // Verify OTP Button
                             authViewModel.isLoading
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 : SizedBox(
                                     width: double.infinity,
                                     height: 56,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        final success = await authViewModel.verifyOTP(
-                                            _currentPhone!, _otpController.text);
-                                        if (!success &&
-                                            authViewModel.errorMessage != null) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  authViewModel.errorMessage!,
-                                                ),
-                                              ),
+                                        final scaffoldMessenger =
+                                            ScaffoldMessenger.of(context);
+                                        final success = await authViewModel
+                                            .verifyOTP(
+                                              _currentPhone!,
+                                              _otpController.text,
                                             );
-                                          }
+                                        if (!success &&
+                                            mounted &&
+                                            authViewModel.errorMessage !=
+                                                null) {
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                authViewModel.errorMessage!,
+                                              ),
+                                            ),
+                                          );
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primaryColor,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                         elevation: 0,
                                       ),
@@ -444,9 +458,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                       _obscurePassword = !_obscurePassword;
                                     });
                                   },
-                                  icon: Icon(_obscurePassword
-                                      ? Icons.visibility
-                                      : Icons.visibility_off),
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                  ),
                                 ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
@@ -458,35 +474,41 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 24),
                             authViewModel.isLoading
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 : SizedBox(
                                     width: double.infinity,
                                     height: 56,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        final success = await authViewModel.login(
-                                          email: _emailController.text,
-                                          password: _passwordController.text,
-                                        );
-                                        if (!success &&
-                                            authViewModel.errorMessage != null) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  authViewModel.errorMessage!,
-                                                ),
-                                              ),
+                                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                        final success = await authViewModel
+                                            .login(
+                                              email: _emailController.text,
+                                              password:
+                                                  _passwordController.text,
                                             );
-                                          }
+                                        if (!success &&
+                                            mounted &&
+                                            authViewModel.errorMessage !=
+                                                null) {
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                authViewModel.errorMessage!,
+                                              ),
+                                            ),
+                                          );
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primaryColor,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                         elevation: 0,
                                       ),
@@ -546,43 +568,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 foregroundColor: const Color(0xFF1F2937),
                               ),
-                              icon: const Icon(
-                                Icons.g_mobiledata,
-                                size: 28,
-                              ),
+                              icon: const Icon(Icons.g_mobiledata, size: 28),
                               label: const Text(
                                 'Continue with Google',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Apple Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                // Handle Apple login
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.grey[300]!),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                foregroundColor: const Color(0xFF1F2937),
-                              ),
-                              icon: const Icon(
-                                Icons.apple,
-                                size: 24,
-                              ),
-                              label: const Text(
-                                'Continue with Apple',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,

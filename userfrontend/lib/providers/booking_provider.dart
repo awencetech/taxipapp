@@ -50,7 +50,7 @@ class BookingProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getRideHistory();
-      if (response.statusCode == 200 && response.data['success'] == true) {
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
         final List data = response.data['data']['rides'];
         _rideHistory = data.map((e) => RideModel.fromMap(e)).toList();
       } else {

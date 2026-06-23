@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+import '../core/providers/auth_provider.dart';
+import '../features/booking/home_screen.dart';
 
 class GoogleOnboardingScreen extends StatefulWidget {
   const GoogleOnboardingScreen({super.key});
@@ -48,7 +49,10 @@ class _GoogleOnboardingScreenState extends State<GoogleOnboardingScreen> {
       );
 
       if (success && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

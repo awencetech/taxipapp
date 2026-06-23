@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 class GoogleAuthService {
   static const String _clientId =
-      "853680153976-bcn1s55141qhvn240c294qa5i85dva3o.apps.googleusercontent.com";
+      "1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com";
 
   late final GoogleSignIn _googleSignIn;
 
@@ -14,10 +14,21 @@ class GoogleAuthService {
     );
   }
 
-  Future<GoogleSignInAccount?> signIn() async {
+  Future<Map<String, dynamic>?> signIn() async {
     try {
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      return account;
+      if (account == null) return null;
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+
+      return {
+        'email': account.email,
+        'name': account.displayName,
+        'googleId': account.id,
+        'photoUrl': account.photoUrl,
+        'idToken': auth.idToken,
+        'accessToken': auth.accessToken,
+      };
     } catch (error) {
       debugPrint('Google Sign-In Error: $error');
       return null;

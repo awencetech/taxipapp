@@ -86,8 +86,8 @@ class DriverModel {
       List<BankAccountModel> accounts = [];
       if (json['bankAccounts'] != null && json['bankAccounts'] is List) {
         accounts = (json['bankAccounts'] as List)
-            .where((item) => item is Map)
-            .map((item) => BankAccountModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .whereType<Map>()
+            .map((item) => BankAccountModel.fromJson(Map<String, dynamic>.from(item)))
             .toList();
       }
       // If no accounts in JSON, check old single fields and create one
@@ -107,8 +107,8 @@ class DriverModel {
       List<DocumentModel> docs = [];
       if (json['documents'] != null && json['documents'] is List) {
         docs = (json['documents'] as List)
-            .where((item) => item is Map)
-            .map((item) => DocumentModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .whereType<Map>()
+            .map((item) => DocumentModel.fromJson(Map<String, dynamic>.from(item)))
             .toList();
       }
       debugPrint('DriverModel.fromJson: Parsed ${docs.length} documents');
@@ -245,15 +245,6 @@ class DocumentModel {
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     debugPrint('Parsing DocumentModel from: $json');
-    // Handle case where json might be null or not a map
-    if (json is! Map<String, dynamic>) {
-      return DocumentModel(
-        id: '',
-        title: 'Unknown Document',
-        category: 'vehicle',
-        status: 'Pending',
-      );
-    }
     
     return DocumentModel(
       id: (json['_id']?.toString() ?? json['id']?.toString()) ?? '',
@@ -295,6 +286,7 @@ class RideRequestModel {
   final int estimatedTime;
   final String status;
   final DateTime? createdAt;
+  final String? cancellationReason;
 
   RideRequestModel({
     required this.id,
@@ -308,21 +300,45 @@ class RideRequestModel {
     required this.estimatedTime,
     required this.status,
     this.createdAt,
+    this.cancellationReason,
   });
 
   factory RideRequestModel.fromJson(Map<String, dynamic> json) {
+    // Parse pickup coords from location object (from backend)
+    List<double> pickupCoords = [0.0, 0.0];
+    if (json['pickupLocation']?['coordinates'] != null &&
+        json['pickupLocation']['coordinates'] is List) {
+      final coords = json['pickupLocation']['coordinates'] as List;
+      pickupCoords = [coords[1]?.toDouble() ?? 0.0, coords[0]?.toDouble() ?? 0.0];
+    }
+
+    // Parse drop coords
+    List<double> dropCoords = [0.0, 0.0];
+    if (json['dropLocation']?['coordinates'] != null &&
+        json['dropLocation']['coordinates'] is List) {
+      final coords = json['dropLocation']['coordinates'] as List;
+      dropCoords = [coords[1]?.toDouble() ?? 0.0, coords[0]?.toDouble() ?? 0.0];
+    }
+
+    // Get passenger name from user object
+    String passengerName = 'Unknown';
+    if (json['user'] != null && json['user'] is Map) {
+      passengerName = json['user']['name'] ?? 'Unknown';
+    }
+
     return RideRequestModel(
       id: json['_id'] ?? json['id'] ?? '',
-      passengerName: json['passengerName'] ?? json['passenger']?['name'] ?? 'Unknown',
-      pickupAddress: json['pickupAddress'] ?? '',
-      dropAddress: json['dropAddress'] ?? '',
-      pickupCoords: (json['pickupCoords'] as List?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0],
-      dropCoords: (json['dropCoords'] as List?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0],
+      passengerName: passengerName,
+      pickupAddress: json['pickupLocation']?['address'] ?? '',
+      dropAddress: json['dropLocation']?['address'] ?? '',
+      pickupCoords: pickupCoords,
+      dropCoords: dropCoords,
       fare: (json['fare'] ?? 0.0).toDouble(),
       distance: (json['distance'] ?? 0.0).toDouble(),
-      estimatedTime: json['estimatedTime'] ?? 0,
+      estimatedTime: json['duration'] ?? 0,
       status: json['status'] ?? 'pending',
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+      cancellationReason: json['cancellationReason'],
     );
   }
 }

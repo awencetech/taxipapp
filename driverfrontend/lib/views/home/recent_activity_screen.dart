@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../viewmodels/ride_viewmodel.dart';
+import '../../models/driver_models.dart';
 
-class RecentActivityScreen extends StatelessWidget {
+class RecentActivityScreen extends StatefulWidget {
   const RecentActivityScreen({super.key});
+
+  @override
+  State<RecentActivityScreen> createState() => _RecentActivityScreenState();
+}
+
+class _RecentActivityScreenState extends State<RecentActivityScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RideViewModel>().fetchRideHistory();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,64 +33,86 @@ class RecentActivityScreen extends StatelessWidget {
         title: Text(
           'Recent Activity',
           style: TextStyle(
-            color: Theme.of(context).textTheme.titleLarge?.color ?? const Color(0xFF1A1A1A), 
-            fontWeight: FontWeight.bold
+            color: Theme.of(context).textTheme.titleLarge?.color ?? const Color(0xFF1A1A1A),
+            fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _buildActivityCard(
-            name: "Priya Sharma",
-            time: "Today, 2:30 PM",
-            pickup: "MG Road Metro Station",
-            drop: "Koramangala 5th Block",
-            fare: "₹285",
-            rating: "5",
-            distance: "8.5 km",
-            duration: "22 min",
-            avatarColor: Colors.amber,
-          ),
-          _buildActivityCard(
-            name: "Amit Patel",
-            time: "Today, 12:15 PM",
-            pickup: "Whitefield Main Road",
-            drop: "Electronic City Phase 1",
-            fare: "₹420",
-            rating: "4",
-            distance: "14.2 km",
-            duration: "35 min",
-            avatarColor: Colors.orange,
-          ),
-          _buildActivityCard(
-            name: "Sneha Reddy",
-            time: "Yesterday, 6:00 PM",
-            pickup: "Indiranagar 100 Feet Road",
-            drop: "Bangalore Airport",
-            fare: "₹650",
-            rating: "5",
-            distance: "22.8 km",
-            duration: "45 min",
-            avatarColor: Colors.blue,
-          ),
-        ],
+      body: Consumer<RideViewModel>(
+        builder: (context, rideViewModel, child) {
+          if (rideViewModel.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (rideViewModel.error != null && rideViewModel.rideHistory.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${rideViewModel.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => rideViewModel.fetchRideHistory(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (rideViewModel.rideHistory.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'No rides yet!',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: rideViewModel.rideHistory.length,
+            itemBuilder: (context, index) {
+              final ride = rideViewModel.rideHistory[index];
+              return _buildActivityCard(ride);
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildActivityCard({
-    required String name,
-    required String time,
-    required String pickup,
-    required String drop,
-    required String fare,
-    required String rating,
-    required String distance,
-    required String duration,
-    required Color avatarColor,
-  }) {
+  Widget _buildActivityCard(RideRequestModel ride) {
+    final List<Color> avatarColors = [
+      Colors.amber,
+      Colors.orange,
+      Colors.blue,
+      Colors.teal,
+      Colors.purple,
+      Colors.pink,
+    ];
+
+    final colorIndex = ride.id.hashCode % avatarColors.length;
+    final avatarColor = avatarColors[colorIndex];
+
+    // Format time
+    String time = 'Unknown';
+    if (ride.createdAt != null) {
+      time = '${ride.createdAt!.day}/${ride.createdAt!.month}/${ride.createdAt!.year}, ${ride.createdAt!.hour}:${ride.createdAt!.minute.toString().padLeft(2, '0')}';
+    }
+
+    // Format distance
+    String distance = ride.distance > 0 ? '${ride.distance.toStringAsFixed(1)} km' : 'Unknown';
+    String duration = ride.estimatedTime > 0 ? '${ride.estimatedTime} min' : 'Unknown';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
@@ -109,9 +147,9 @@ class RecentActivityScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      ride.passengerName,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold, 
+                        fontWeight: FontWeight.bold,
                         fontSize: 17,
                         color: Color(0xFF1A1A1A),
                       ),
@@ -127,7 +165,7 @@ class RecentActivityScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    fare,
+                    '₹${ride.fare.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
@@ -138,9 +176,9 @@ class RecentActivityScreen extends StatelessWidget {
                     children: [
                       const Icon(Icons.star, color: Colors.amber, size: 14),
                       Text(
-                        " $rating",
+                        " 5",
                         style: const TextStyle(
-                          fontSize: 13, 
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1A1A1A),
                         ),
@@ -191,39 +229,43 @@ class RecentActivityScreen extends StatelessWidget {
                     Text(
                       "PICKUP",
                       style: TextStyle(
-                        color: Colors.grey[400], 
-                        fontSize: 11, 
+                        color: Colors.grey[400],
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      pickup,
+                      ride.pickupAddress,
                       style: const TextStyle(
-                        fontSize: 15, 
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1A1A1A),
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 18),
                     Text(
                       "DROP",
                       style: TextStyle(
-                        color: Colors.grey[400], 
-                        fontSize: 11, 
+                        color: Colors.grey[400],
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      drop,
+                      ride.dropAddress,
                       style: const TextStyle(
-                        fontSize: 15, 
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1A1A1A),
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -238,7 +280,7 @@ class RecentActivityScreen extends StatelessWidget {
               Text(
                 distance,
                 style: TextStyle(
-                  color: Colors.grey[600], 
+                  color: Colors.grey[600],
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -250,7 +292,7 @@ class RecentActivityScreen extends StatelessWidget {
               Text(
                 duration,
                 style: TextStyle(
-                  color: Colors.grey[600], 
+                  color: Colors.grey[600],
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -262,4 +304,3 @@ class RecentActivityScreen extends StatelessWidget {
     );
   }
 }
-

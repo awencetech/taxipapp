@@ -30,7 +30,10 @@ class AuthViewModel extends ChangeNotifier {
 
   // Get documents by category
   List<DocumentModel> getDocumentsByCategory(String category) {
-    return _driver?.documents.where((doc) => doc.category == category).toList() ?? [];
+    return _driver?.documents
+            .where((doc) => doc.category == category)
+            .toList() ??
+        [];
   }
 
   // Upload a document to backend
@@ -49,20 +52,29 @@ class AuthViewModel extends ChangeNotifier {
       formData.fields.add(MapEntry('title', title));
       formData.fields.add(MapEntry('category', category));
       if (expiryDate != null) {
-        formData.fields.add(MapEntry('expiryDate', expiryDate.toIso8601String()));
+        formData.fields.add(
+          MapEntry('expiryDate', expiryDate.toIso8601String()),
+        );
       }
       if (documentFile != null) {
         if (kIsWeb) {
           final bytes = await documentFile.readAsBytes();
-          formData.files.add(MapEntry(
-            'document',
-            MultipartFile.fromBytes(bytes, filename: documentFile.name),
-          ));
+          formData.files.add(
+            MapEntry(
+              'document',
+              MultipartFile.fromBytes(bytes, filename: documentFile.name),
+            ),
+          );
         } else {
-          formData.files.add(MapEntry(
-            'document',
-            await MultipartFile.fromFile(documentFile.path, filename: documentFile.name),
-          ));
+          formData.files.add(
+            MapEntry(
+              'document',
+              await MultipartFile.fromFile(
+                documentFile.path,
+                filename: documentFile.name,
+              ),
+            ),
+          );
         }
       }
 
@@ -109,7 +121,9 @@ class AuthViewModel extends ChangeNotifier {
       formData.fields.add(MapEntry('title', title));
       formData.fields.add(MapEntry('category', category));
       if (expiryDate != null) {
-        formData.fields.add(MapEntry('expiryDate', expiryDate.toIso8601String()));
+        formData.fields.add(
+          MapEntry('expiryDate', expiryDate.toIso8601String()),
+        );
       }
       if (status != null) {
         formData.fields.add(MapEntry('status', status));
@@ -117,23 +131,27 @@ class AuthViewModel extends ChangeNotifier {
       if (documentFile != null) {
         if (kIsWeb) {
           final bytes = await documentFile.readAsBytes();
-          formData.files.add(MapEntry(
-            'document',
-            MultipartFile.fromBytes(bytes, filename: documentFile.name),
-          ));
+          formData.files.add(
+            MapEntry(
+              'document',
+              MultipartFile.fromBytes(bytes, filename: documentFile.name),
+            ),
+          );
         } else {
-          formData.files.add(MapEntry(
-            'document',
-            await MultipartFile.fromFile(documentFile.path, filename: documentFile.name),
-          ));
+          formData.files.add(
+            MapEntry(
+              'document',
+              await MultipartFile.fromFile(
+                documentFile.path,
+                filename: documentFile.name,
+              ),
+            ),
+          );
         }
       }
 
       final url = AppConstants.editDocumentUrl.replaceAll(':docId', docId);
-      final response = await _apiService.put(
-        url,
-        data: formData,
-      );
+      final response = await _apiService.put(url, data: formData);
 
       if (response.data['success'] == true) {
         await fetchDriverProfile();
@@ -156,9 +174,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // Delete a document
-  Future<bool> deleteDocument({
-    required String docId,
-  }) async {
+  Future<bool> deleteDocument({required String docId}) async {
     try {
       _isLoading = true;
       _error = null;
@@ -214,32 +230,44 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('fetchDriverProfile: Starting...');
       _isLoading = true;
       notifyListeners();
-      
-      final response = await _apiService.get(
-        AppConstants.getDriverProfileUrl,
+
+      final response = await _apiService.get(AppConstants.getDriverProfileUrl);
+      debugPrint(
+        'fetchDriverProfile: Response received, status: ${response.statusCode}',
       );
-      debugPrint('fetchDriverProfile: Response received, status: ${response.statusCode}');
       debugPrint('fetchDriverProfile: Response data: ${response.data}');
-      
+
       if (response.statusCode == 200) {
         final data = response.data;
-        debugPrint('fetchDriverProfile: Top-level data type: ${data.runtimeType}');
-        
-        final actualData = (data is Map && data['data'] != null) ? data['data'] : data;
-        debugPrint('fetchDriverProfile: actualData type: ${actualData.runtimeType}');
-        
-        final userData = (actualData is Map) ? (actualData['user'] ?? actualData['driver'] ?? actualData) : actualData;
-        debugPrint('fetchDriverProfile: userData type: ${userData.runtimeType}');
+        debugPrint(
+          'fetchDriverProfile: Top-level data type: ${data.runtimeType}',
+        );
+
+        final actualData = (data is Map && data['data'] != null)
+            ? data['data']
+            : data;
+        debugPrint(
+          'fetchDriverProfile: actualData type: ${actualData.runtimeType}',
+        );
+
+        final userData = (actualData is Map)
+            ? (actualData['user'] ?? actualData['driver'] ?? actualData)
+            : actualData;
+        debugPrint(
+          'fetchDriverProfile: userData type: ${userData.runtimeType}',
+        );
         debugPrint('fetchDriverProfile: userData content: $userData');
-        
+
         if (userData is Map) {
           debugPrint('fetchDriverProfile: Parsing DriverModel...');
           _driver = DriverModel.fromJson(Map<String, dynamic>.from(userData));
           debugPrint('fetchDriverProfile: DriverModel parsed successfully!');
           debugPrint('fetchDriverProfile: _driver.id: ${_driver?.id}');
           debugPrint('fetchDriverProfile: _driver.name: ${_driver?.name}');
-          debugPrint('fetchDriverProfile: _driver.documents length: ${_driver?.documents.length}');
-          
+          debugPrint(
+            'fetchDriverProfile: _driver.documents length: ${_driver?.documents.length}',
+          );
+
           final prefs = await SharedPreferences.getInstance();
           if (_driver != null) {
             debugPrint('fetchDriverProfile: Saving driver to prefs...');
@@ -256,7 +284,9 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('fetchDriverProfile: Error: $e');
       debugPrint('fetchDriverProfile: Stack trace: $stackTrace');
     } finally {
-      debugPrint('fetchDriverProfile: Finally block, setting _isLoading to false');
+      debugPrint(
+        'fetchDriverProfile: Finally block, setting _isLoading to false',
+      );
       _isLoading = false;
       notifyListeners();
       debugPrint('fetchDriverProfile: Notified listeners!');
@@ -270,7 +300,7 @@ class AuthViewModel extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(AppConstants.tokenKey);
-      
+
       // First try to load locally from SharedPreferences as fallback
       final savedDriver = await _loadDriverFromPrefs();
       if (savedDriver != null) {
@@ -327,12 +357,12 @@ class AuthViewModel extends ChangeNotifier {
         if (bankAccounts != null)
           'bankAccounts': bankAccounts.map((e) => e.toJson()).toList(),
       };
-      
+
       // If we have a profilePicFile, create FormData
       if (profilePicFile != null) {
         debugPrint('Creating FormData for file upload');
         Map<String, dynamic> formDataMap = Map.from(baseData);
-        
+
         if (kIsWeb) {
           // For web, use fromBytes
           final bytes = await profilePicFile.readAsBytes();
@@ -347,7 +377,7 @@ class AuthViewModel extends ChangeNotifier {
             filename: profilePicFile.name,
           );
         }
-        
+
         requestData = FormData.fromMap(formDataMap);
       } else {
         debugPrint('Sending regular JSON data');
@@ -363,9 +393,11 @@ class AuthViewModel extends ChangeNotifier {
 
       if (response.data['success'] == true) {
         // First try to get updated driver from backend
-        final backendDriverData = response.data['data']['user'] ?? response.data;
-        
-        if (backendDriverData != null && backendDriverData is Map<String, dynamic>) {
+        final backendDriverData =
+            response.data['data']['user'] ?? response.data;
+
+        if (backendDriverData != null &&
+            backendDriverData is Map<String, dynamic>) {
           _driver = DriverModel.fromJson(backendDriverData);
           debugPrint('Loaded driver from backend: ${_driver?.profilePic}');
         } else if (_driver != null) {
@@ -390,7 +422,7 @@ class AuthViewModel extends ChangeNotifier {
           );
           debugPrint('Manually updated driver: ${_driver?.profilePic}');
         }
-        
+
         if (_driver != null) {
           await _saveDriverToPrefs(_driver!);
         }
@@ -424,14 +456,15 @@ class AuthViewModel extends ChangeNotifier {
 
       final response = await _apiService.put(
         AppConstants.changePasswordUrl,
-        data: {
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        },
+        data: {'currentPassword': currentPassword, 'newPassword': newPassword},
       );
 
-      debugPrint('AuthViewModel.changePassword: Response status: ${response.statusCode}');
-      debugPrint('AuthViewModel.changePassword: Response data: ${response.data}');
+      debugPrint(
+        'AuthViewModel.changePassword: Response status: ${response.statusCode}',
+      );
+      debugPrint(
+        'AuthViewModel.changePassword: Response data: ${response.data}',
+      );
 
       if (response.data['success'] == true) {
         _isLoading = false;
@@ -530,21 +563,25 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('AuthViewModel: Sending POST request to ${AppConstants.driverLoginUrl}');
+      debugPrint(
+        'AuthViewModel: Sending POST request to ${AppConstants.driverLoginUrl}',
+      );
       final response = await _apiService.post(
         AppConstants.driverLoginUrl,
         data: {
-          'email': email, 
+          'email': email,
           'password': password,
           'role': 'driver', // Ensure role is specified for auth controller
         },
       );
-      debugPrint('AuthViewModel: Login response status: ${response.statusCode}');
+      debugPrint(
+        'AuthViewModel: Login response status: ${response.statusCode}',
+      );
       debugPrint('AuthViewModel: Login response data: ${response.data}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
-        
+
         // Check for success flag if present in the response
         if (data is Map && data['success'] == false) {
           _error = data['message'] ?? 'Login failed';
@@ -555,19 +592,25 @@ class AuthViewModel extends ChangeNotifier {
         }
 
         // Check if data is nested under 'data' key
-        final actualData = (data is Map && data['data'] != null) ? data['data'] : data;
-        
-        final token = (actualData is Map) ? (actualData['token'] ?? data['token']) : null;
-        
+        final actualData = (data is Map && data['data'] != null)
+            ? data['data']
+            : data;
+
+        final token = (actualData is Map)
+            ? (actualData['token'] ?? data['token'])
+            : null;
+
         if (token != null) {
           debugPrint('AuthViewModel: Token found, saving to prefs: $token');
           await prefs.setString(AppConstants.tokenKey, token);
-          
+
           // Now fetch the full driver profile from /drivers/profile
           await fetchDriverProfile();
-          
+
           _isLoading = false;
-          debugPrint('AuthViewModel: Login successful, isLoggedIn=${_driver != null}');
+          debugPrint(
+            'AuthViewModel: Login successful, isLoggedIn=${_driver != null}',
+          );
           notifyListeners();
           return true;
         } else {
@@ -578,7 +621,9 @@ class AuthViewModel extends ChangeNotifier {
           return false;
         }
       }
-      debugPrint('AuthViewModel: Login failed with status ${response.statusCode}');
+      debugPrint(
+        'AuthViewModel: Login failed with status ${response.statusCode}',
+      );
       _error = 'Login failed with status ${response.statusCode}';
       _isLoading = false;
       notifyListeners();
@@ -618,8 +663,12 @@ class AuthViewModel extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
-        final actualData = (data is Map && data['data'] != null) ? data['data'] : data;
-        final token = (actualData is Map) ? (actualData['token'] ?? data['token']) : null;
+        final actualData = (data is Map && data['data'] != null)
+            ? data['data']
+            : data;
+        final token = (actualData is Map)
+            ? (actualData['token'] ?? data['token'])
+            : null;
 
         if (token == null) {
           _error = 'Token not found in response';
@@ -633,10 +682,7 @@ class AuthViewModel extends ChangeNotifier {
 
         final driverResponse = await _apiService.post(
           AppConstants.driverRegisterUrl,
-          data: {
-            'vehicleType': vehicleType, 
-            'vehicleNumber': vehicleNumber,
-          },
+          data: {'vehicleType': vehicleType, 'vehicleNumber': vehicleNumber},
         );
 
         if (driverResponse.statusCode == 200 ||
@@ -663,18 +709,19 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final googleAccount = await _googleAuthService.signIn();
-      if (googleAccount == null) {
+      final googleData = await _googleAuthService.signIn();
+      if (googleData == null) {
         _isLoading = false;
         notifyListeners();
         return {'success': false};
       }
 
       final driverData = {
-        'email': googleAccount.email,
-        'name': googleAccount.displayName,
-        'googleId': googleAccount.id,
-        'photoUrl': googleAccount.photoUrl,
+        'googleToken': googleData['idToken'] ?? googleData['accessToken'],
+        'email': googleData['email'],
+        'name': googleData['name'],
+        'googleId': googleData['googleId'],
+        'photoUrl': googleData['photoUrl'],
       };
 
       final response = await _apiService.post(
@@ -694,11 +741,11 @@ class AuthViewModel extends ChangeNotifier {
 
         final prefs = await SharedPreferences.getInstance();
         final token = actualData['token'] ?? data['token'];
-        
+
         if (token != null) {
           await prefs.setString(AppConstants.tokenKey, token);
           await prefs.setString(AppConstants.driverIdKey, _driver!.id);
-          
+
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'isNewUser': false};
@@ -730,7 +777,12 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final driverData = {..._newDriverInfo!, 'name': name, 'mobile': mobile};
+      final driverData = {
+        ..._newDriverInfo!,
+        'name': name,
+        'mobile': mobile,
+        'role': 'driver',
+      };
 
       final response = await _apiService.post(
         AppConstants.completeProfileUrl,
@@ -739,11 +791,15 @@ class AuthViewModel extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
-        final actualData = (data is Map && data['data'] != null) ? data['data'] : data;
+        final actualData = (data is Map && data['data'] != null)
+            ? data['data']
+            : data;
 
         final prefs = await SharedPreferences.getInstance();
-        final token = (actualData is Map) ? (actualData['token'] ?? data['token']) : null;
-        
+        final token = (actualData is Map)
+            ? (actualData['token'] ?? data['token'])
+            : null;
+
         if (token == null) {
           _error = 'Token not found in response';
           _isLoading = false;
@@ -760,12 +816,18 @@ class AuthViewModel extends ChangeNotifier {
 
         if (driverResponse.statusCode == 200 ||
             driverResponse.statusCode == 201) {
-          final userData = (actualData is Map) ? (actualData['user'] ?? actualData) : actualData;
-          _driver = DriverModel.fromJson(userData is Map ? Map<String, dynamic>.from(userData) : <String, dynamic>{});
+          final userData = (actualData is Map)
+              ? (actualData['user'] ?? actualData)
+              : actualData;
+          _driver = DriverModel.fromJson(
+            userData is Map
+                ? Map<String, dynamic>.from(userData)
+                : <String, dynamic>{},
+          );
           _newDriverInfo = null;
 
           await prefs.setString(AppConstants.driverIdKey, _driver!.id);
-          
+
           // Save driver to prefs
           if (_driver != null) {
             await _saveDriverToPrefs(_driver!);

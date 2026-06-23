@@ -1,47 +1,45 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/services/api_service.dart';
+import 'add_money_screen.dart';
 
-class WalletScreen extends StatelessWidget {
+class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
-  // Transaction history data
-  final List<Map<String, dynamic>> transactions = const [
-    {
-      'title': 'Ride Payment',
-      'date': 'Today, 10:30 AM',
-      'amount': '-₹131.25',
-      'isPositive': false,
-      'iconColor': Color(0xFFFF9500),
-    },
-    {
-      'title': 'Cashback Reward',
-      'date': 'Today, 9:15 AM',
-      'amount': '+₹20',
-      'isPositive': true,
-      'iconColor': Color(0xFF4CD964),
-    },
-    {
-      'title': 'Wallet Recharge',
-      'date': 'Yesterday, 6:00 PM',
-      'amount': '+₹500',
-      'isPositive': true,
-      'iconColor': Color(0xFF4CD964),
-    },
-    {
-      'title': 'Ride Payment',
-      'date': 'Yesterday, 2:45 PM',
-      'amount': '-₹89',
-      'isPositive': false,
-      'iconColor': Color(0xFFFF9500),
-    },
-    {
-      'title': 'Referral Bonus',
-      'date': '2 days ago',
-      'amount': '+₹50',
-      'isPositive': true,
-      'iconColor': Color(0xFF4CD964),
-    },
-  ];
+  @override
+  State<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends State<WalletScreen> {
+  final ApiService _apiService = ApiService();
+  List<dynamic> _transactions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTransactions();
+  }
+
+  Future<void> _fetchTransactions() async {
+    try {
+      final response = await _apiService.getUserPayments();
+      if (response.data['success'] == true) {
+        setState(() {
+          _transactions = response.data['data']['payments'] ?? [];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,27 +122,37 @@ class WalletScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add, color: AppColors.secondary, size: 24),
-                        SizedBox(width: 8),
-                        Text(
-                          'Add Money',
-                          style: TextStyle(
-                            color: AppColors.secondary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddMoneyScreen(),
                         ),
-                      ],
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add, color: AppColors.secondary, size: 24),
+                          SizedBox(width: 8),
+                          Text(
+                            'Add Money',
+                            style: TextStyle(
+                              color: AppColors.secondary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -171,162 +179,43 @@ class WalletScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       ...['₹100', '₹250', '₹500', '₹1000'].map((amount) {
-                        return Container(
-                          width: 80,
-                          height: 80,
-                          decoration: const BoxDecoration(
-                            color: AppColors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AddMoneyScreen(),
                               ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              amount,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.black,
+                            );
+                          },
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: const BoxDecoration(
+                              color: AppColors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                amount,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.black,
+                                ),
                               ),
                             ),
                           ),
                         );
                       }),
                     ],
-                  ),
-                  const SizedBox(height: 32),
-                  // Wallet Offers
-                  const Text(
-                    'Wallet Offers',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFFF6B35), Color(0xFFEC4400)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Add ₹500, Get ₹50 Cashback',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Use code: WALLET50',
-                                style: TextStyle(
-                                  color: AppColors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.card_giftcard,
-                            color: AppColors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF9B59B6), Color(0xFF8E44AD)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'First Recharge Bonus',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Use code: FIRST100',
-                                style: TextStyle(
-                                  color: AppColors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.card_giftcard,
-                            color: AppColors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 32),
                   // Transaction History
@@ -351,133 +240,105 @@ class WalletScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  ...transactions.map((tx) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: const BoxDecoration(
-                              color: AppColors.grey100,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              tx['isPositive']
-                                  ? Icons.arrow_downward
-                                  : Icons.arrow_upward,
-                              size: 28,
-                              color: tx['iconColor'],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  tx['title'],
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  tx['date'],
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.grey600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            tx['amount'],
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: tx['isPositive']
-                                  ? AppColors.accent
-                                  : AppColors.foreground,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 20),
-                  // Earn Rewards
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Earn Rewards',
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _transactions.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No transactions yet',
                                 style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: AppColors.grey600,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Complete rides and earn',
-                                style: TextStyle(
-                                  color: AppColors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.trending_up,
-                            color: AppColors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                            )
+                          : Column(
+                              children: _transactions.map((tx) {
+                                final isPositive =
+                                    tx['paymentMethod'] == 'wallet' &&
+                                        tx['amount'] > 0;
+                                final iconColor = isPositive
+                                    ? const Color(0xFF4CD964)
+                                    : const Color(0xFFFF9500);
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black12,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.grey100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isPositive
+                                              ? Icons.arrow_downward
+                                              : Icons.arrow_upward,
+                                          size: 28,
+                                          color: iconColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              tx['paymentMethod'] == 'wallet' &&
+                                                      tx['amount'] > 0
+                                                  ? 'Wallet Recharge'
+                                                  : 'Ride Payment',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.black,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              tx['createdAt'] != null
+                                                  ? DateTime.parse(
+                                                          tx['createdAt'])
+                                                      .toString()
+                                                      .substring(0, 16)
+                                                  : '',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.grey600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        '${isPositive ? '+' : '-'}₹${tx['amount']}',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: isPositive
+                                              ? AppColors.accent
+                                              : AppColors.foreground,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
                 ],
               ),
             ),

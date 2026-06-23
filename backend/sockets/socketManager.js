@@ -75,6 +75,27 @@ const initSocket = (server) => {
       }
     });
 
+    // Driver rejects ride
+    socket.on('rejectRide', async (data) => {
+      const { rideId, driverId } = data;
+      try {
+        const ride = await Ride.findByIdAndUpdate(
+          rideId,
+          { status: 'cancelled',
+            cancellationReason: 'Rejected by driver' },
+          { new: true }
+        ).populate('user');
+        
+        if (!ride) {
+          console.log('Ride rejected:', rideId);
+          // Notify user
+          io.to(ride.user._id.toString()).emit('rideCancelled', ride);
+        }
+      } catch (error) {
+        console.error('Socket reject ride error:', error);
+      }
+    });
+
     // Ride status updates
     socket.on('updateRideStatus', async (data) => {
       const { rideId, status, userId } = data;

@@ -29,16 +29,15 @@ class BookingProvider extends ChangeNotifier {
   PaymentMethod? get selectedPaymentMethod => _selectedPaymentMethod;
 
   BookingProvider() {
-    _socketService.driverLocationStream.listen((data) {
-      // Update local driver positions if needed
-      notifyListeners();
-    });
-
+    // Only listen to ride status stream, and only notify if current ride changes
     _socketService.rideStatusStream.listen((data) {
       if (_currentRide != null && data['rideId'] == _currentRide!.id) {
-        _currentRide = RideModel.fromMap(
-            {..._currentRide!.toMap(), 'status': data['status']});
-        notifyListeners();
+        final newStatus = data['status'];
+        if (_currentRide!.status != newStatus) {
+          _currentRide = RideModel.fromMap(
+              {..._currentRide!.toMap(), 'status': newStatus});
+          notifyListeners();
+        }
       }
     });
   }
@@ -50,14 +49,36 @@ class BookingProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getRideHistory();
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final List data = response.data['data']['rides'];
+      // Handle both response formats
+      bool isSuccess = false;
+      List<dynamic>? data;
+
+      if (response.statusCode == 200 || response.statusCode == 304) {
+        if (response.data != null) {
+          if (response.data['status'] == 'success') {
+            isSuccess = true;
+            data = response.data['data']?['rides'] ?? response.data['rides'];
+          } else if (response.data['success'] == true) {
+            isSuccess = true;
+            data = response.data['data']?['rides'] ?? response.data['rides'];
+          }
+        }
+      }
+
+      if (isSuccess && data != null) {
         _rideHistory = data.map((e) => RideModel.fromMap(e)).toList();
       } else {
-        _error = response.data['message'] ?? 'Failed to fetch ride history';
+        // If not success but no error, just set to empty list
+        if (response.statusCode == 200 || response.statusCode == 304) {
+          _rideHistory = [];
+        } else {
+          _error = response.data?['message']?.toString() ??
+              'Failed to fetch ride history';
+        }
       }
     } catch (e) {
       _error = e.toString();
+      _rideHistory = [];
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -127,11 +148,24 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  void cancelRide() {
-    _currentRide = null;
-    _selectedRideType = null;
-    _selectedPaymentMethod = null;
+  Future<void> cancelRide(String rideId, String reason) async {
+    _isLoading = true;
+    _error = null;
     notifyListeners();
+
+    try {
+      final response = await _apiService.cancelRide(rideId, reason);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchRideHistory();
+      } else {
+        _error = response.data['message'] ?? 'Failed to cancel ride';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   void selectRideType(RideType rideType) {

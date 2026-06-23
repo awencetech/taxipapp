@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/driver_viewmodel.dart';
 import '../../viewmodels/vehicle_viewmodel.dart';
@@ -8,12 +7,10 @@ import '../../viewmodels/trip_viewmodel.dart';
 import '../../viewmodels/earning_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import '../drivers/drivers_screen.dart';
-import '../vehicles/vehicles_screen.dart';
 import '../trips/trips_screen.dart';
 import '../earnings/earnings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
-import '../settings/settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -101,7 +98,6 @@ class DashboardHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dashboardVM = context.watch<DashboardViewModel>();
 
     return Container(
       color: const Color(0xFFF8F9FA),
@@ -588,7 +584,7 @@ class DashboardHome extends StatelessWidget {
                             ),
                             const SizedBox(height: 24),
                             // Chart
-                            Container(
+                            SizedBox(
                               height: 150,
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -765,7 +761,7 @@ class DashboardHome extends StatelessWidget {
                       const SizedBox(height: 24),
                       
                       // Nearby Ride Requests
-                      Container(
+                      SizedBox(
                         width: double.infinity,
                         child: Column(
                           children: [

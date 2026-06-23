@@ -29,6 +29,10 @@ const rideSchema = new mongoose.Schema({
     },
     coordinates: [Number],
   },
+  vehicleType: {
+    type: String,
+    default: 'standard',
+  },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'arrived', 'started', 'completed', 'cancelled'],
@@ -46,7 +50,7 @@ const rideSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'wallet'],
+    enum: ['cash', 'card', 'wallet', 'upi'],
     default: 'cash',
   },
   paymentStatus: {
@@ -55,6 +59,9 @@ const rideSchema = new mongoose.Schema({
     default: 'pending',
   },
   otp: {
+    type: String,
+  },
+  cancellationReason: {
     type: String,
   },
   startTime: Date,

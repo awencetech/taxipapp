@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../shared/widgets/primary_button.dart';
 import '../../features/booking/home_screen.dart';
+import '../../screens/google_onboarding_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -20,6 +21,38 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.loginWithGoogle();
+
+    if (mounted) {
+      if (result['success'] == true) {
+        if (result['isNewUser'] == true) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GoogleOnboardingScreen(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Google sign in failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
   void _login() async {
     final authProvider = context.read<AuthProvider>();
@@ -165,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: _handleGoogleSignIn,
                 icon: const FaIcon(FontAwesomeIcons.google,
                     color: AppColors.black, size: 20),
                 label: const Text('Sign in with Google',

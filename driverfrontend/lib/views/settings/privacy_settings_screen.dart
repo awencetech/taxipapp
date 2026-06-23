@@ -112,7 +112,6 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     Function(bool) onChanged,
   ) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     
     return Container(
       decoration: BoxDecoration(
@@ -131,7 +130,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFFFF6D00),
+        activeThumbColor: const Color(0xFFFF6D00),
       ),
     );
   }

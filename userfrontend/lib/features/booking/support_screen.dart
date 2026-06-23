@@ -1,39 +1,309 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:intl/intl.dart';
 import '../../core/providers/ticket_provider.dart';
 import '../../core/models/ticket_model.dart';
 
-class SupportScreen extends StatelessWidget {
+class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
   @override
+  State<SupportScreen> createState() => _SupportScreenState();
+}
+
+class _SupportScreenState extends State<SupportScreen> {
+  int _selectedTab = 0;
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          title: const Text('Support Center',
-              style: TextStyle(color: AppColors.black)),
-          bottom: const TabBar(
-            labelColor: AppColors.secondary,
-            unselectedLabelColor: AppColors.grey600,
-            indicatorColor: AppColors.secondary,
-            tabs: [
-              Tab(text: 'Get Help'),
-              Tab(text: 'My Tickets'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      body: SafeArea(
+        child: Column(
           children: [
-            GetHelpTab(),
-            MyTicketsTab(),
+            // 1. Gradient Header
+            Container(
+              height: 180,
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFFFF6B00),
+                    Color(0xFFFF8A00),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Support Center',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'How can we help you today?',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.support_agent,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 2. Custom Segmented Tabs
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                height: 45,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 0;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 0
+                                ? const Color(0xFFFF6B00)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Get Help',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedTab == 0
+                                  ? Colors.white
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 1;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 1
+                                ? const Color(0xFFFF6B00)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'My Tickets',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedTab == 1
+                                  ? Colors.white
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 3. Tab Content
+            Expanded(
+              child: IndexedStack(
+                index: _selectedTab,
+                children: const [
+                  GetHelpTab(),
+                  MyTicketsTab(),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+      // 6. Floating Contact Button (only on "Get Help" tab)
+      floatingActionButton: _selectedTab == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                _showQuickSupport(context);
+              },
+              backgroundColor: const Color(0xFFFF6B00),
+              elevation: 4,
+              child: const Icon(
+                Icons.support_agent,
+                color: Colors.white,
+                size: 28,
+              ),
+            )
+          : null,
+    );
+  }
+
+  void _showQuickSupport(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Quick Support',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _QuickSupportOption(
+                  icon: Icons.chat,
+                  color: const Color(0xFF10B981),
+                  label: 'Chat',
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                _QuickSupportOption(
+                  icon: Icons.call,
+                  color: const Color(0xFFFF6B00),
+                  label: 'Call',
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                _QuickSupportOption(
+                  icon: Icons.chat_bubble_outline,
+                  color: const Color(0xFF25D366),
+                  label: 'WhatsApp',
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickSupportOption extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickSupportOption({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF334155),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -42,184 +312,186 @@ class SupportScreen extends StatelessWidget {
 class GetHelpTab extends StatelessWidget {
   const GetHelpTab({super.key});
 
+  static const List<Map<String, dynamic>> quickSupportOptions = [
+    {
+      'icon': Icons.chat,
+      'color': Color(0xFF10B981),
+      'title': 'Live Chat',
+      'description': 'Chat with our support team',
+    },
+    {
+      'icon': Icons.call,
+      'color': Color(0xFFFF6B00),
+      'title': 'Call Support',
+      'description': 'Toll free: 1800-123-4567',
+    },
+    {
+      'icon': Icons.chat_bubble_outline,
+      'color': Color(0xFF25D366),
+      'title': 'WhatsApp',
+      'description': 'Get help via WhatsApp',
+    },
+    {
+      'icon': Icons.emergency,
+      'color': Color(0xFFEF4444),
+      'title': 'Emergency',
+      'description': 'Immediate assistance',
+    },
+  ];
+
+  static const List<Map<String, dynamic>> helpCategories = [
+    {
+      'icon': Icons.directions_car,
+      'color': Color(0xFFFF6B00),
+      'title': 'Ride Issues',
+    },
+    {
+      'icon': Icons.payment,
+      'color': Color(0xFF10B981),
+      'title': 'Payment',
+    },
+    {
+      'icon': Icons.attach_money,
+      'color': Color(0xFF3B82F6),
+      'title': 'Refund',
+    },
+    {
+      'icon': Icons.person,
+      'color': Color(0xFF8B5CF6),
+      'title': 'Driver',
+    },
+    {
+      'icon': Icons.account_circle,
+      'color': Color(0xFF14B8A6),
+      'title': 'Account',
+    },
+    {
+      'icon': Icons.security,
+      'color': Color(0xFFF59E0B),
+      'title': 'Safety',
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Support options grid
+          // Quick Support Cards
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            padding: EdgeInsets.zero,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 0.85,
-            children: [
-              _buildSupportOption(
-                context,
-                icon: Icons.chat,
-                iconColor: const Color(0xFF4CD964),
-                title: 'Live Chat',
-                subtitle: 'team',
-                onTap: () {},
-              ),
-              _buildSupportOption(
-                context,
-                icon: Icons.call,
-                iconColor: const Color(0xFFFF9500),
-                title: 'Call Support',
-                subtitle: '1800-123-4567\n(Toll Free)',
-                onTap: () {},
-              ),
-              _buildSupportOption(
-                context,
-                icon: Icons.email,
-                iconColor: const Color(0xFF4A90E2),
-                title: 'Email Support',
-                subtitle: 'om',
-                onTap: () {},
-              ),
-              _buildSupportOption(
-                context,
-                icon: Icons.feedback,
-                iconColor: const Color(0xFF9B59B6),
-                title: 'Raise a Ticket',
-                subtitle: 'request',
-                onTap: () => _showRaiseTicketDialog(context),
-              ),
-            ],
+            childAspectRatio: 1.5,
+            children: quickSupportOptions.map((option) {
+              return _QuickSupportCard(option);
+            }).toList(),
           ),
           const SizedBox(height: 32),
-          // FAQ section
-          const Row(
-            children: [
-              Icon(Icons.help_outline, color: Color(0xFFFF9500), size: 28),
-              SizedBox(width: 10),
-              Text(
-                'Frequently Asked Questions',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          // Help Categories
+          const Text(
+            'Help Categories',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
           ),
           const SizedBox(height: 16),
-          _buildFAQItem(
-            question: 'How do I cancel a ride?',
-            answer:
-                'You can cancel your ride from the ride details screen before the driver arrives.',
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: helpCategories.length,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              itemBuilder: (context, index) {
+                final category = helpCategories[index];
+                return _CategoryCard(category);
+              },
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildFAQItem(
-            question: 'How to add a payment method?',
-            answer:
-                'Go to Profile > Payment Methods to add your preferred payment method.',
+          const SizedBox(height: 32),
+          // Recent Requests
+          const Text(
+            'Recent Support Requests',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSupportOption(
-    BuildContext context, {
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: iconColor, size: 26),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Flexible(
-              child: Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.grey600,
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                textAlign: TextAlign.center,
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFAQItem({
-    required String question,
-    required String answer,
-  }) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: ExpansionTile(
-        title: Text(
-          question,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              answer,
-              style: const TextStyle(color: AppColors.grey600),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.support_agent,
+                    size: 40,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No recent support requests.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    _showRaiseTicketDialog(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B00),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Raise a Ticket',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 40),
         ],
       ),
     );
@@ -229,6 +501,123 @@ class GetHelpTab extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => const RaiseTicketDialog(),
+    );
+  }
+}
+
+class _QuickSupportCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _QuickSupportCard(this.data);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: (data['color'] as Color).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              data['icon'] as IconData,
+              color: data['color'] as Color,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            data['title'] as String,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            data['description'] as String,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF64748B),
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _CategoryCard(this.data);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: (data['color'] as Color).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              data['icon'] as IconData,
+              color: data['color'] as Color,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            data['title'] as String,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF334155),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -252,75 +641,231 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
   @override
   Widget build(BuildContext context) {
     final ticketProvider = Provider.of<TicketProvider>(context);
-    return ticketProvider.isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : ticketProvider.tickets.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.feedback_outlined,
-                        size: 80, color: AppColors.grey400),
-                    SizedBox(height: 16),
-                    Text('No tickets yet',
-                        style: TextStyle(color: AppColors.grey600)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: ticketProvider.tickets.length,
-                itemBuilder: (context, index) {
-                  final ticket = ticketProvider.tickets[index];
-                  return _buildTicketCard(ticket, context);
-                },
-              );
-  }
 
-  Widget _buildTicketCard(TicketModel ticket, BuildContext context) {
-    Color statusColor;
-    switch (ticket.status) {
-      case 'open':
-        statusColor = Colors.blue;
-        break;
-      case 'in_progress':
-        statusColor = Colors.orange;
-        break;
-      case 'resolved':
-        statusColor = Colors.green;
-        break;
-      case 'closed':
-        statusColor = Colors.grey;
-        break;
-      default:
-        statusColor = Colors.blue;
+    if (ticketProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        title: Text(ticket.subject,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-            '${ticket.category} • ${ticket.createdAt.day}/${ticket.createdAt.month}'),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(ticket.status,
-              style:
-                  TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-        ),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => TicketDetailScreen(ticket: ticket),
+    if (ticketProvider.tickets.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.feedback_outlined,
+                size: 60,
+                color: Color(0xFF94A3B8),
+              ),
             ),
-          );
-        },
+            const SizedBox(height: 24),
+            const Text(
+              'No support tickets found.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                _showRaiseTicketDialog(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B00),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Contact Support',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      itemCount: ticketProvider.tickets.length,
+      itemBuilder: (context, index) {
+        final ticket = ticketProvider.tickets[index];
+        return _TicketCard(ticket);
+      },
+    );
+  }
+
+  void _showRaiseTicketDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const RaiseTicketDialog(),
+    );
+  }
+}
+
+class _TicketCard extends StatelessWidget {
+  final TicketModel ticket;
+
+  const _TicketCard(this.ticket);
+
+  @override
+  Widget build(BuildContext context) {
+    Color statusColor;
+    String statusText;
+    switch (ticket.status) {
+      case 'resolved':
+        statusColor = const Color(0xFF10B981);
+        statusText = 'Resolved';
+        break;
+      case 'open':
+      case 'in_progress':
+        statusColor = const Color(0xFFFF6B00);
+        statusText = 'Pending';
+        break;
+      case 'closed':
+        statusColor = const Color(0xFFEF4444);
+        statusText = 'Closed';
+        break;
+      default:
+        statusColor = const Color(0xFFFF6B00);
+        statusText = 'Pending';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Ticket #${ticket.id.length > 8 ? ticket.id.substring(0, 8) : ticket.id}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            ticket.subject,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.category_outlined,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                ticket.category,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Icon(
+                Icons.access_time,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                DateFormat('MMM dd, yyyy').format(ticket.createdAt),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => TicketDetailScreen(ticket: ticket),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B00),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'View Details',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -367,12 +912,15 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Ticket raised successfully!'),
-              backgroundColor: Colors.green),
+            content: Text('Ticket raised successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(provider.error ?? 'Failed to raise ticket')),
+          SnackBar(
+            content: Text(provider.error ?? 'Failed to raise ticket'),
+          ),
         );
       }
     }
@@ -382,7 +930,13 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
   Widget build(BuildContext context) {
     final provider = Provider.of<TicketProvider>(context);
     return AlertDialog(
-      title: const Text('Raise a Ticket'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text(
+        'Raise a Ticket',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -392,9 +946,11 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
                 decoration: InputDecoration(
-                    labelText: 'Category',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12))),
+                  labelText: 'Category',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 items: const [
                   DropdownMenuItem(value: 'General', child: Text('General')),
                   DropdownMenuItem(value: 'Rides', child: Text('Rides')),
@@ -407,13 +963,15 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
                   });
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _selectedPriority,
                 decoration: InputDecoration(
-                    labelText: 'Priority',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12))),
+                  labelText: 'Priority',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 items: const [
                   DropdownMenuItem(value: 'Low', child: Text('Low')),
                   DropdownMenuItem(value: 'Medium', child: Text('Medium')),
@@ -426,25 +984,29 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
                   });
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _subjectController,
                 decoration: InputDecoration(
-                    labelText: 'Subject',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12))),
+                  labelText: 'Subject',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Required';
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12))),
+                  labelText: 'Description',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 maxLines: 4,
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Required';
@@ -457,13 +1019,39 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel')),
-        TextButton(
-            onPressed: provider.isLoading ? null : _submitTicket,
-            child: provider.isLoading
-                ? const CircularProgressIndicator()
-                : const Text('Submit')),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: provider.isLoading ? null : _submitTicket,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF6B00),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: provider.isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text(
+                  'Submit',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -501,56 +1089,93 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final ticket = provider.currentTicket ?? widget.ticket;
 
     Color statusColor;
+    String statusText;
     switch (ticket.status) {
       case 'open':
-        statusColor = Colors.blue;
+        statusColor = const Color(0xFF3B82F6);
+        statusText = 'Open';
         break;
       case 'in_progress':
-        statusColor = Colors.orange;
+        statusColor = const Color(0xFFFF6B00);
+        statusText = 'In Progress';
         break;
       case 'resolved':
-        statusColor = Colors.green;
+        statusColor = const Color(0xFF10B981);
+        statusText = 'Resolved';
         break;
       case 'closed':
-        statusColor = Colors.grey;
+        statusColor = const Color(0xFFEF4444);
+        statusText = 'Closed';
         break;
       default:
-        statusColor = Colors.blue;
+        statusColor = const Color(0xFF3B82F6);
+        statusText = 'Open';
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ticket #${ticket.id.substring(0, 8)}'),
+        title: Text(
+          'Ticket #${ticket.id.length > 8 ? ticket.id.substring(0, 8) : ticket.id}',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 17,
+          ),
+        ),
+        centerTitle: true,
       ),
       body: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: AppColors.white,
+            padding: const EdgeInsets.all(24),
+            color: Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(ticket.subject,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                Text(
+                  ticket.subject,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(ticket.status,
-                          style: TextStyle(
-                              color: statusColor, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(ticket.category,
-                        style: const TextStyle(color: AppColors.grey600)),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        ticket.category,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -567,19 +1192,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 8),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: message.isUser
-                          ? AppColors.secondary
-                          : AppColors.grey200,
+                          ? const Color(0xFFFF6B00)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       message.message,
                       style: TextStyle(
-                          color:
-                              message.isUser ? Colors.white : AppColors.black),
+                        color: message.isUser
+                            ? Colors.white
+                            : const Color(0xFF0F172A),
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 );
@@ -595,21 +1226,34 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     controller: _messageController,
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24)),
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _sendMessage,
-                  icon: const Icon(Icons.send),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.all(12),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _sendMessage,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF6B00),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ),
               ],

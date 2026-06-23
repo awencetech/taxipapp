@@ -2,8 +2,65 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/ride_viewmodel.dart';
 
-class RideRequestPopup extends StatelessWidget {
+class RideRequestPopup extends StatefulWidget {
   const RideRequestPopup({super.key});
+
+  @override
+  State<RideRequestPopup> createState() => _RideRequestPopupState();
+}
+
+class _RideRequestPopupState extends State<RideRequestPopup> {
+  final _reasonController = TextEditingController();
+
+  void _showCancelReasonDialog(String rideId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Ride'),
+        content: TextField(
+          controller: _reasonController,
+          decoration: const InputDecoration(
+            labelText: 'Cancellation Reason',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final rideViewModel = Provider.of<RideViewModel>(
+                context,
+                listen: false,
+              );
+              await rideViewModel.rejectRide(
+                rideId,
+                reason: _reasonController.text,
+              );
+              if (mounted) {
+                Navigator.pop(context);
+              }
+              _reasonController.clear();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +123,7 @@ class RideRequestPopup extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => rideViewModel.rejectRide(),
+                      onPressed: () => _showCancelReasonDialog(request.id),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.red),
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -142,5 +199,3 @@ class RideRequestPopup extends StatelessWidget {
     );
   }
 }
-
-

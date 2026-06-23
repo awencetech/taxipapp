@@ -214,7 +214,7 @@ class ApiService {
 
   Future<Response> getRideHistory() async {
     try {
-      return await _dio.get('/users/rides');
+      return await _dio.get('/rides/user/my-rides');
     } catch (e) {
       developer.log('GetRideHistory error: $e');
       rethrow;
