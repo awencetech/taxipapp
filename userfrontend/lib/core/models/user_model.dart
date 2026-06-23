@@ -7,7 +7,6 @@ class UserModel {
   final String role;
   final String? gender;
   final DateTime? dateOfBirth;
-  final String? referralCode;
   final double ratings;
   final int numReviews;
   final int totalRides;
@@ -23,7 +22,6 @@ class UserModel {
     required this.role,
     this.gender,
     this.dateOfBirth,
-    this.referralCode,
     this.ratings = 5.0,
     this.numReviews = 0,
     this.totalRides = 0,
@@ -41,7 +39,6 @@ class UserModel {
       role: map['role'] ?? 'user',
       gender: map['gender'],
       dateOfBirth: map['dateOfBirth'] != null ? DateTime.parse(map['dateOfBirth']) : null,
-      referralCode: map['referralCode'],
       ratings: (map['ratings'] as num?)?.toDouble() ?? 5.0,
       numReviews: (map['numReviews'] as num?)?.toInt() ?? 0,
       totalRides: (map['totalRides'] as num?)?.toInt() ?? 0,
@@ -60,7 +57,6 @@ class UserModel {
       'role': role,
       'gender': gender,
       'dateOfBirth': dateOfBirth?.toIso8601String(),
-      'referralCode': referralCode,
       'ratings': ratings,
       'numReviews': numReviews,
       'totalRides': totalRides,
@@ -78,7 +74,6 @@ class UserModel {
     String? role,
     String? gender,
     DateTime? dateOfBirth,
-    String? referralCode,
     double? ratings,
     int? numReviews,
     int? totalRides,
@@ -94,7 +89,6 @@ class UserModel {
       role: role ?? this.role,
       gender: gender ?? this.gender,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
-      referralCode: referralCode ?? this.referralCode,
       ratings: ratings ?? this.ratings,
       numReviews: numReviews ?? this.numReviews,
       totalRides: totalRides ?? this.totalRides,

@@ -7,7 +7,6 @@ import 'core/providers/admin_provider.dart';
 import 'core/providers/address_provider.dart';
 import 'core/providers/payment_provider.dart';
 import 'core/providers/notification_provider.dart';
-import 'core/providers/referral_provider.dart';
 import 'core/providers/ticket_provider.dart';
 import 'core/providers/search_provider.dart';
 import 'splash_screen.dart';
@@ -24,7 +23,6 @@ void main() {
         ChangeNotifierProvider(create: (_) => AddressProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
-        ChangeNotifierProvider(create: (_) => ReferralProvider()),
         ChangeNotifierProvider(create: (_) => TicketProvider()),
         ChangeNotifierProvider(create: (_) => SearchProvider()),
       ],

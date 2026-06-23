@@ -9,7 +9,6 @@ import 'saved_addresses_screen.dart';
 import 'payment_methods_screen.dart';
 import 'notifications_screen.dart';
 import 'privacy_security_screen.dart';
-import 'referral_program_screen.dart';
 import 'support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -251,19 +250,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const PrivacySecurityScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMenuItem(
-                    icon: Icons.card_giftcard,
-                    iconColor: const Color(0xFFFFD300),
-                    title: 'Referral Program',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ReferralProgramScreen(),
                         ),
                       );
                     },

@@ -518,15 +518,7 @@ class ApiService {
     }
   }
 
-  // Referral
-  Future<Response> getReferralData() async {
-    try {
-      return await _dio.get('/users/referral');
-    } catch (e) {
-      developer.log('GetReferralData error: $e');
-      rethrow;
-    }
-  }
+
 
   // Tickets/Support
   Future<Response> getTickets() async {
