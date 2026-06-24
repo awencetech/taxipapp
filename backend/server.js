@@ -110,6 +110,10 @@ app.use('/api/v1/rides', require('./routes/rideRoutes'));
 app.use('/api/v1/admin', require('./routes/adminRoutes'));
 app.use('/api/v1/maps', require('./routes/mapsRoutes'));
 app.use('/api/v1/vendor', require('./routes/vendorRoutes'));
+app.use('/api/v1/support-tickets', require('./routes/supportTicketRoutes'));
+app.use('/api/v1/driver-earnings', require('./routes/driverEarningRoutes'));
+app.use('/api/v1/wallets', require('./routes/walletRoutes'));
+app.use('/api/v1/coupons', require('./routes/couponRoutes'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

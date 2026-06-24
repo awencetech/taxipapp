@@ -41,12 +41,16 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.createTicket({
+      final Map<String, dynamic> data = {
         'subject': ticket.subject,
         'description': ticket.description,
         'category': ticket.category,
         'priority': ticket.priority,
-      });
+      };
+      if (ticket.rideId != null && ticket.rideId!.isNotEmpty) {
+        data['ride'] = ticket.rideId;
+      }
+      final response = await _apiService.createTicket(data);
       if (response.data['success'] == true) {
         await fetchTickets();
         return true;

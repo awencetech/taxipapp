@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/primary_button.dart';
@@ -222,8 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: _handleGoogleSignIn,
-                icon: const FaIcon(FontAwesomeIcons.google,
-                    color: AppColors.black, size: 20),
+                icon: const Icon(Icons.login, color: AppColors.black, size: 20),
                 label: const Text('Sign up with Google',
                     style: TextStyle(
                         color: AppColors.black,

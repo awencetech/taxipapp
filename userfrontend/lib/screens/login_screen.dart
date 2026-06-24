@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -147,8 +146,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Image.network(
                     'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
                     height: 24,
-                    errorBuilder: (context, error, stackTrace) => const FaIcon(
-                      FontAwesomeIcons.google,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.login,
                       color: Colors.red,
                       size: 20,
                     ),

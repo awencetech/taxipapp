@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/providers/ticket_provider.dart';
+import '../../core/providers/booking_provider.dart';
 import '../../core/models/ticket_model.dart';
 
 class SupportScreen extends StatefulWidget {
@@ -687,7 +688,7 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
                 elevation: 0,
               ),
               child: const Text(
-                'Contact Support',
+                'Raise Ticket',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -882,8 +883,18 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _descriptionController = TextEditingController();
-  String _selectedCategory = 'General';
+  String _selectedCategory = 'Ride Issue';
   String _selectedPriority = 'Medium';
+  String? _selectedRideId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch ride history when dialog opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingProvider>().fetchRideHistory();
+    });
+  }
 
   @override
   void dispose() {
@@ -904,6 +915,7 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
       priority: _selectedPriority.toLowerCase(),
       createdAt: DateTime.now(),
       messages: const [],
+      rideId: _selectedRideId,
     );
 
     bool success = await provider.createTicket(newTicket);
@@ -928,13 +940,15 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<TicketProvider>(context);
+    final ticketProvider = Provider.of<TicketProvider>(context);
+    final bookingProvider = Provider.of<BookingProvider>(context);
+
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
       title: const Text(
-        'Raise a Ticket',
+        'Raise Support Ticket',
         style: TextStyle(fontWeight: FontWeight.bold),
       ),
       content: SingleChildScrollView(
@@ -946,16 +960,26 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
                 decoration: InputDecoration(
-                  labelText: 'Category',
+                  labelText: 'Issue Category',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'General', child: Text('General')),
-                  DropdownMenuItem(value: 'Rides', child: Text('Rides')),
-                  DropdownMenuItem(value: 'Payments', child: Text('Payments')),
-                  DropdownMenuItem(value: 'Account', child: Text('Account')),
+                  DropdownMenuItem(
+                      value: 'Ride Issue', child: Text('Ride Issue')),
+                  DropdownMenuItem(
+                      value: 'Driver Complaint',
+                      child: Text('Driver Complaint')),
+                  DropdownMenuItem(
+                      value: 'Payment Problem', child: Text('Payment Problem')),
+                  DropdownMenuItem(
+                      value: 'Refund Issue', child: Text('Refund Issue')),
+                  DropdownMenuItem(
+                      value: 'Account Problem', child: Text('Account Problem')),
+                  DropdownMenuItem(
+                      value: 'Safety Issue', child: Text('Safety Issue')),
+                  DropdownMenuItem(value: 'Other', child: Text('Other')),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -965,22 +989,29 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: _selectedPriority,
+                initialValue: _selectedRideId,
                 decoration: InputDecoration(
-                  labelText: 'Priority',
+                  labelText: 'Select Ride (Optional)',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'Low', child: Text('Low')),
-                  DropdownMenuItem(value: 'Medium', child: Text('Medium')),
-                  DropdownMenuItem(value: 'High', child: Text('High')),
-                  DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('No Ride Selected'),
+                  ),
+                  ...bookingProvider.rideHistory.map((ride) {
+                    return DropdownMenuItem<String>(
+                      value: ride.id,
+                      child: Text(
+                          '${ride.pickupAddress.substring(0, ride.pickupAddress.length > 30 ? 30 : ride.pickupAddress.length)}...'),
+                    );
+                  }),
                 ],
                 onChanged: (value) {
                   setState(() {
-                    _selectedPriority = value!;
+                    _selectedRideId = value;
                   });
                 },
               ),
@@ -988,7 +1019,7 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
               TextFormField(
                 controller: _subjectController,
                 decoration: InputDecoration(
-                  labelText: 'Subject',
+                  labelText: 'Issue Title',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1013,6 +1044,26 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedPriority,
+                decoration: InputDecoration(
+                  labelText: 'Priority',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Low', child: Text('Low')),
+                  DropdownMenuItem(value: 'Medium', child: Text('Medium')),
+                  DropdownMenuItem(value: 'High', child: Text('High')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPriority = value!;
+                  });
+                },
+              ),
             ],
           ),
         ),
@@ -1028,14 +1079,14 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
           ),
         ),
         ElevatedButton(
-          onPressed: provider.isLoading ? null : _submitTicket,
+          onPressed: ticketProvider.isLoading ? null : _submitTicket,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFF6B00),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          child: provider.isLoading
+          child: ticketProvider.isLoading
               ? const SizedBox(
                   width: 18,
                   height: 18,
@@ -1045,7 +1096,7 @@ class _RaiseTicketDialogState extends State<RaiseTicketDialog> {
                   ),
                 )
               : const Text(
-                  'Submit',
+                  'Submit Ticket',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

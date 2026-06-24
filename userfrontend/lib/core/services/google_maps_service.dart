@@ -83,4 +83,27 @@ class GoogleMapsService {
       rethrow;
     }
   }
+
+  Future<String> reverseGeocode(double lat, double lng) async {
+    final String url =
+        '${baseUrl.replaceAll('/api/v1', '')}/api/v1/maps/reverse-geocode?lat=$lat&lng=$lng';
+
+    try {
+      developer.log('Fetching reverse geocode via proxy for: $lat, $lng');
+      final headers = await _getHeaders();
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success']) {
+          return data['address'];
+        }
+      }
+      developer.log('Proxy reverse geocode failed');
+      return 'Unknown Location';
+    } catch (e) {
+      developer.log('Proxy reverse geocode exception: $e');
+      return 'Unknown Location';
+    }
+  }
 }

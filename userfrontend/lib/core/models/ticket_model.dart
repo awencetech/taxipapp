@@ -8,6 +8,7 @@ class TicketModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final List<TicketMessage> messages;
+  final String? rideId;
 
   TicketModel({
     required this.id,
@@ -19,6 +20,7 @@ class TicketModel {
     required this.createdAt,
     this.updatedAt,
     this.messages = const [],
+    this.rideId,
   });
 
   factory TicketModel.fromMap(Map<String, dynamic> map) {
@@ -35,6 +37,9 @@ class TicketModel {
               ?.map((e) => TicketMessage.fromMap(e))
               .toList() ??
           const [],
+      rideId: map['ride'] != null 
+          ? (map['ride'] is Map ? map['ride']['_id']?.toString() : map['ride']?.toString()) 
+          : null,
     );
   }
 }

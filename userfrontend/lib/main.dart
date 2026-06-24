@@ -11,6 +11,10 @@ import 'core/providers/ticket_provider.dart';
 import 'core/providers/search_provider.dart';
 import 'splash_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'features/booking/location_selection_screen.dart';
+import 'features/booking/ride_map_screen.dart';
+import 'features/booking/driver_match_screen.dart';
+import 'features/booking/home_screen.dart';
 
 void main() {
   runApp(
@@ -41,6 +45,12 @@ class TaxiNanbanApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
+      routes: {
+        '/home': (context) => const HomeScreen(),
+        '/location-selection': (context) => const LocationSelectionScreen(),
+        '/ride-map': (context) => const RideMapScreen(),
+        '/driver-match': (context) => const DriverMatchScreen(),
+      },
     );
   }
 }

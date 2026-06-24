@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/ride_viewmodel.dart';
 import '../../models/driver_models.dart';
@@ -109,6 +107,10 @@ class HomeDashboard extends StatefulWidget {
 }
 
 class _HomeDashboardState extends State<HomeDashboard> {
+  GoogleMapController? _mapController;
+  LatLng? _currentMapCenter;
+  String? _currentAddress;
+
   @override
   void initState() {
     super.initState();
@@ -141,6 +143,37 @@ class _HomeDashboardState extends State<HomeDashboard> {
         ),
       );
     }
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    final locationProvider = context.read<LocationProvider>();
+    if (locationProvider.currentPosition != null) {
+      final pos = locationProvider.currentPosition!;
+      _currentMapCenter = LatLng(pos.latitude, pos.longitude);
+    }
+  }
+
+  void _onCameraMove(CameraPosition position) {
+    setState(() {
+      _currentMapCenter = position.target;
+    });
+  }
+
+  void _goToCurrentLocation() async {
+    final locationProvider = context.read<LocationProvider>();
+    final pos = await locationProvider.getCurrentLocation();
+    if (pos != null && _mapController != null) {
+      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
+    }
+  }
+
+  void _zoomIn() {
+    _mapController?.animateCamera(CameraUpdate.zoomIn());
+  }
+
+  void _zoomOut() {
+    _mapController?.animateCamera(CameraUpdate.zoomOut());
   }
 
   Widget _buildRideCard(RideRequestModel ride, {bool showActions = false}) {
@@ -426,116 +459,61 @@ class _HomeDashboardState extends State<HomeDashboard> {
             child: Column(
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
+                    const Text(
+                      "TAXI NANBAN",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
                       ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                          size: 20,
+                    ),
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.notifications_none,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const NotificationsScreen(),
+                              ),
+                            );
+                          },
                         ),
-                        onPressed: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white,
-                      backgroundImage:
-                          (driver?.profilePic != null &&
-                              driver!.profilePic!.isNotEmpty)
-                          ? (driver.profilePic!.startsWith('http')
-                                ? CachedNetworkImageProvider(driver.profilePic!)
-                                : FileImage(File(driver.profilePic!))
-                                      as ImageProvider)
-                          : null,
-                      child:
-                          (driver?.profilePic == null ||
-                              driver!.profilePic!.isEmpty)
-                          ? const Icon(
-                              Icons.person,
-                              size: 35,
-                              color: Colors.grey,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            driver?.name ?? 'Driver Name',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                color: Colors.yellow,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${driver?.rating ?? 4.8} • ${driver?.vehicleNumber ?? "KA 05 MX 1234"}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.notifications_none,
-                              color: Colors.white,
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const NotificationsScreen(),
-                                ),
-                              );
-                            },
-                          ),
+                        if (rideViewModel.unreadCount > 0)
                           Positioned(
-                            right: 12,
-                            top: 12,
+                            right: 8,
+                            top: 8,
                             child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
                                 color: Colors.red,
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                rideViewModel.unreadCount > 9
+                                    ? '9+'
+                                    : '${rideViewModel.unreadCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                     const SizedBox(width: 10),
                     Container(
@@ -631,7 +609,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
           // Earnings Summary Card
           Transform.translate(
-            offset: const Offset(0, -30),
+            offset: const Offset(0, 0),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.all(24),
@@ -1046,7 +1024,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       "5",
                       avatarColor,
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           ),
@@ -1058,472 +1036,288 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Widget _buildOnlineUI() {
     final rideViewModel = context.watch<RideViewModel>();
+    final locationProvider = context.watch<LocationProvider>();
+    // Filter pending/accepted rides
+    final pendingRides = rideViewModel.rideHistory
+        .where((ride) => ride.status == 'pending' || ride.status == 'accepted')
+        .toList();
+    final hasRequests =
+        rideViewModel.incomingRequest != null || pendingRides.isNotEmpty;
 
-    return Container(
-      color: const Color(0xFFF8F9FA), // Light grey body background
-      child: Column(
+    return Scaffold(
+      body: Stack(
         children: [
-          // Green Header Section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.only(top: 50, bottom: 40),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2EBD59), // Solid green from image
+          // Full screen Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: locationProvider.currentPosition != null
+                  ? LatLng(
+                      locationProvider.currentPosition!.latitude,
+                      locationProvider.currentPosition!.longitude,
+                    )
+                  : const LatLng(11.0168, 76.9558),
+              zoom: 16,
             ),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            zoomGesturesEnabled: false,
+            scrollGesturesEnabled: true,
+            tiltGesturesEnabled: false,
+            rotateGesturesEnabled: false,
+            onMapCreated: _onMapCreated,
+            onCameraMove: _onCameraMove,
+          ),
+
+          // Center pickup pin
+          Center(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Positioned(
-                        left: 20,
-                        child: GestureDetector(
-                          onTap: () {
-                            if (rideViewModel.isOnline) {
-                              rideViewModel.toggleOnlineOffline();
-                            } else if (Navigator.canPop(context)) {
-                              Navigator.pop(context);
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Transform.rotate(
-                            angle: -0.5, // Slight tilt like in navigation icons
-                            child: const Icon(
-                              Icons.navigation,
-                              color: Colors.white,
-                              size: 55,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 20,
-                        child: GestureDetector(
-                          onTap: () {
-                            rideViewModel.toggleOnlineOffline();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.power_settings_new,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  "Go Offline",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "You're Online",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  "Waiting for ride requests...",
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Timer Pill
+                // Pickup point label
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 10,
+                    horizontal: 16,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        rideViewModel.onlineDuration,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace', // Better for timers
-                        ),
+                    color: const Color(0xFF2EBD59),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
+                  child: const Text(
+                    "Pickup Point",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 8),
+                // Pin icon
+                const Icon(
+                  Icons.location_on,
+                  color: Color(0xFF4A90E2),
+                  size: 48,
+                ),
+                const SizedBox(height: 60), // Adjust to align pin center
               ],
             ),
           ),
 
-          Expanded(
-            child: SingleChildScrollView(
-              child: Stack(
-                clipBehavior: Clip.none,
+          // Address card below center
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.45,
+            left: 24,
+            right: 24,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Background with subtle pattern or gradient if needed
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            const Color(0xFFF8F9FA),
-                            Colors.white.withValues(alpha: 0.5),
-                            Colors.white,
-                          ],
-                        ),
-                      ),
+                  const Text(
+                    "Current Location",
+                    style: TextStyle(
+                      color: Color(0xFF757575),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  // Content under header
-                  Column(
-                    children: [
-                      const SizedBox(
-                        height: 100,
-                      ), // Space for the overlapping card
-                      // Live Map View Pulse
-                      Center(
-                        child: Column(
-                          children: [
-                            Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Pulsing effect
-                                ...List.generate(
-                                  3,
-                                  (index) => Container(
-                                    width: 80.0 + (index * 20),
-                                    height: 80.0 + (index * 20),
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFF2EBD59,
-                                      ).withValues(alpha: 0.1 / (index + 1)),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF2EBD59),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Color(0x402EBD59),
-                                        blurRadius: 15,
-                                        spreadRadius: 8,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.my_location,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              "Live Map View",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF444444),
-                              ),
-                            ),
-                            const Text(
-                              "Your current location",
-                              style: TextStyle(fontSize: 14, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      // Bottom Stats and Actions
-                      Container(
-                        padding: const EdgeInsets.only(
-                          left: 24,
-                          right: 24,
-                          top: 30,
-                          bottom: 40,
-                        ),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(35),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x0A000000),
-                              blurRadius: 20,
-                              offset: Offset(0, -10),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildOnlineStat(
-                                  "₹0",
-                                  "Today's Earnings",
-                                  const Color(0xFF2EBD59),
-                                ),
-                                _buildOnlineStat(
-                                  "0",
-                                  "Trips",
-                                  const Color(0xFF1A1A1A),
-                                ),
-                                _buildOnlineStat(
-                                  rideViewModel.onlineDuration,
-                                  "Online Time",
-                                  const Color(0xFF1A1A1A),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 30),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: () =>
-                                    rideViewModel.toggleOnlineOffline(),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFFE53935),
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: const Text(
-                                  "Go Offline",
-                                  style: TextStyle(
-                                    color: Color(0xFFE53935),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            // Earning Tip Card
-                            Container(
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF0F7FF),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.bolt,
-                                      color: Color(0xFF2196F3),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 15),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Earning Tip",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            color: Color(0xFF1A1A1A),
-                                          ),
-                                        ),
-                                        Text(
-                                          "Head to MG Road for higher demand and better earnings!",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Color(0xFF666666),
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            // Offline Shortcut
-                            GestureDetector(
-                              onTap: () => rideViewModel.toggleOnlineOffline(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.power_settings_new,
-                                      color: Colors.grey[400],
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      "SWITCH TO OFFLINE MODE",
-                                      style: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    _currentAddress ?? "Fetching address...",
+                    style: const TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  // High Demand Areas Overlapping Card
-                  Positioned(
-                    top: -45,
-                    left: 20,
-                    right: 20,
-                    child: Container(
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
+                ],
+              ),
+            ),
+          ),
+
+          // Top header
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "TAXI NANBAN",
+                      style: TextStyle(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 25,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.trending_up,
-                                color: Color(0xFFFF8A00),
-                                size: 22,
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                "High Demand Areas",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 17,
-                                  color: Color(0xFF1A1A1A),
-                                ),
+                    ),
+                    Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 18),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: Row(
-                              children: [
-                                _buildDemandArea(
-                                  "MG Road",
-                                  "2.3 km",
-                                  const Color(0xFFE53935),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.notifications_none,
+                              color: Color(0xFF1A1A1A),
+                              size: 28,
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationsScreen(),
                                 ),
-                                const SizedBox(width: 14),
-                                _buildDemandArea(
-                                  "Koramangala",
-                                  "3.5 km",
-                                  const Color(0xFFFFB300),
+                              );
+                            },
+                          ),
+                        ),
+                        if (rideViewModel.unreadCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                rideViewModel.unreadCount > 9
+                                    ? '9+'
+                                    : '${rideViewModel.unreadCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(width: 14),
-                                _buildDemandArea(
-                                  "Indiranagar",
-                                  "4.1 km",
-                                  const Color(0xFFE53935),
-                                ),
-                              ],
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Map controls (right side)
+          Positioned(
+            right: 16,
+            top: MediaQuery.of(context).size.height * 0.25,
+            child: Column(
+              children: [
+                _buildMapControlButton(Icons.my_location, _goToCurrentLocation),
+                const SizedBox(height: 12),
+                _buildMapControlButton(Icons.add, _zoomIn),
+                const SizedBox(height: 12),
+                _buildMapControlButton(Icons.remove, _zoomOut),
+              ],
+            ),
+          ),
+
+          // Online status and go offline button
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.12,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2EBD59),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Online",
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () {
+                      rideViewModel.toggleOnlineOffline();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF4444),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "Go Offline",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -1531,7 +1325,85 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ),
             ),
           ),
+
+          // Ride requests bottom sheet
+          if (hasRequests)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(32),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0E0E0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Text(
+                      "Available Ride Requests",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (rideViewModel.incomingRequest != null)
+                      _buildRideCard(
+                        rideViewModel.incomingRequest!,
+                        showActions: true,
+                      ),
+                    ...pendingRides.map(
+                      (ride) => _buildRideCard(ride, showActions: true),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMapControlButton(IconData icon, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: const Color(0xFF1A1A1A), size: 24),
+        onPressed: onPressed,
       ),
     );
   }
@@ -1919,10 +1791,55 @@ class _MapViewState extends State<MapView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Taxi Nanban Driver"),
-        backgroundColor: Colors.red,
+        title: const Text(
+          "TAXI NANBAN",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28),
+        ),
+        backgroundColor: const Color(0xFF2D2D2D),
         foregroundColor: Colors.white,
         actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              ),
+              if (rideViewModel.unreadCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      rideViewModel.unreadCount > 9
+                          ? '9+'
+                          : '${rideViewModel.unreadCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -1955,6 +1872,11 @@ class _MapViewState extends State<MapView> {
             myLocationButtonEnabled: false,
             mapType: _getMapType(),
             trafficEnabled: _isTrafficEnabled,
+            zoomControlsEnabled: false,
+            zoomGesturesEnabled: false,
+            scrollGesturesEnabled: true,
+            tiltGesturesEnabled: false,
+            rotateGesturesEnabled: false,
             onMapCreated: (controller) {
               _mapController = controller;
               final locationProvider = context.read<LocationProvider>();

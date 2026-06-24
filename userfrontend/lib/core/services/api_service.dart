@@ -518,12 +518,10 @@ class ApiService {
     }
   }
 
-
-
   // Tickets/Support
   Future<Response> getTickets() async {
     try {
-      return await _dio.get('/users/tickets');
+      return await _dio.get('/support-tickets/my-tickets');
     } catch (e) {
       developer.log('GetTickets error: $e');
       rethrow;
@@ -532,7 +530,7 @@ class ApiService {
 
   Future<Response> createTicket(Map<String, dynamic> data) async {
     try {
-      return await _dio.post('/users/tickets', data: data);
+      return await _dio.post('/support-tickets', data: data);
     } catch (e) {
       developer.log('CreateTicket error: $e');
       rethrow;
@@ -541,7 +539,7 @@ class ApiService {
 
   Future<Response> getTicketDetails(String id) async {
     try {
-      return await _dio.get('/users/tickets/$id');
+      return await _dio.get('/support-tickets/$id');
     } catch (e) {
       developer.log('GetTicketDetails error: $e');
       rethrow;
@@ -551,9 +549,25 @@ class ApiService {
   Future<Response> sendTicketMessage(
       String id, Map<String, dynamic> data) async {
     try {
-      return await _dio.post('/users/tickets/$id/messages', data: data);
+      return await _dio.post('/support-tickets/$id/messages', data: data);
     } catch (e) {
       developer.log('SendTicketMessage error: $e');
+      rethrow;
+    }
+  }
+
+  // Maps
+  Future<Response> getDirections(double originLat, double originLng,
+      double destLat, double destLng) async {
+    try {
+      return await _dio.get('/maps/directions', queryParameters: {
+        'originLat': originLat,
+        'originLng': originLng,
+        'destLat': destLat,
+        'destLng': destLng,
+      });
+    } catch (e) {
+      developer.log('GetDirections error: $e');
       rethrow;
     }
   }

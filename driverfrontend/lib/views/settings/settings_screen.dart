@@ -9,7 +9,7 @@ import '../../viewmodels/theme_viewmodel.dart';
 import '../profile/bank_details_screen.dart';
 import './privacy_settings_screen.dart';
 import './change_password_screen.dart';
-import '../support/help_center_screen.dart';
+import '../support/support_screen.dart';
 import '../support/static_page_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -35,7 +35,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Top Header with Gradient
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 40),
+              padding: const EdgeInsets.only(
+                top: 60,
+                left: 24,
+                right: 24,
+                bottom: 40,
+              ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -52,7 +57,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       onPressed: () {
                         if (Navigator.canPop(context)) {
                           Navigator.pop(context);
@@ -85,42 +94,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('ACCOUNT'),
             _buildSettingsCard([
               _buildSettingItem(
-                Icons.person_outline, 
-                'Personal Information', 
+                Icons.person_outline,
+                'Personal Information',
                 onTap: () {
-                  HomeScreen.of(context)?.setSelectedIndex(3); // Index for ProfileScreen
+                  HomeScreen.of(
+                    context,
+                  )?.setSelectedIndex(3); // Index for ProfileScreen
                 },
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.credit_card_outlined, 
-                'Payment Methods', 
+                Icons.credit_card_outlined,
+                'Payment Methods',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const WalletScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const WalletScreen(),
+                    ),
                   );
                 },
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.description_outlined, 
-                'Documents', 
+                Icons.description_outlined,
+                'Documents',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const VehicleManagementScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const VehicleManagementScreen(),
+                    ),
                   );
                 },
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.account_balance_outlined, 
-                'Bank Details', 
+                Icons.account_balance_outlined,
+                'Bank Details',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BankDetailsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const BankDetailsScreen(),
+                    ),
                   );
                 },
               ),
@@ -132,8 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('PREFERENCES'),
             _buildSettingsCard([
               _buildSettingItem(
-                Icons.dark_mode_outlined, 
-                'Dark Mode', 
+                Icons.dark_mode_outlined,
+                'Dark Mode',
                 trailing: Switch(
                   value: themeViewModel.isDarkMode,
                   onChanged: (value) {
@@ -160,23 +177,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('SECURITY'),
             _buildSettingsCard([
               _buildSettingItem(
-                Icons.shield_outlined, 
-                'Privacy Settings', 
+                Icons.shield_outlined,
+                'Privacy Settings',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const PrivacySettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const PrivacySettingsScreen(),
+                    ),
                   );
                 },
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.lock_outline, 
-                'Change Password', 
+                Icons.lock_outline,
+                'Change Password',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const ChangePasswordScreen(),
+                    ),
                   );
                 },
               ),
@@ -188,26 +209,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('SUPPORT'),
             _buildSettingsCard([
               _buildSettingItem(
-                Icons.help_outline, 
-                'Help Center', 
+                Icons.help_outline,
+                'Help Center',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const SupportScreen(),
+                    ),
                   );
                 },
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.article_outlined, 
-                'Terms & Conditions', 
+                Icons.article_outlined,
+                'Terms & Conditions',
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const StaticPageScreen(
                         title: 'Terms & Conditions',
-                        content: 'These Terms & Conditions govern your use of the TaxiNanban Driver app. By using the app, you agree to these terms in full...',
+                        content:
+                            'These Terms & Conditions govern your use of the TaxiNanban Driver app. By using the app, you agree to these terms in full...',
                       ),
                     ),
                   );
@@ -215,15 +239,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1, indent: 60),
               _buildSettingItem(
-                Icons.privacy_tip_outlined, 
-                'Privacy Policy', 
+                Icons.privacy_tip_outlined,
+                'Privacy Policy',
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const StaticPageScreen(
                         title: 'Privacy Policy',
-                        content: 'Your privacy is important to us. This Privacy Policy explains how we collect, use, and share your personal information...',
+                        content:
+                            'Your privacy is important to us. This Privacy Policy explains how we collect, use, and share your personal information...',
                       ),
                     ),
                   );
@@ -253,7 +278,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final navigator = Navigator.of(context);
                   await authViewModel.logout();
                   navigator.pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
                     (route) => false,
                   );
                 },
@@ -296,7 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSettingsCard(List<Widget> children) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
@@ -310,23 +337,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
 
-  Widget _buildSettingItem(IconData icon, String label, {Widget? trailing, VoidCallback? onTap}) {
+  Widget _buildSettingItem(
+    IconData icon,
+    String label, {
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF5F5F5),
+          color: isDark
+              ? theme.scaffoldBackgroundColor
+              : const Color(0xFFF5F5F5),
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: theme.colorScheme.onSurface, size: 22),
@@ -339,9 +371,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: theme.colorScheme.onSurface,
         ),
       ),
-      trailing: trailing ?? Icon(Icons.chevron_right, color: theme.hintColor, size: 20),
+      trailing:
+          trailing ??
+          Icon(Icons.chevron_right, color: theme.hintColor, size: 20),
     );
   }
 }
-
-

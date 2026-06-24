@@ -70,5 +70,8 @@ const rideSchema = new mongoose.Schema({
 
 rideSchema.index({ pickupLocation: '2dsphere' });
 rideSchema.index({ dropLocation: '2dsphere' });
+rideSchema.index({ status: 1 });
+rideSchema.index({ user: 1 });
+rideSchema.index({ driver: 1 });
 
 module.exports = mongoose.model('Ride', rideSchema);

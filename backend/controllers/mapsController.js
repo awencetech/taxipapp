@@ -1,4 +1,4 @@
-const { getAutocompleteSuggestions, getPlaceDetails, getDistanceMatrix, getDirections } = require('../services/mapsService');
+const { getAutocompleteSuggestions, getPlaceDetails, getDistanceMatrix, getDirections, getAddressFromCoords } = require('../services/mapsService');
 
 const autocomplete = async (req, res) => {
   try {
@@ -62,4 +62,18 @@ const directions = async (req, res) => {
   }
 };
 
-module.exports = { autocomplete, placeDetails, distance, directions };
+const reverseGeocode = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
+    }
+
+    const address = await getAddressFromCoords(parseFloat(lat), parseFloat(lng));
+    res.status(200).json({ success: true, address });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { autocomplete, placeDetails, distance, directions, reverseGeocode };

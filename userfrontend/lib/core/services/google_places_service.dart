@@ -34,6 +34,9 @@ class GooglePlacesService {
       if (response.statusCode == 200) {
         // Check if there are any API errors
         if (response.data['status'] != 'OK') {
+          if (response.data['status'] == 'ZERO_RESULTS') {
+            return [];
+          }
           throw Exception(
               'Google Places API Error: ${response.data['status']}');
         }

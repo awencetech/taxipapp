@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import '../services/google_maps_service.dart';
@@ -230,44 +229,20 @@ class LocationProvider extends ChangeNotifier {
 
   Future<void> _reverseGeocode(LatLng coords) async {
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        coords.latitude,
-        coords.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        List<String> addressParts = [];
-
-        if (place.street != null && place.street!.isNotEmpty) {
-          addressParts.add(place.street!);
-        }
-        if (place.subLocality != null && place.subLocality!.isNotEmpty) {
-          addressParts.add(place.subLocality!);
-        }
-        if (place.locality != null && place.locality!.isNotEmpty) {
-          addressParts.add(place.locality!);
-        }
-        if (place.subAdministrativeArea != null &&
-            place.subAdministrativeArea!.isNotEmpty) {
-          addressParts.add(place.subAdministrativeArea!);
-        }
-        if (place.administrativeArea != null &&
-            place.administrativeArea!.isNotEmpty) {
-          addressParts.add(place.administrativeArea!);
-        }
-
-        _currentAddress = addressParts.join(', ');
-        if (_currentAddress.isEmpty) {
-          _currentAddress =
-              '${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}';
-        }
-      }
+      final address = await _mapsService.reverseGeocode(coords.latitude, coords.longitude);
+      _currentAddress = address;
     } catch (e) {
-      _currentAddress =
-          '${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}';
+      _currentAddress = 'Current Location';
     }
     notifyListeners();
+  }
+
+  Future<String> getAddressFromLatLng(double lat, double lng) async {
+    try {
+      return await _mapsService.reverseGeocode(lat, lng);
+    } catch (e) {
+      return 'Unknown Location';
+    }
   }
 
   Future<void> searchPlaces(String query) async {

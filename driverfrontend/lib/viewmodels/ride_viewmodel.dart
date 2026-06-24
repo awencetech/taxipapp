@@ -416,6 +416,97 @@ class RideViewModel extends ChangeNotifier {
     }
   }
 
+  List<SupportTicketModel> _tickets = [];
+  bool _ticketsLoading = false;
+  List<SupportTicketModel> get tickets => _tickets;
+  bool get ticketsLoading => _ticketsLoading;
+
+  Future<void> fetchTickets() async {
+    _ticketsLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final response = await _apiService.get(AppConstants.mySupportTicketsUrl);
+      debugPrint('Tickets response: ${response.data}');
+
+      if (response.data['success'] == true) {
+        final data = response.data['data'];
+        if (data != null && data is List) {
+          _tickets = data
+              .map((ticket) => SupportTicketModel.fromJson(ticket))
+              .toList();
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Fetch tickets error: $e');
+      _error = e.toString();
+    } finally {
+      _ticketsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<SupportTicketModel?> createTicket({
+    required String category,
+    required String title,
+    required String description,
+    String? rideId,
+    String priority = 'Medium',
+  }) async {
+    try {
+      final response = await _apiService.post(
+        AppConstants.createSupportTicketsUrl,
+        data: {
+          'category': category,
+          'subject': title,
+          'description': description,
+          'ride': rideId,
+          'priority': priority,
+        },
+      );
+      if (response.data['success'] == true) {
+        final ticket = SupportTicketModel.fromJson(response.data['data']);
+        _tickets.add(ticket);
+        notifyListeners();
+        return ticket;
+      }
+    } catch (e) {
+      debugPrint('Create ticket error: $e');
+      _error = e.toString();
+      rethrow;
+    }
+    return null;
+  }
+
+  Future<SupportTicketModel?> getTicket(String ticketId) async {
+    try {
+      final response = await _apiService.get(
+        AppConstants.supportTicketUrl.replaceFirst(':id', ticketId),
+      );
+      if (response.data['success'] == true) {
+        return SupportTicketModel.fromJson(response.data['data']);
+      }
+    } catch (e) {
+      debugPrint('Get ticket error: $e');
+      _error = e.toString();
+    }
+    return null;
+  }
+
+  Future<void> addMessage(String ticketId, String message) async {
+    try {
+      await _apiService.post(
+        AppConstants.supportTicketMessagesUrl.replaceFirst(':id', ticketId),
+        data: {'message': message},
+      );
+    } catch (e) {
+      debugPrint('Add message error: $e');
+      _error = e.toString();
+      rethrow;
+    }
+  }
+
   @override
   void dispose() {
     _stopLocationUpdates();

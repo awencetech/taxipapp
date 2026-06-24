@@ -81,17 +81,24 @@ class DriverModel {
   factory DriverModel.fromJson(Map<String, dynamic> json) {
     try {
       debugPrint('DriverModel.fromJson: Input JSON: $json');
-      
+
       // Parse bank accounts
       List<BankAccountModel> accounts = [];
       if (json['bankAccounts'] != null && json['bankAccounts'] is List) {
         accounts = (json['bankAccounts'] as List)
             .whereType<Map>()
-            .map((item) => BankAccountModel.fromJson(Map<String, dynamic>.from(item)))
+            .map(
+              (item) =>
+                  BankAccountModel.fromJson(Map<String, dynamic>.from(item)),
+            )
             .toList();
       }
       // If no accounts in JSON, check old single fields and create one
-      if (accounts.isEmpty && ((json['bankName'] != null && (json['bankName'] as String).isNotEmpty) || (json['accountNumber'] != null && (json['accountNumber'] as String).isNotEmpty))) {
+      if (accounts.isEmpty &&
+          ((json['bankName'] != null &&
+                  (json['bankName'] as String).isNotEmpty) ||
+              (json['accountNumber'] != null &&
+                  (json['accountNumber'] as String).isNotEmpty))) {
         accounts = [
           BankAccountModel(
             bankName: (json['bankName'] as String?) ?? '',
@@ -99,7 +106,7 @@ class DriverModel {
             accountNumber: (json['accountNumber'] as String?) ?? '',
             ifscCode: (json['ifscCode'] as String?) ?? '',
             branchName: (json['branchName'] as String?) ?? '',
-          )
+          ),
         ];
       }
 
@@ -108,14 +115,17 @@ class DriverModel {
       if (json['documents'] != null && json['documents'] is List) {
         docs = (json['documents'] as List)
             .whereType<Map>()
-            .map((item) => DocumentModel.fromJson(Map<String, dynamic>.from(item)))
+            .map(
+              (item) => DocumentModel.fromJson(Map<String, dynamic>.from(item)),
+            )
             .toList();
       }
       debugPrint('DriverModel.fromJson: Parsed ${docs.length} documents');
 
-      final driverId = json['_id']?.toString() ?? json['id']?.toString() ?? 'unknown';
+      final driverId =
+          json['_id']?.toString() ?? json['id']?.toString() ?? 'unknown';
       debugPrint('DriverModel.fromJson: Extracted driverId: $driverId');
-      
+
       final driver = DriverModel(
         id: driverId,
         name: (json['name'] as String?) ?? 'Unknown Driver',
@@ -138,7 +148,7 @@ class DriverModel {
         // New documents
         documents: docs,
       );
-      
+
       debugPrint('DriverModel.fromJson: Successfully created DriverModel!');
       return driver;
     } catch (e, stackTrace) {
@@ -245,18 +255,20 @@ class DocumentModel {
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     debugPrint('Parsing DocumentModel from: $json');
-    
+
     return DocumentModel(
       id: (json['_id']?.toString() ?? json['id']?.toString()) ?? '',
       title: (json['title'] as String?) ?? 'Unknown',
       category: (json['category'] as String?) ?? 'vehicle',
-      url: (json['url'] as String?) ?? (json['filePath'] as String?), // Backward compatibility
+      url:
+          (json['url'] as String?) ??
+          (json['filePath'] as String?), // Backward compatibility
       status: (json['status'] as String?) ?? 'Pending',
-      uploadedAt: json['uploadedAt'] != null 
-          ? DateTime.tryParse(json['uploadedAt'].toString()) 
+      uploadedAt: json['uploadedAt'] != null
+          ? DateTime.tryParse(json['uploadedAt'].toString())
           : null,
-      expiryDate: json['expiryDate'] != null 
-          ? DateTime.tryParse(json['expiryDate'].toString()) 
+      expiryDate: json['expiryDate'] != null
+          ? DateTime.tryParse(json['expiryDate'].toString())
           : null,
     );
   }
@@ -309,7 +321,10 @@ class RideRequestModel {
     if (json['pickupLocation']?['coordinates'] != null &&
         json['pickupLocation']['coordinates'] is List) {
       final coords = json['pickupLocation']['coordinates'] as List;
-      pickupCoords = [coords[1]?.toDouble() ?? 0.0, coords[0]?.toDouble() ?? 0.0];
+      pickupCoords = [
+        coords[1]?.toDouble() ?? 0.0,
+        coords[0]?.toDouble() ?? 0.0,
+      ];
     }
 
     // Parse drop coords
@@ -337,8 +352,113 @@ class RideRequestModel {
       distance: (json['distance'] ?? 0.0).toDouble(),
       estimatedTime: json['duration'] ?? 0,
       status: json['status'] ?? 'pending',
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'])
+          : null,
       cancellationReason: json['cancellationReason'],
     );
+  }
+}
+
+class TicketMessageModel {
+  final String senderId;
+  final String message;
+  final DateTime timestamp;
+
+  TicketMessageModel({
+    required this.senderId,
+    required this.message,
+    required this.timestamp,
+  });
+
+  factory TicketMessageModel.fromJson(Map<String, dynamic> json) {
+    return TicketMessageModel(
+      senderId: json['sender']?.toString() ?? '',
+      message: json['message'] ?? '',
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'sender': senderId,
+      'message': message,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+}
+
+class SupportTicketModel {
+  final String id;
+  final String? ticketId;
+  final String userId;
+  final String? rideId;
+  final String category;
+  final String subject;
+  final String description;
+  final String priority;
+  final String status;
+  final DateTime? createdAt;
+  final List<TicketMessageModel> messages;
+
+  SupportTicketModel({
+    required this.id,
+    this.ticketId,
+    required this.userId,
+    this.rideId,
+    required this.category,
+    required this.subject,
+    required this.description,
+    required this.priority,
+    required this.status,
+    this.createdAt,
+    this.messages = const [],
+  });
+
+  factory SupportTicketModel.fromJson(Map<String, dynamic> json) {
+    List<TicketMessageModel> messages = [];
+    if (json['messages'] != null && json['messages'] is List) {
+      messages = (json['messages'] as List)
+          .whereType<Map>()
+          .map(
+            (item) =>
+                TicketMessageModel.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList();
+    }
+
+    return SupportTicketModel(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      ticketId: json['ticketId']?.toString(),
+      userId: json['user']?.toString() ?? json['userId']?.toString() ?? '',
+      rideId: json['ride']?.toString() ?? json['rideId']?.toString(),
+      category: json['category']?.toString() ?? 'Other',
+      subject: json['subject']?.toString() ?? json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      priority: json['priority']?.toString() ?? 'Medium',
+      status: json['status']?.toString() ?? 'Open',
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+      messages: messages,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'ticketId': ticketId,
+      'userId': userId,
+      'rideId': rideId,
+      'category': category,
+      'subject': subject,
+      'description': description,
+      'priority': priority,
+      'status': status,
+      'createdAt': createdAt?.toIso8601String(),
+      'messages': messages.map((e) => e.toJson()).toList(),
+    };
   }
 }

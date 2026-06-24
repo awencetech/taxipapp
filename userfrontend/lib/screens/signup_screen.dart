@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/auth_provider.dart';
 import 'home_screen.dart';
 
@@ -152,8 +151,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Image.network(
                   'https://auth.expo.io/@vendor/google.png',
                   height: 24,
-                  errorBuilder: (context, error, stackTrace) => const FaIcon(
-                    FontAwesomeIcons.google,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.login,
                     color: Colors.red,
                     size: 20,
                   ),

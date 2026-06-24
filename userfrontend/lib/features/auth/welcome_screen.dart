@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
@@ -253,7 +252,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               color: AppColors.card.withValues(alpha: 0.2),
                             ),
                           ),
-                          icon: const FaIcon(FontAwesomeIcons.google),
+                          icon: const Icon(Icons.login),
                           onPressed: _handleGoogleSignIn,
                           label: const Text(
                             "Continue with Google",
@@ -264,7 +263,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: () {},

@@ -46,6 +46,13 @@ class AppConstants {
   static const String markAllNotificationsReadUrl =
       '/drivers/notifications/mark-all-read';
 
+  // Support Ticket APIs
+  static const String createSupportTicketsUrl = '/support-tickets';
+  static const String mySupportTicketsUrl = '/support-tickets/my-tickets';
+  static const String supportTicketUrl = '/support-tickets/:id';
+  static const String supportTicketMessagesUrl =
+      '/support-tickets/:id/messages';
+
   static const String tokenKey = 'driver_jwt_token';
   static const String driverIdKey = 'driver_id';
   static const String isOnlineKey = 'is_online';
