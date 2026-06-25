@@ -7,11 +7,18 @@ class GoogleAuthService {
 
   late final GoogleSignIn _googleSignIn;
 
-  GoogleAuthService() {
+  // Singleton pattern
+  GoogleAuthService._privateConstructor() {
     _googleSignIn = GoogleSignIn(
       clientId: kIsWeb ? _clientId : null,
       scopes: ['email', 'profile'],
     );
+  }
+
+  static final GoogleAuthService _instance = GoogleAuthService._privateConstructor();
+
+  factory GoogleAuthService() {
+    return _instance;
   }
 
   Future<Map<String, dynamic>?> signIn() async {
