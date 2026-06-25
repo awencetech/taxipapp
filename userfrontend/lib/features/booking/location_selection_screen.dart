@@ -10,6 +10,7 @@ import '../../core/models/place_details_model.dart';
 import '../../core/models/ride_type.dart';
 import 'map_location_picker_screen.dart';
 import 'searching_driver_screen.dart';
+import 'ride_booking_screen.dart';
 
 enum LocationField { pickup, drop }
 
@@ -99,10 +100,18 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
           _isSearching = false;
         });
 
-        // If both are selected, calculate route
+        // If both are selected, calculate route and navigate
         if (bookingProvider.pickupLocation != null &&
             bookingProvider.dropLocation != null) {
           await bookingProvider.calculateRoute();
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const RideBookingScreen(),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -300,6 +309,15 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                                 await context
                                     .read<BookingProvider>()
                                     .calculateRoute();
+                                if (mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RideBookingScreen(),
+                                    ),
+                                  );
+                                }
                               }
                             }
                           },
@@ -347,11 +365,21 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
             Expanded(
               child: Consumer<BookingProvider>(
                 builder: (context, bookingProvider, child) {
-                  // If both locations selected, show ride details
+                  // If both locations selected, navigate to RideBookingScreen
                   if (bookingProvider.pickupLocation != null &&
                       bookingProvider.dropLocation != null &&
                       !_isSearching) {
-                    return _buildRideDetails(bookingProvider);
+                    // Use PostFrameCallback to avoid building during build
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RideBookingScreen(),
+                          ),
+                        );
+                      }
+                    });
                   }
                   // Otherwise show search results or recent locations
                   return _isSearching
@@ -920,10 +948,18 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                               .read<BookingProvider>()
                               .setDropLocation(placeDetails);
                           _dropController.text = displayLabel;
-                          // Calculate route
+                          // Calculate route and navigate
                           await context
                               .read<BookingProvider>()
                               .calculateRoute();
+                          if (mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RideBookingScreen(),
+                              ),
+                            );
+                          }
                         }
                       },
                       child: Container(
