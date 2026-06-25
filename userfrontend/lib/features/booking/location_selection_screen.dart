@@ -29,6 +29,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   final TextEditingController _dropController = TextEditingController();
   LocationField _activeField = LocationField.drop;
   bool _isSearching = false;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
@@ -105,6 +106,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
             bookingProvider.dropLocation != null) {
           await bookingProvider.calculateRoute();
           if (mounted) {
+            setState(() {
+              _hasNavigated = true;
+            });
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -132,263 +136,295 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: Colors.white,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back,
-                            color: AppColors.black),
-                        onPressed: () {
-                          context.read<BookingProvider>().resetBooking();
-                          Navigator.pop(context);
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        "Where to?",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Pickup & Drop Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.grey100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    return WillPopScope(
+      onWillPop: () async {
+        // Reset the navigation flag when user navigates back
+        setState(() {
+          _hasNavigated = false;
+        });
+        context.read<BookingProvider>().resetBooking();
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F8FA),
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: Colors.white,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        // Icons Column
-                        Column(
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF4CD964),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.circle,
-                                  size: 10, color: Colors.white),
-                            ),
-                            Container(
-                              width: 2,
-                              height: 30,
-                              color: AppColors.grey300,
-                            ),
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFF9500),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.location_pin,
-                                  size: 14, color: Colors.white),
-                            ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back,
+                              color: AppColors.black),
+                          onPressed: () {
+                            setState(() {
+                              _hasNavigated = false;
+                            });
+                            context.read<BookingProvider>().resetBooking();
+                            Navigator.pop(context);
+                          },
                         ),
-                        const SizedBox(width: 16),
-                        // Text Fields Column
-                        Expanded(
-                          child: Column(
-                            children: [
-                              TextField(
-                                controller: _pickupController,
-                                onTap: () {
-                                  setState(() =>
-                                      _activeField = LocationField.pickup);
-                                },
-                                style: const TextStyle(
-                                    color: AppColors.black,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500),
-                                decoration: InputDecoration(
-                                  hintText: "Current Location",
-                                  hintStyle: const TextStyle(
-                                      color: AppColors.grey400, fontSize: 16),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                  suffixIcon: _pickupController.text.isNotEmpty
-                                      ? IconButton(
-                                          icon:
-                                              const Icon(Icons.clear, size: 20),
-                                          onPressed: () {
-                                            _pickupController.clear();
-                                            setState(
-                                                () => _isSearching = false);
-                                          },
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              const Divider(height: 24, thickness: 1),
-                              TextField(
-                                controller: _dropController,
-                                onTap: () {
-                                  setState(
-                                      () => _activeField = LocationField.drop);
-                                },
-                                autofocus: true,
-                                style: const TextStyle(
-                                    color: AppColors.black,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500),
-                                decoration: InputDecoration(
-                                  hintText: "Enter destination",
-                                  hintStyle: const TextStyle(
-                                      color: AppColors.grey400, fontSize: 16),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                  suffixIcon: _dropController.text.isNotEmpty
-                                      ? IconButton(
-                                          icon:
-                                              const Icon(Icons.clear, size: 20),
-                                          onPressed: () {
-                                            _dropController.clear();
-                                            setState(
-                                                () => _isSearching = false);
-                                          },
-                                        )
-                                      : null,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 12),
+                        const Text(
+                          "Where to?",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.black,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const MapLocationPickerScreen(),
+                    const SizedBox(height: 20),
+                    // Pickup & Drop Card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.grey100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Icons Column
+                          Column(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF4CD964),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.circle,
+                                    size: 10, color: Colors.white),
                               ),
-                            );
-                            if (result != null &&
-                                result is PlaceDetails &&
-                                mounted) {
-                              context
-                                  .read<BookingProvider>()
-                                  .setDropLocation(result);
-                              final displayName = _isNumericOnly(result.name)
-                                  ? result.address
-                                  : result.name;
-                              _dropController.text = displayName;
-                              if (context
-                                      .read<BookingProvider>()
-                                      .pickupLocation !=
-                                  null) {
-                                await context
+                              Container(
+                                width: 2,
+                                height: 30,
+                                color: AppColors.grey300,
+                              ),
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFF9500),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.location_pin,
+                                    size: 14, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 16),
+                          // Text Fields Column
+                          Expanded(
+                            child: Column(
+                              children: [
+                                TextField(
+                                  controller: _pickupController,
+                                  onTap: () {
+                                    setState(() =>
+                                        _activeField = LocationField.pickup);
+                                  },
+                                  style: const TextStyle(
+                                      color: AppColors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500),
+                                  decoration: InputDecoration(
+                                    hintText: "Current Location",
+                                    hintStyle: const TextStyle(
+                                        color: AppColors.grey400, fontSize: 16),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    suffixIcon:
+                                        _pickupController.text.isNotEmpty
+                                            ? IconButton(
+                                                icon: const Icon(Icons.clear,
+                                                    size: 20),
+                                                onPressed: () {
+                                                  _pickupController.clear();
+                                                  setState(() {
+                                                    _isSearching = false;
+                                                    _hasNavigated = false;
+                                                  });
+                                                },
+                                              )
+                                            : null,
+                                  ),
+                                ),
+                                const Divider(height: 24, thickness: 1),
+                                TextField(
+                                  controller: _dropController,
+                                  onTap: () {
+                                    setState(() =>
+                                        _activeField = LocationField.drop);
+                                  },
+                                  autofocus: true,
+                                  style: const TextStyle(
+                                      color: AppColors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500),
+                                  decoration: InputDecoration(
+                                    hintText: "Enter destination",
+                                    hintStyle: const TextStyle(
+                                        color: AppColors.grey400, fontSize: 16),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    suffixIcon: _dropController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear,
+                                                size: 20),
+                                            onPressed: () {
+                                              _dropController.clear();
+                                              setState(() {
+                                                _isSearching = false;
+                                                _hasNavigated = false;
+                                              });
+                                            },
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const MapLocationPickerScreen(),
+                                ),
+                              );
+                              if (result != null &&
+                                  result is PlaceDetails &&
+                                  mounted) {
+                                context
                                     .read<BookingProvider>()
-                                    .calculateRoute();
-                                if (mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const RideBookingScreen(),
-                                    ),
-                                  );
+                                    .setDropLocation(result);
+                                final displayName = _isNumericOnly(result.name)
+                                    ? result.address
+                                    : result.name;
+                                _dropController.text = displayName;
+                                if (context
+                                        .read<BookingProvider>()
+                                        .pickupLocation !=
+                                    null) {
+                                  await context
+                                      .read<BookingProvider>()
+                                      .calculateRoute();
+                                  if (mounted) {
+                                    setState(() {
+                                      _hasNavigated = true;
+                                    });
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const RideBookingScreen(),
+                                      ),
+                                    );
+                                  }
                                 }
                               }
-                            }
-                          },
-                          icon: const Icon(Icons.map, size: 18),
-                          label: const Text(
-                            "Select from Map",
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+                            },
+                            icon: const Icon(Icons.map, size: 18),
+                            label: const Text(
+                              "Select from Map",
+                              style: TextStyle(fontSize: 14),
                             ),
-                            side: const BorderSide(color: AppColors.grey300),
-                            foregroundColor: AppColors.black,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              side: const BorderSide(color: AppColors.grey300),
+                              foregroundColor: AppColors.black,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text(
-                            "Add Stops",
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text(
+                              "Add Stops",
+                              style: TextStyle(fontSize: 14),
                             ),
-                            side: const BorderSide(color: AppColors.grey300),
-                            foregroundColor: AppColors.black,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              side: const BorderSide(color: AppColors.grey300),
+                              foregroundColor: AppColors.black,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Content Area: Search Results or Saved Locations or Ride Details
-            Expanded(
-              child: Consumer<BookingProvider>(
-                builder: (context, bookingProvider, child) {
-                  // If both locations selected, navigate to RideBookingScreen
-                  if (bookingProvider.pickupLocation != null &&
-                      bookingProvider.dropLocation != null &&
-                      !_isSearching) {
-                    // Use PostFrameCallback to avoid building during build
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RideBookingScreen(),
-                          ),
-                        );
-                      }
-                    });
-                  }
-                  // Otherwise show search results or recent locations
-                  return _isSearching
-                      ? _buildSearchResults()
-                      : _buildRecentLocations();
-                },
+              const SizedBox(height: 16),
+              // Content Area: Search Results or Saved Locations or Ride Details
+              Expanded(
+                child: Consumer<BookingProvider>(
+                  builder: (context, bookingProvider, child) {
+                    // If both locations selected and not yet navigated, go to RideBookingScreen
+                    if (bookingProvider.pickupLocation != null &&
+                        bookingProvider.dropLocation != null &&
+                        !_isSearching &&
+                        !_hasNavigated) {
+                      // Use PostFrameCallback to avoid building during build
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (mounted) {
+                          // First calculate the route if not already calculated
+                          if (bookingProvider.distance == 0.0) {
+                            await bookingProvider.calculateRoute();
+                          }
+                          setState(() {
+                            _hasNavigated = true;
+                          });
+                          if (mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RideBookingScreen(),
+                              ),
+                            );
+                          }
+                        }
+                      });
+                    }
+                    // Otherwise show search results or recent locations
+                    return _isSearching
+                        ? _buildSearchResults()
+                        : _buildRecentLocations();
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -953,6 +989,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                               .read<BookingProvider>()
                               .calculateRoute();
                           if (mounted) {
+                            setState(() {
+                              _hasNavigated = true;
+                            });
                             Navigator.push(
                               context,
                               MaterialPageRoute(
