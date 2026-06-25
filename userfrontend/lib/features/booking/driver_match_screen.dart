@@ -187,59 +187,83 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                       ),
             const SizedBox(height: 32),
             // Status Text
-            _isRequestingRide
-                ? const Text(
-                    "Requesting your ride...",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.black,
-                    ),
+            _errorMessage != null
+                ? Column(
+                    children: [
+                      Text(
+                        "Oops, something went wrong!",
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.grey600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   )
-                : _isFindingDriver
+                : _isRequestingRide
                     ? const Text(
-                        "Waiting for driver to accept...",
+                        "Requesting your ride...",
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppColors.black,
                         ),
                       )
-                    : const Text(
-                        "Driver found!",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.black,
-                        ),
+                    : _isFindingDriver
+                        ? const Text(
+                            "Waiting for driver to accept...",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.black,
+                            ),
+                          )
+                        : const Text(
+                            "Driver found!",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.black,
+                            ),
+                          ),
+            if (_errorMessage == null)
+              const SizedBox(height: 8),
+            if (_errorMessage == null)
+              _isRequestingRide
+                  ? const Text(
+                      "Please wait while we confirm your ride",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.grey600,
                       ),
-            const SizedBox(height: 8),
-            _isRequestingRide
-                ? const Text(
-                    "Please wait while we confirm your ride",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.grey600,
-                    ),
-                    textAlign: TextAlign.center,
-                  )
-                : _isFindingDriver
-                    ? const Text(
-                        "Looking for nearby drivers to accept your request",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.grey600,
+                      textAlign: TextAlign.center,
+                    )
+                  : _isFindingDriver
+                      ? const Text(
+                          "Looking for nearby drivers to accept your request",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.grey600,
+                          ),
+                          textAlign: TextAlign.center,
+                        )
+                      : const Text(
+                          "Your driver is on the way",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.grey600,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      )
-                    : const Text(
-                        "Your driver is on the way",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.grey600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
             const SizedBox(height: 32),
             // Driver Info Card
             if (!_isFindingDriver)

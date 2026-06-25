@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/search_provider.dart';
 import '../../core/providers/address_provider.dart';
+import '../../core/models/place_prediction_model.dart';
 import '../../core/models/place_details_model.dart';
 import '../../core/models/ride_type.dart';
 import 'map_location_picker_screen.dart';
@@ -137,7 +137,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         // Reset the navigation flag when user navigates back
         setState(() {
           _hasNavigated = false;

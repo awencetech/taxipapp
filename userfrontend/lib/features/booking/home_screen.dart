@@ -480,14 +480,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 if (bookingProvider.rideHistory.isNotEmpty) {
                                   completedRides.addAll(
                                     bookingProvider.rideHistory.where((ride) {
-                                      if (ride.status == null) return false;
-                                      final status = ride.status!.toLowerCase();
+                                      final status = ride.status.toLowerCase();
                                       return ['completed', 'cancelled']
                                           .contains(status);
                                     }).toList()
                                       ..sort((a, b) {
                                         if (a.createdAt == null ||
-                                            b.createdAt == null) return 0;
+                                            b.createdAt == null) {
+                                          return 0;
+                                        }
                                         return b.createdAt!
                                             .compareTo(a.createdAt!);
                                       }),
