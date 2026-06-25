@@ -7,7 +7,7 @@ import '../../core/providers/booking_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/models/place_details_model.dart';
 import '../../core/models/ride_type.dart';
-import 'searching_driver_screen.dart';
+import 'pickup_confirmation_screen.dart';
 
 class RideBookingScreen extends StatefulWidget {
   const RideBookingScreen({super.key});
@@ -16,11 +16,8 @@ class RideBookingScreen extends StatefulWidget {
   State<RideBookingScreen> createState() => _RideBookingScreenState();
 }
 
-class _RideBookingScreenState extends State<RideBookingScreen>
-    with SingleTickerProviderStateMixin {
+class _RideBookingScreenState extends State<RideBookingScreen> {
   final Completer<GoogleMapController> _mapController = Completer();
-  bool _isMapReady = false;
-  late AnimationController _bottomSheetAnimationController;
   final Set<Marker> _markers = {};
   final List<LatLng> _polylineCoordinates = [];
   String _selectedPaymentMethod = 'Cash';
@@ -35,19 +32,9 @@ class _RideBookingScreenState extends State<RideBookingScreen>
   @override
   void initState() {
     super.initState();
-    _bottomSheetAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _updateMapMarkersAndRoute();
     });
-  }
-
-  @override
-  void dispose() {
-    _bottomSheetAnimationController.dispose();
-    super.dispose();
   }
 
   Future<void> _updateMapMarkersAndRoute() async {
@@ -57,7 +44,6 @@ class _RideBookingScreenState extends State<RideBookingScreen>
       return;
     }
 
-    // Add markers
     setState(() {
       _markers.clear();
       _markers.add(Marker(
@@ -85,7 +71,6 @@ class _RideBookingScreenState extends State<RideBookingScreen>
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       ));
 
-      // Dummy polyline (in real app, use Google Directions API polyline)
       _polylineCoordinates.clear();
       _polylineCoordinates.add(LatLng(
         bookingProvider.pickupLocation!.latitude,
@@ -97,7 +82,6 @@ class _RideBookingScreenState extends State<RideBookingScreen>
       ));
     });
 
-    // Fit map bounds
     if (_mapController.isCompleted) {
       final controller = await _mapController.future;
       final bounds = LatLngBounds(
@@ -139,14 +123,17 @@ class _RideBookingScreenState extends State<RideBookingScreen>
         baseFare = 50;
         perKmRate = 12;
         break;
+      case 'cab economy':
       case 'mini':
         baseFare = 70;
         perKmRate = 15;
         break;
+      case 'cab premium':
       case 'sedan':
         baseFare = 100;
         perKmRate = 18;
         break;
+      case 'cab xl':
       case 'suv':
         baseFare = 150;
         perKmRate = 25;
@@ -158,10 +145,9 @@ class _RideBookingScreenState extends State<RideBookingScreen>
 
     double fare = baseFare + (distance * perKmRate);
 
-    // Apply coupon discount
     if (_appliedCoupon != null) {
-      final coupon = _coupons.firstWhere((c) => c['code'] == _appliedCoupon,
-          orElse: () => {});
+      final coupon = _coupons
+          .firstWhere((c) => c['code'] == _appliedCoupon, orElse: () => {});
       if (coupon.isNotEmpty) {
         final discount = coupon['discount'] as double? ?? 0;
         fare = fare - discount;
@@ -175,490 +161,622 @@ class _RideBookingScreenState extends State<RideBookingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer2<BookingProvider, LocationProvider>(
-        builder: (context, bookingProvider, locationProvider, child) {
-          final rideTypes = RideType.getDummyRides(bookingProvider.distance);
-          return Stack(
-            children: [
-              // Google Map
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: locationProvider.currentPosition != null
-                      ? LatLng(
-                          locationProvider.currentPosition!.latitude,
-                          locationProvider.currentPosition!.longitude,
-                        )
-                      : const LatLng(11.0168, 76.9558),
-                  zoom: 16,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Google Map
+            GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target:
+                    context.read<LocationProvider>().currentPosition != null
+                        ? LatLng(
+                            context.read<LocationProvider>().currentPosition!.latitude,
+                            context.read<LocationProvider>().currentPosition!.longitude,
+                          )
+                        : const LatLng(11.0168, 76.9558),
+                zoom: 16,
+              ),
+              markers: _markers,
+              polylines: _polylineCoordinates.length > 1
+                  ? {
+                      Polyline(
+                        polylineId: const PolylineId('route'),
+                        points: _polylineCoordinates,
+                        color: Colors.blue,
+                        width: 5,
+                      )
+                    }
+                  : {},
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomGesturesEnabled: true,
+              scrollGesturesEnabled: true,
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              onMapCreated: (controller) {
+                _mapController.complete(controller);
+                _updateMapMarkersAndRoute();
+              },
+            ),
+
+            // Back button
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                markers: _markers,
-                polylines: _polylineCoordinates.length > 1
-                    ? {
-                        Polyline(
-                          polylineId: const PolylineId('route'),
-                          points: _polylineCoordinates,
-                          color: Colors.blue,
-                          width: 5,
-                        )
-                      }
-                    : {},
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: true,
-                onMapCreated: (controller) {
-                  _mapController.complete(controller);
-                  _isMapReady = true;
-                  _updateMapMarkersAndRoute();
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ),
+
+            // Recenter button
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.my_location),
+                  onPressed: () async {
+                    final locationProvider =
+                        context.read<LocationProvider>();
+                    final pos = await locationProvider.getCurrentLocation();
+                    if (pos != null && _mapController.isCompleted) {
+                      final controller = await _mapController.future;
+                      controller.animateCamera(
+                        CameraUpdate.newLatLngZoom(pos, 16),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ),
+
+            // Pickup and Drop address cards
+            Positioned(
+              top: 80,
+              left: 16,
+              right: 16,
+              child: Consumer<BookingProvider>(
+                builder: (context, bookingProvider, child) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (bookingProvider.pickupLocation != null)
+                        _buildAddressCard(
+                            bookingProvider.pickupLocation!, true),
+                      const SizedBox(height: 8),
+                      if (bookingProvider.dropLocation != null)
+                        _buildAddressCard(
+                            bookingProvider.dropLocation!, false),
+                    ],
+                  );
                 },
               ),
+            ),
 
-              // Back button
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Recenter button
-              Positioned(
-                bottom: 500,
-                right: 16,
-                child: Container(
+            // Bottom sheet
+            DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.4,
+              maxChildSize: 0.85,
+              builder: (context, scrollController) {
+                return Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, -4),
                       ),
                     ],
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.my_location),
-                    onPressed: () async {
-                      final locationProvider = context.read<LocationProvider>();
-                      final pos = await locationProvider.getCurrentLocation();
-                      if (pos != null && _mapController.isCompleted) {
-                        final controller = await _mapController.future;
-                        controller.animateCamera(
-                          CameraUpdate.newLatLngZoom(pos, 16),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ),
-
-              // Pickup & Drop Address Cards
-              Positioned(
-                top: 80,
-                left: 16,
-                right: 16,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (bookingProvider.pickupLocation != null)
-                      _buildAddressCard(
-                        bookingProvider.pickupLocation!,
-                        true,
-                      ),
-                    const SizedBox(height: 8),
-                    if (bookingProvider.dropLocation != null)
-                      _buildAddressCard(
-                        bookingProvider.dropLocation!,
-                        false,
-                      ),
-                  ],
-                ),
-              ),
-
-              // Bottom Sheet
-              DraggableScrollableSheet(
-                initialChildSize: 0.5,
-                minChildSize: 0.4,
-                maxChildSize: 0.8,
-                builder: (context, scrollController) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, -4),
-                        ),
-                      ],
-                    ),
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        // Drag indicator
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: AppColors.grey300,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Offer Section
-                        Container(
-                          padding: const EdgeInsets.all(16),
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      // Drag indicator
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 5,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFFF9800),
-                              width: 1,
-                            ),
+                            color: AppColors.grey300,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.local_offer,
-                                color: Color(0xFFFF9800),
-                                size: 28,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Trip Summary Section
+                      Consumer<BookingProvider>(
+                        builder: (context, bookingProvider, child) {
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.grey100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Trip Summary',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Pickup
+                                Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
+                                  children: [
+                                    const Icon(Icons.location_on,
+                                        color: Colors.green, size: 24),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Pickup',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.grey600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            bookingProvider.pickupLocation
+                                                    ?.name ??
+                                                'Pickup Location',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.black,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Divider
+                                Container(
+                                  margin: const EdgeInsets.only(left: 9),
+                                  width: 2,
+                                  height: 24,
+                                  color: AppColors.grey300,
+                                ),
+                                const SizedBox(height: 12),
+                                // Drop
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.location_pin,
+                                        color: Colors.red, size: 24),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Drop',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.grey600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            bookingProvider.dropLocation
+                                                    ?.name ??
+                                                'Drop Location',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.black,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                // Distance and Time
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Distance',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.grey600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${bookingProvider.distance.toStringAsFixed(1)} km',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.black,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Est. Time',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.grey600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${bookingProvider.estimatedTime} mins',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.black,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Choose a Ride Title
+                      const Text(
+                        'Choose a ride',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Vehicle List
+                      Consumer<BookingProvider>(
+                        builder: (context, bookingProvider, child) {
+                          final rideTypes = RideType.getDummyRides(
+                              bookingProvider.distance);
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: rideTypes.length,
+                            itemBuilder: (context, index) {
+                              final rideType = rideTypes[index];
+                              final isSelected = bookingProvider
+                                      .selectedRideType?.id ==
+                                  rideType.id;
+                              final fare = _calculateFare(
+                                  rideType, bookingProvider.distance);
+                              return GestureDetector(
+                                onTap: () {
+                                  bookingProvider.selectRideType(rideType);
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFFFFF3E0)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isSelected
+                                        ? Border.all(
+                                            color: const Color(0xFFFF9800),
+                                            width: 2,
+                                          )
+                                        : Border.all(
+                                            color: AppColors.grey300,
+                                            width: 1,
+                                          ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Vehicle Icon
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.grey100,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(
+                                          rideType.icon,
+                                          size: 28,
+                                          color: rideType.iconColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Details
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  rideType.name,
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.black,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '₹${fare.toStringAsFixed(0)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.secondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  '👤 ${rideType.maxPassengers}',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: AppColors.grey600,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '${rideType.estimatedTime} mins away',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: AppColors.grey600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: Color(0xFFFF9800),
+                                          size: 28,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Payment Method and Coupon
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _showPaymentModal(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey100,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.payment,
+                                      size: 20,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      '🎉 You get ₹20 OFF + 20 Coins Cashback',
-                                      style: TextStyle(
+                                      _selectedPaymentMethod,
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.black,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const Spacer(),
+                                    const Icon(Icons.arrow_drop_down),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _showCouponModal(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey100,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.local_offer,
+                                      size: 20,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'Limited time offer',
+                                      _appliedCoupon != null
+                                          ? _appliedCoupon!
+                                          : 'Apply Coupon',
                                       style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.grey600,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: _appliedCoupon != null
+                                            ? AppColors.primary
+                                            : AppColors.grey600,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
-                        // Vehicle Options
-                        const Text(
-                          'Choose a ride',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ...rideTypes.map((rideType) {
-                          final isSelected =
-                              bookingProvider.selectedRideType?.id ==
-                                  rideType.id;
-                          final fare = _calculateFare(
-                              rideType, bookingProvider.distance);
-                          return GestureDetector(
-                            onTap: () =>
-                                bookingProvider.selectRideType(rideType),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFFFFF3E0)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: isSelected
-                                    ? Border.all(
-                                        color: const Color(0xFFFF9800),
-                                        width: 2,
-                                      )
-                                    : Border.all(
-                                        color: AppColors.grey300,
-                                        width: 1,
-                                      ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  // Vehicle Icon
-                                  Container(
-                                    width: 56,
-                                    height: 56,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.grey100,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      rideType.icon,
-                                      size: 32,
-                                      color: rideType.iconColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  // Details
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              rideType.name,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.black,
-                                              ),
-                                            ),
-                                            Text(
-                                              '₹${fare.toStringAsFixed(0)}',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppColors.secondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              '👤 ${rideType.maxPassengers}',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: AppColors.grey600,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${rideType.estimatedTime} mins away',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: AppColors.grey600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: 20),
-
-                        // Payment & Coupon Section
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _showPaymentModal(),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.grey100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.payment,
-                                        size: 20,
-                                        color: AppColors.primary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _selectedPaymentMethod,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.black,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      const Icon(Icons.arrow_drop_down),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _showCouponModal(),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.grey100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.local_offer,
-                                        size: 20,
-                                        color: AppColors.primary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _appliedCoupon != null
-                                            ? _appliedCoupon!
-                                            : 'Apply Coupon',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: _appliedCoupon != null
-                                              ? AppColors.primary
-                                              : AppColors.grey600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 40),
-
-                        // Book Ride Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: bookingProvider.selectedRideType == null
-                                ? null
-                                : () async {
-                                    // Create ride
-                                    final success =
-                                        await bookingProvider.requestRide({
-                                      'pickupLocation': {
-                                        'type': 'Point',
-                                        'coordinates': [
-                                          bookingProvider
-                                                  .pickupLocation?.longitude ??
-                                              0.0,
-                                          bookingProvider
-                                                  .pickupLocation?.latitude ??
-                                              0.0
-                                        ],
-                                        'address': bookingProvider
-                                            .pickupLocation?.address
-                                      },
-                                      'dropLocation': {
-                                        'type': 'Point',
-                                        'coordinates': [
-                                          bookingProvider
-                                                  .dropLocation?.longitude ??
-                                              0.0,
-                                          bookingProvider
-                                                  .dropLocation?.latitude ??
-                                              0.0
-                                        ],
-                                        'address': bookingProvider
-                                            .dropLocation?.address
-                                      },
-                                      'fare': _calculateFare(
-                                          bookingProvider.selectedRideType!,
-                                          bookingProvider.distance),
-                                      'distance': bookingProvider.distance,
-                                      'duration': bookingProvider.estimatedTime,
-                                      'vehicleType': bookingProvider
-                                          .selectedRideType?.name,
-                                      'paymentMethod': _selectedPaymentMethod,
-                                      'coupon': _appliedCoupon,
-                                      'rideStatus': 'searching_driver',
-                                    });
-                                    if (success && mounted) {
-                                      Navigator.pushAndRemoveUntil(
+                      // Book Ride Button
+                      Consumer<BookingProvider>(
+                        builder: (context, bookingProvider, child) {
+                          return SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: bookingProvider.selectedRideType ==
+                                      null
+                                  ? null
+                                  : () {
+                                      Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              const SearchingDriverScreen(),
+                                              PickupConfirmationScreen(
+                                            bookingProvider: bookingProvider,
+                                            selectedPaymentMethod:
+                                                _selectedPaymentMethod,
+                                            appliedCoupon: _appliedCoupon,
+                                            calculatedFare: _calculateFare(
+                                                bookingProvider.selectedRideType!,
+                                                bookingProvider.distance),
+                                          ),
                                         ),
-                                        (route) => route.isFirst,
                                       );
-                                    }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFC107),
-                              disabledBackgroundColor: AppColors.grey300,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFC107),
+                                disabledBackgroundColor: AppColors.grey300,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: Text(
+                                bookingProvider.selectedRideType == null
+                                    ? 'SELECT A RIDE'
+                                    : 'BOOK ${bookingProvider.selectedRideType?.name.toUpperCase()}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              bookingProvider.selectedRideType == null
-                                  ? 'SELECT A RIDE'
-                                  : 'BOOK ${bookingProvider.selectedRideType?.name.toUpperCase()}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          );
-        },
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -683,7 +801,7 @@ class _RideBookingScreenState extends State<RideBookingScreen>
           Icon(
             isPickup ? Icons.location_on : Icons.location_pin,
             color: isPickup ? Colors.green : Colors.red,
-            size: 28,
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -707,19 +825,6 @@ class _RideBookingScreenState extends State<RideBookingScreen>
                     color: AppColors.black,
                   ),
                 ),
-                if (place.address.isNotEmpty && place.address != place.name)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      place.address,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.grey600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -854,7 +959,9 @@ class _RideBookingScreenState extends State<RideBookingScreen>
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFFFF3E0) : Colors.white,
+                    color: isSelected
+                        ? const Color(0xFFFFF3E0)
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: isSelected
                         ? Border.all(
