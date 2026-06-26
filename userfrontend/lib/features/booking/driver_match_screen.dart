@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -11,84 +10,24 @@ class DriverMatchScreen extends StatefulWidget {
   State<DriverMatchScreen> createState() => _DriverMatchScreenState();
 }
 
-class _DriverMatchScreenState extends State<DriverMatchScreen>
-    with SingleTickerProviderStateMixin {
+class _DriverMatchScreenState extends State<DriverMatchScreen> {
   bool _isFindingDriver = true;
   bool _isRequestingRide = true;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-  String? _errorMessage;
-
-  // Dummy driver data
-  final Map<String, dynamic> _dummyDriver = {
-    "name": "John Doe",
-    "vehicleNumber": "TN 01 AB 1234",
-    "vehicleModel": "Toyota Etios",
-    "vehicleColor": "Silver",
-    "rating": 4.8,
-    "totalRides": 500,
-  };
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.4)
-        .chain(CurveTween(curve: Curves.easeInOut))
-        .animate(_pulseController)
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          _pulseController.reverse();
-        } else if (status == AnimationStatus.dismissed) {
-          _pulseController.forward();
-        }
-      });
-    _pulseController.forward();
-
-    _requestRide();
-  }
-
-  Future<void> _requestRide() async {
-    try {
-      final bookingProvider = context.read<BookingProvider>();
-      await bookingProvider.requestRide({
-        'pickupAddress': bookingProvider.pickupLocation?.address,
-        'dropAddress': bookingProvider.dropLocation?.address,
-        'fare': bookingProvider.selectedRideType?.estimatedPrice,
-        'distance': bookingProvider.distance,
-        'rideType': bookingProvider.selectedRideType?.name,
-      });
-      setState(() {
-        _isRequestingRide = false;
-      });
-      _simulateDriverMatch();
-    } catch (e) {
-      setState(() {
-        _isRequestingRide = false;
-        _errorMessage = e.toString();
-      });
-    }
-  }
-
-  Future<void> _simulateDriverMatch() async {
-    // Simulate finding a driver after 3 seconds
-    await Future.delayed(const Duration(seconds: 3));
-
-    if (mounted) {
-      setState(() {
-        _isFindingDriver = false;
-      });
-      // Refresh ride history
-      await context.read<BookingProvider>().fetchRideHistory();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isRequestingRide = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -111,6 +50,16 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bookingProvider = context.watch<BookingProvider>();
+    final currentRide = bookingProvider.currentRide;
+
+    // If ride is accepted, show driver details
+    if (currentRide != null &&
+        (currentRide.status == "accepted" ||
+            currentRide.status == "driver_arriving")) {
+      _isFindingDriver = false;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -140,28 +89,25 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                     ),
                   )
                 : _isFindingDriver
-                    ? ScaleTransition(
-                        scale: _pulseAnimation,
-                        child: Container(
-                          width: 180,
-                          height: 180,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFF9500)
-                                    .withValues(alpha: 0.3),
-                                blurRadius: 30,
-                                spreadRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.local_taxi,
-                            size: 80,
-                            color: Color(0xFFFF9500),
-                          ),
+                    ? Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF9500)
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.local_taxi,
+                          size: 80,
+                          color: Color(0xFFFF9500),
                         ),
                       )
                     : Container(
@@ -187,83 +133,59 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                       ),
             const SizedBox(height: 32),
             // Status Text
-            _errorMessage != null
-                ? Column(
-                    children: [
-                      Text(
-                        "Oops, something went wrong!",
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: AppColors.grey600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+            _isRequestingRide
+                ? const Text(
+                    "Requesting your ride...",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
                   )
-                : _isRequestingRide
+                : _isFindingDriver
                     ? const Text(
-                        "Requesting your ride...",
+                        "Waiting for driver to accept...",
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppColors.black,
                         ),
                       )
-                    : _isFindingDriver
-                        ? const Text(
-                            "Waiting for driver to accept...",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.black,
-                            ),
-                          )
-                        : const Text(
-                            "Driver found!",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.black,
-                            ),
-                          ),
-            if (_errorMessage == null)
-              const SizedBox(height: 8),
-            if (_errorMessage == null)
-              _isRequestingRide
-                  ? const Text(
-                      "Please wait while we confirm your ride",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.grey600,
-                      ),
-                      textAlign: TextAlign.center,
-                    )
-                  : _isFindingDriver
-                      ? const Text(
-                          "Looking for nearby drivers to accept your request",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.grey600,
-                          ),
-                          textAlign: TextAlign.center,
-                        )
-                      : const Text(
-                          "Your driver is on the way",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.grey600,
-                          ),
-                          textAlign: TextAlign.center,
+                    : const Text(
+                        "Driver found!",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.black,
                         ),
+                      ),
+            const SizedBox(height: 8),
+            _isRequestingRide
+                ? const Text(
+                    "Please wait while we confirm your ride",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.grey600,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                : _isFindingDriver
+                    ? const Text(
+                        "Looking for nearby drivers to accept your request",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.grey600,
+                        ),
+                        textAlign: TextAlign.center,
+                      )
+                    : const Text(
+                        "Your driver is on the way",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.grey600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
             const SizedBox(height: 32),
             // Driver Info Card
             if (!_isFindingDriver)
@@ -303,7 +225,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _dummyDriver["name"],
+                                  currentRide?.driverName ?? "Unknown Driver",
                                   style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
@@ -317,7 +239,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                                         size: 16, color: Color(0xFFFF9500)),
                                     const SizedBox(width: 4),
                                     Text(
-                                      "${_dummyDriver["rating"].toStringAsFixed(1)} • ${_dummyDriver["totalRides"]} rides",
+                                      "${(currentRide?.driverRating != null ? currentRide?.driverRating?.toStringAsFixed(1) : "5.0")} • 500 rides",
                                       style: const TextStyle(
                                         fontSize: 14,
                                         color: AppColors.grey600,
@@ -343,7 +265,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                               color: AppColors.grey100,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Icon(Icons.car_repair,
+                            child: const Icon(Icons.directions_car,
                                 color: AppColors.secondary, size: 28),
                           ),
                           const SizedBox(width: 16),
@@ -352,7 +274,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _dummyDriver["vehicleModel"],
+                                  currentRide?.driverVehicleType ?? "Car",
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
@@ -366,17 +288,16 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                                       width: 24,
                                       height: 16,
                                       decoration: BoxDecoration(
-                                        color: _getColorFromName(
-                                            _dummyDriver["vehicleColor"]),
+                                        color: _getColorFromName("Silver"),
                                         borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
                                             color: AppColors.grey300),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      _dummyDriver["vehicleColor"],
-                                      style: const TextStyle(
+                                    const Text(
+                                      "Silver",
+                                      style: TextStyle(
                                         fontSize: 14,
                                         color: AppColors.grey600,
                                       ),
@@ -387,7 +308,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                             ),
                           ),
                           Text(
-                            _dummyDriver["vehicleNumber"],
+                            currentRide?.driverVehicleNumber ?? "TN 01 AB 1234",
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -397,7 +318,7 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                         ],
                       ),
                       const SizedBox(height: 24),
-                      // ETA
+                      // OTP
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -406,23 +327,24 @@ class _DriverMatchScreenState extends State<DriverMatchScreen>
                           color: const Color(0xFFE8F5E9),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
                           children: [
-                            Text(
-                              "Arriving in",
+                            const Text(
+                              "Ride OTP",
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF4CAF50),
                               ),
                             ),
+                            const SizedBox(height: 8),
                             Text(
-                              "4 mins",
-                              style: TextStyle(
-                                fontSize: 24,
+                              currentRide?.otp ?? "1234",
+                              style: const TextStyle(
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF4CAF50),
+                                letterSpacing: 4,
                               ),
                             ),
                           ],

@@ -256,7 +256,10 @@ class ApiService {
   // Rides
   Future<Response> bookRide(Map<String, dynamic> data) async {
     try {
-      return await _dio.post('/rides/create', data: jsonEncode(data));
+      developer.log('Booking ride with data: $data');
+      final response = await _dio.post('/ride/request', data: jsonEncode(data));
+      developer.log('Booking response: ${response.data}');
+      return response;
     } catch (e) {
       developer.log('BookRide error: $e');
       rethrow;

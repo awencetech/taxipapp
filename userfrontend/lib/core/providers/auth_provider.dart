@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
+import '../services/socket_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final GoogleAuthService _googleAuthService = GoogleAuthService();
+  final SocketService _socketService = SocketService();
   UserModel? _user;
   Map<String, dynamic>? _newUserInfo;
   bool _isLoading = false;
@@ -19,6 +21,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> checkAuthStatus() async {
     _user = await _authService.getCurrentUser();
+    if (_user != null) {
+      _socketService.connect(_user!.id);
+    }
     notifyListeners();
   }
 
@@ -29,6 +34,9 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       _user = await _authService.signIn(email, password);
+      if (_user != null) {
+        _socketService.connect(_user!.id);
+      }
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -63,6 +71,9 @@ class AuthProvider extends ChangeNotifier {
         return {'success': true, 'isNewUser': true};
       } else {
         _user = result['user'];
+        if (_user != null) {
+          _socketService.connect(_user!.id);
+        }
         _isLoading = false;
         notifyListeners();
         return {'success': true, 'isNewUser': false};
@@ -90,6 +101,9 @@ class AuthProvider extends ChangeNotifier {
       };
 
       _user = await _authService.completeProfile(userData);
+      if (_user != null) {
+        _socketService.connect(_user!.id);
+      }
       _newUserInfo = null;
       _isLoading = false;
       notifyListeners();
@@ -110,6 +124,9 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       _user = await _authService.signUp(name, email, password, mobile);
+      if (_user != null) {
+        _socketService.connect(_user!.id);
+      }
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -123,6 +140,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     await _authService.signOut();
+    _socketService.disconnect();
     _user = null;
     notifyListeners();
   }

@@ -10,6 +10,13 @@ class RideModel {
   final String? otp;
   final DateTime? createdAt;
   final String? userName;
+  // Driver details
+  final String? driverName;
+  final String? driverVehicleType;
+  final String? driverVehicleNumber;
+  final double? driverRating;
+  final double? driverLatitude;
+  final double? driverLongitude;
 
   RideModel({
     required this.id,
@@ -23,6 +30,12 @@ class RideModel {
     this.otp,
     this.createdAt,
     this.userName,
+    this.driverName,
+    this.driverVehicleType,
+    this.driverVehicleNumber,
+    this.driverRating,
+    this.driverLatitude,
+    this.driverLongitude,
   });
 
   factory RideModel.fromMap(Map<String, dynamic> map) {
@@ -41,7 +54,8 @@ class RideModel {
     String getAddress(dynamic location) {
       if (location is Map) {
         if (location['address'] != null) return location['address'].toString();
-        if (location['locationAddress'] != null) return location['locationAddress'].toString();
+        if (location['locationAddress'] != null)
+          return location['locationAddress'].toString();
       }
       return '';
     }
@@ -58,11 +72,27 @@ class RideModel {
 
     // Get driverId
     String? driverId;
+    String? driverName;
+    String? driverVehicleType;
+    String? driverVehicleNumber;
+    double? driverRating;
+    double? driverLatitude;
+    double? driverLongitude;
     if (map['driver'] is Map) {
       driverId = map['driver']['_id']?.toString();
+      driverName = map['driver']['name']?.toString();
+      driverVehicleType = map['driver']['vehicleType']?.toString();
+      driverVehicleNumber = map['driver']['vehicleNumber']?.toString();
+      driverRating =
+          parseDouble(map['driver']['rating'] ?? map['driver']['ratings']);
+      driverLatitude = parseDouble(map['driver']['currentLatitude']);
+      driverLongitude = parseDouble(map['driver']['currentLongitude']);
     } else if (map['driver'] != null) {
       driverId = map['driver'].toString();
     }
+    // Also check for driverLocationUpdated data
+    driverLatitude ??= parseDouble(map['latitude']);
+    driverLongitude ??= parseDouble(map['longitude']);
 
     // Get pickup and drop addresses
     String pickupAddress = getAddress(map['pickupLocation']);
@@ -81,13 +111,21 @@ class RideModel {
       userId: userId,
       userName: userName,
       driverId: driverId,
+      driverName: driverName,
+      driverVehicleType: driverVehicleType,
+      driverVehicleNumber: driverVehicleNumber,
+      driverRating: driverRating,
+      driverLatitude: driverLatitude,
+      driverLongitude: driverLongitude,
       pickupAddress: pickupAddress,
       dropAddress: dropAddress,
       fare: parseDouble(map['fare']),
       distance: map['distance'] != null ? parseDouble(map['distance']) : null,
       status: map['status']?.toString().toLowerCase() ?? 'pending',
       otp: map['otp']?.toString(),
-      createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'].toString()) : null,
+      createdAt: map['createdAt'] != null
+          ? DateTime.tryParse(map['createdAt'].toString())
+          : null,
     );
   }
 
@@ -103,6 +141,8 @@ class RideModel {
       'status': status,
       'otp': otp,
       'createdAt': createdAt?.toIso8601String(),
+      'driverLatitude': driverLatitude,
+      'driverLongitude': driverLongitude,
     };
   }
 }

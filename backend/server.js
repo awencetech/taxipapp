@@ -107,6 +107,8 @@ app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/users', require('./routes/userRoutes'));
 app.use('/api/v1/drivers', require('./routes/driverRoutes'));
 app.use('/api/v1/rides', require('./routes/rideRoutes'));
+app.use('/api/v1/ride', require('./routes/rideSingularRoutes'));
+app.use('/api/v1/driver', require('./routes/driverSingularRoutes'));
 app.use('/api/v1/admin', require('./routes/adminRoutes'));
 app.use('/api/v1/maps', require('./routes/mapsRoutes'));
 app.use('/api/v1/vendor', require('./routes/vendorRoutes'));

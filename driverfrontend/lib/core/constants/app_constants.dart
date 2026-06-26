@@ -16,7 +16,7 @@ class AppConstants {
   static const String driverSignupUrl = '/auth/register';
   static const String driverLoginUrl = '/auth/login';
   static const String driverRegisterUrl = '/drivers/register';
-  static const String driverStatusUrl = '/drivers/status';
+  static const String driverStatusUrl = '/driver/status';
   static const String updateLocationUrl = '/drivers/location';
   static const String driverLocationUrl = '/drivers/location';
   static const String driverEarningsUrl = '/drivers/earnings';
@@ -29,12 +29,13 @@ class AppConstants {
 
   // Ride APIs
   static const String nearbyRidesUrl = '/rides/nearby';
-  static const String driverAcceptRideUrl = '/rides/driver/accept';
-  static const String driverRejectRideUrl = '/rides/driver/reject';
-  static const String driverArrivedUrl = '/rides/driver/arrived';
-  static const String driverStartTripUrl = '/rides/driver/start-trip';
-  static const String driverCompleteTripUrl = '/rides/driver/complete-trip';
+  static const String driverAcceptRideUrl = '/ride/accept';
+  static const String driverRejectRideUrl = '/ride/reject';
+  static const String driverArrivedUrl = '/ride/arrived';
+  static const String driverStartTripUrl = '/ride/start';
+  static const String driverCompleteTripUrl = '/ride/complete';
   static const String driverCurrentRideUrl = '/rides/driver/current-ride';
+  static const String pendingRidesUrl = '/driver/pending-rides';
   static const String driverHistoryUrl = '/rides/driver/history';
   static const String driverRidesUrl = '/rides/driver/my-rides';
 

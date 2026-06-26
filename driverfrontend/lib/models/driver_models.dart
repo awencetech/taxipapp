@@ -297,6 +297,8 @@ class RideRequestModel {
   final double distance;
   final int estimatedTime;
   final String status;
+  final String vehicleType;
+  final String paymentMethod;
   final DateTime? createdAt;
   final String? cancellationReason;
 
@@ -311,6 +313,8 @@ class RideRequestModel {
     required this.distance,
     required this.estimatedTime,
     required this.status,
+    this.vehicleType = 'Auto',
+    this.paymentMethod = 'Cash',
     this.createdAt,
     this.cancellationReason,
   });
@@ -322,8 +326,8 @@ class RideRequestModel {
         json['pickupLocation']['coordinates'] is List) {
       final coords = json['pickupLocation']['coordinates'] as List;
       pickupCoords = [
-        coords[1]?.toDouble() ?? 0.0,
-        coords[0]?.toDouble() ?? 0.0,
+        (coords[1] as num?)?.toDouble() ?? 0.0,
+        (coords[0] as num?)?.toDouble() ?? 0.0,
       ];
     }
 
@@ -332,7 +336,10 @@ class RideRequestModel {
     if (json['dropLocation']?['coordinates'] != null &&
         json['dropLocation']['coordinates'] is List) {
       final coords = json['dropLocation']['coordinates'] as List;
-      dropCoords = [coords[1]?.toDouble() ?? 0.0, coords[0]?.toDouble() ?? 0.0];
+      dropCoords = [
+        (coords[1] as num?)?.toDouble() ?? 0.0,
+        (coords[0] as num?)?.toDouble() ?? 0.0,
+      ];
     }
 
     // Get passenger name from user object
@@ -348,12 +355,14 @@ class RideRequestModel {
       dropAddress: json['dropLocation']?['address'] ?? '',
       pickupCoords: pickupCoords,
       dropCoords: dropCoords,
-      fare: (json['fare'] ?? 0.0).toDouble(),
-      distance: (json['distance'] ?? 0.0).toDouble(),
-      estimatedTime: json['duration'] ?? 0,
+      fare: (json['fare'] as num?)?.toDouble() ?? 0.0,
+      distance: (json['distance'] as num?)?.toDouble() ?? 0.0,
+      estimatedTime: (json['duration'] as num?)?.toInt() ?? 0,
       status: json['status'] ?? 'pending',
+      vehicleType: json['vehicleType'] ?? 'Auto',
+      paymentMethod: json['paymentMethod'] ?? 'Cash',
       createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'])
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       cancellationReason: json['cancellationReason'],
     );

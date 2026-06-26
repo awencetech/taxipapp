@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:intl/intl.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/providers/address_provider.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/models/ride_model.dart';
 import 'location_selection_screen.dart';
 import 'ride_history_screen.dart';
+import 'ride_details_screen.dart';
 import 'wallet_screen.dart';
 import 'support_screen.dart';
 import 'profile_screen.dart';
@@ -23,7 +26,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  bool _hasClearedRecentDestinations = false;
+  final bool _hasClearedRecentDestinations = false;
   GoogleMapController? _mapController;
 
   // Vehicle options data
@@ -152,13 +155,65 @@ class _HomeScreenState extends State<HomeScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
-                                    'TAXI NANBAN',
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.black,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xFFFF6B00),
+                                              Color(0xFFFF8C00)
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x33FF6B00),
+                                              blurRadius: 8,
+                                              offset: Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.local_taxi,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      RichText(
+                                        text: const TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: 'TAXI',
+                                              style: TextStyle(
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFF111827),
+                                                letterSpacing: -0.5,
+                                              ),
+                                            ),
+                                            TextSpan(
+                                              text: ' ',
+                                            ),
+                                            TextSpan(
+                                              text: 'NANBAN',
+                                              style: TextStyle(
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFFFF6B00),
+                                                letterSpacing: -0.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   GestureDetector(
                                     onTap: () {
@@ -201,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             child: Container(
                                               width: 20,
                                               height: 20,
-                                              decoration: BoxDecoration(
+                                              decoration: const BoxDecoration(
                                                 color: Colors.red,
                                                 shape: BoxShape.circle,
                                               ),
@@ -270,10 +325,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onTap: _goToCurrentLocation,
                                       child: Container(
                                         padding: const EdgeInsets.all(14),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFF6B00),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFFF6B00),
                                           shape: BoxShape.circle,
-                                          boxShadow: const [
+                                          boxShadow: [
                                             BoxShadow(
                                               color: Colors.black12,
                                               blurRadius: 8,
@@ -423,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         const SizedBox(height: 2),
                                         Text(
                                           'Starting ${vehicle['startingPrice']}',
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 14,
                                             color: AppColors.grey600,
                                           ),
@@ -431,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         const SizedBox(height: 2),
                                         Text(
                                           '${vehicle['eta']} away',
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 12,
                                             color: AppColors.secondary,
                                             fontWeight: FontWeight.w500,
@@ -443,143 +498,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
-                          ),
-                          const SizedBox(height: 32),
-                          // Recent Rides
-                          const Text(
-                            'Recent Rides',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Consumer<BookingProvider>(
-                            builder: (context, bookingProvider, child) {
-                              if (_hasClearedRecentDestinations) {
-                                return Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.grey100,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      'No recent rides yet. Start booking!',
-                                      textAlign: TextAlign.center,
-                                      style:
-                                          TextStyle(color: AppColors.grey600),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final List completedRides = [];
-                              try {
-                                if (bookingProvider.rideHistory.isNotEmpty) {
-                                  completedRides.addAll(
-                                    bookingProvider.rideHistory.where((ride) {
-                                      final status = ride.status.toLowerCase();
-                                      return ['completed', 'cancelled']
-                                          .contains(status);
-                                    }).toList()
-                                      ..sort((a, b) {
-                                        if (a.createdAt == null ||
-                                            b.createdAt == null) {
-                                          return 0;
-                                        }
-                                        return b.createdAt!
-                                            .compareTo(a.createdAt!);
-                                      }),
-                                  );
-                                }
-                              } catch (e) {
-                                // Handle any errors
-                              }
-
-                              final recentRides =
-                                  completedRides.take(3).toList();
-
-                              if (recentRides.isEmpty) {
-                                return Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.grey100,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      'No recent rides yet. Start booking!',
-                                      textAlign: TextAlign.center,
-                                      style:
-                                          TextStyle(color: AppColors.grey600),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return Column(
-                                children: recentRides.map((ride) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Colors.black12,
-                                          blurRadius: 8,
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 52,
-                                          height: 52,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.grey100,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.location_pin,
-                                              color: AppColors.secondary,
-                                              size: 28),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                ride.dropAddress ??
-                                                    'Unknown destination',
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                ride.distance != null
-                                                    ? '${ride.distance!.toStringAsFixed(1)} km • ${ride.status ?? 'Unknown'}'
-                                                    : 'N/A',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: AppColors.grey600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              );
-                            },
                           ),
                           const SizedBox(height: 32),
                           // Saved Places
@@ -699,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(height: 4),
                                               Text(
                                                 address.address ?? 'No address',
-                                                style: TextStyle(
+                                                style: const TextStyle(
                                                   fontSize: 14,
                                                   color: AppColors.grey600,
                                                 ),
@@ -708,6 +626,242 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 32),
+                          // Recent Rides
+                          const Text(
+                            'Recent Rides',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Consumer<BookingProvider>(
+                            builder: (context, bookingProvider, child) {
+                              if (_hasClearedRecentDestinations) {
+                                return Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.grey100,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '🚖 No recent rides yet',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.black,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Book your first ride with Taxi Nanban.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              color: AppColors.grey600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final List<RideModel> recentRides = [];
+                              try {
+                                if (bookingProvider.rideHistory.isNotEmpty) {
+                                  recentRides.addAll(
+                                    bookingProvider.rideHistory.where((ride) {
+                                      final status = ride.status.toLowerCase();
+                                      return [
+                                        'completed',
+                                        'accepted',
+                                        'ongoing',
+                                        'arrived',
+                                        'started',
+                                        'pending'
+                                      ].contains(status);
+                                    }).toList()
+                                      ..sort((a, b) {
+                                        if (a.createdAt == null ||
+                                            b.createdAt == null) {
+                                          return 0;
+                                        }
+                                        return b.createdAt!
+                                            .compareTo(a.createdAt!);
+                                      }),
+                                  );
+                                }
+                              } catch (e) {
+                                // Handle any errors
+                              }
+
+                              final latestRides = recentRides.take(3).toList();
+
+                              if (latestRides.isEmpty) {
+                                return Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.grey100,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '🚖 No recent rides yet',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.black,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Book your first ride with Taxi Nanban.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              color: AppColors.grey600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Column(
+                                children: latestRides.map((ride) {
+                                  // Format date
+                                  String dateStr = '';
+                                  if (ride.createdAt != null) {
+                                    final now = DateTime.now();
+                                    final diff =
+                                        now.difference(ride.createdAt!);
+                                    if (diff.inDays == 0) {
+                                      dateStr = 'Today';
+                                    } else if (diff.inDays == 1) {
+                                      dateStr = 'Yesterday';
+                                    } else if (diff.inDays < 7) {
+                                      dateStr = DateFormat('EEE')
+                                          .format(ride.createdAt!);
+                                    } else {
+                                      dateStr = DateFormat('MMM dd')
+                                          .format(ride.createdAt!);
+                                    }
+                                  }
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              RideDetailsScreen(ride: ride),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Colors.black12,
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Pickup row
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.location_on,
+                                                color: Color(0xFF2ECC71),
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  ride.pickupAddress,
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    color: AppColors.black,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          // Drop row
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.location_pin,
+                                                color: Color(0xFFFF6B00),
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  ride.dropAddress,
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    color: AppColors.black,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          // Date and fare row
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                dateStr,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppColors.grey600,
+                                                ),
+                                              ),
+                                              Text(
+                                                '₹${ride.fare.toStringAsFixed(0)}',
+                                                style: const TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.secondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 }).toList(),

@@ -253,7 +253,7 @@ class ApiService {
   // Rides
   Future<Response> bookRide(Map<String, dynamic> data) async {
     try {
-      return await _dio.post('/rides/create', data: data);
+      return await _dio.post('/ride/request', data: data);
     } catch (e) {
       developer.log('BookRide error: $e');
       rethrow;

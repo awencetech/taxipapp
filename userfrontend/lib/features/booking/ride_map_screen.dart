@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/models/ride_type.dart';
+import 'keep_alive_map.dart';
 
 class RideMapScreen extends StatefulWidget {
   const RideMapScreen({super.key});
@@ -13,133 +13,27 @@ class RideMapScreen extends StatefulWidget {
 }
 
 class _RideMapScreenState extends State<RideMapScreen> {
-  GoogleMapController? _mapController;
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateMap();
-    });
-  }
-
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    super.dispose();
-  }
-
-  void _updateMap() {
-    final bookingProvider = context.read<BookingProvider>();
-    final markers = <Marker>{};
-    final polylines = <Polyline>{};
-
-    if (bookingProvider.pickupLocation != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('pickup'),
-        position: LatLng(
-          bookingProvider.pickupLocation!.latitude,
-          bookingProvider.pickupLocation!.longitude,
-        ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      ));
-    }
-
-    if (bookingProvider.dropLocation != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('drop'),
-        position: LatLng(
-          bookingProvider.dropLocation!.latitude,
-          bookingProvider.dropLocation!.longitude,
-        ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      ));
-    }
-
-    if (bookingProvider.polylinePoints.isNotEmpty) {
-      polylines.add(Polyline(
-        polylineId: const PolylineId('route'),
-        points: bookingProvider.polylinePoints.map((point) {
-          return LatLng(point['latitude'], point['longitude']);
-        }).toList(),
-        color: Colors.blue,
-        width: 5,
-      ));
-    }
-
-    setState(() {
-      _markers.addAll(markers);
-      _polylines.addAll(polylines);
-    });
-
-    // Auto-zoom to fit both markers
-    if (_mapController != null &&
-        bookingProvider.pickupLocation != null &&
-        bookingProvider.dropLocation != null) {
-      final bounds = LatLngBounds(
-        southwest: LatLng(
-          bookingProvider.pickupLocation!.latitude <
-                  bookingProvider.dropLocation!.latitude
-              ? bookingProvider.pickupLocation!.latitude
-              : bookingProvider.dropLocation!.latitude,
-          bookingProvider.pickupLocation!.longitude <
-                  bookingProvider.dropLocation!.longitude
-              ? bookingProvider.pickupLocation!.longitude
-              : bookingProvider.dropLocation!.longitude,
-        ),
-        northeast: LatLng(
-          bookingProvider.pickupLocation!.latitude >
-                  bookingProvider.dropLocation!.latitude
-              ? bookingProvider.pickupLocation!.latitude
-              : bookingProvider.dropLocation!.latitude,
-          bookingProvider.pickupLocation!.longitude >
-                  bookingProvider.dropLocation!.longitude
-              ? bookingProvider.pickupLocation!.longitude
-              : bookingProvider.dropLocation!.longitude,
-        ),
-      );
-
-      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Google Map
+          // Keep Alive Interactive Map
           Consumer<BookingProvider>(
             builder: (context, bookingProvider, child) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _updateMap(); // Call update map whenever provider changes
-              });
-              
               if (bookingProvider.pickupLocation == null) {
                 return const Center(child: Text('Pickup location not set'));
               }
 
-              return GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(
-                    bookingProvider.pickupLocation!.latitude,
-                    bookingProvider.pickupLocation!.longitude,
-                  ),
-                  zoom: 14,
-                ),
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  _updateMap();
-                },
-                markers: _markers,
-                polylines: _polylines,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: true,
+              return KeepAliveMap(
+                pickupLocation: bookingProvider.pickupLocation,
+                dropLocation: bookingProvider.dropLocation,
+                polylinePoints: bookingProvider.polylinePoints,
               );
             },
           ),
+
           // Top Back Button
           Positioned(
             top: 20,
@@ -162,6 +56,7 @@ class _RideMapScreenState extends State<RideMapScreen> {
               ),
             ),
           ),
+          
           // Bottom Sheet: Vehicle Selection
           Positioned(
             bottom: 0,
@@ -199,7 +94,9 @@ class _RideMapScreenState extends State<RideMapScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "${bookingProvider.distance.toStringAsFixed(1)} km",
+                                    bookingProvider.distanceText.isNotEmpty
+                                        ? bookingProvider.distanceText
+                                        : "${bookingProvider.distance.toStringAsFixed(1)} km",
                                     style: const TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
@@ -207,7 +104,9 @@ class _RideMapScreenState extends State<RideMapScreen> {
                                     ),
                                   ),
                                   Text(
-                                    "${bookingProvider.estimatedTime} mins",
+                                    bookingProvider.durationText.isNotEmpty
+                                        ? bookingProvider.durationText
+                                        : "${bookingProvider.estimatedTime} mins",
                                     style: const TextStyle(
                                       fontSize: 16,
                                       color: AppColors.grey600,
@@ -247,7 +146,6 @@ class _RideMapScreenState extends State<RideMapScreen> {
                       const SizedBox(height: 16),
                       Consumer<BookingProvider>(
                         builder: (context, bookingProvider, child) {
-                          // Get available ride types
                           final rideTypes =
                               RideType.getDummyRides(bookingProvider.distance);
 

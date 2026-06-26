@@ -65,7 +65,9 @@ class _RideRequestPopupState extends State<RideRequestPopup> {
   @override
   Widget build(BuildContext context) {
     final rideViewModel = Provider.of<RideViewModel>(context);
-    final request = rideViewModel.incomingRequest;
+    final request = rideViewModel.incomingRequests.isNotEmpty 
+        ? rideViewModel.incomingRequests.first 
+        : null;
 
     if (request == null) return const SizedBox.shrink();
 

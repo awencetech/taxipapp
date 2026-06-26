@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -107,23 +108,67 @@ class HomeDashboard extends StatefulWidget {
 }
 
 class _HomeDashboardState extends State<HomeDashboard> {
-  GoogleMapController? _mapController;
-  LatLng? _currentMapCenter;
-  String? _currentAddress;
+  Timer? _timer;
+  int _secondsElapsed = 0;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
       if (mounted) {
         final authViewModel = context.read<AuthViewModel>();
         if (authViewModel.driver != null) {
-          context.read<RideViewModel>().initialize(authViewModel.driver!.id);
-          context.read<RideViewModel>().fetchNotifications();
-          context.read<RideViewModel>().fetchRideHistory();
+          await context.read<RideViewModel>().initialize(
+            authViewModel.driver!.id,
+          );
+          await context.read<RideViewModel>().fetchNotifications();
+          await context.read<RideViewModel>().fetchRideHistory();
         }
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final rideViewModel = context.watch<RideViewModel>();
+    if (rideViewModel.isOnline) {
+      _startTimer();
+    } else {
+      _stopTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    if (_timer != null) {
+      _timer!.cancel();
+    }
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _secondsElapsed++;
+      });
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    setState(() {
+      _secondsElapsed = 0;
+    });
+  }
+
+  String _formatDuration(int totalSeconds) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits((totalSeconds / 3600).floor());
+    final minutes = twoDigits(((totalSeconds % 3600) / 60).floor());
+    final seconds = twoDigits(totalSeconds % 60);
+    return '$hours:$minutes:$seconds';
   }
 
   @override
@@ -132,7 +177,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
       final rideViewModel = context.watch<RideViewModel>();
       debugPrint('HomeDashboard: Building. isOnline=${rideViewModel.isOnline}');
 
-      return rideViewModel.isOnline ? _buildOnlineUI() : _buildOfflineUI();
+      return rideViewModel.isOnline ? _buildWaitingScreen() : _buildOfflineUI();
     } catch (e, stack) {
       debugPrint('HomeDashboard: Build Error: $e');
       debugPrint('HomeDashboard: Stack Trace: $stack');
@@ -143,37 +188,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
         ),
       );
     }
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-    final locationProvider = context.read<LocationProvider>();
-    if (locationProvider.currentPosition != null) {
-      final pos = locationProvider.currentPosition!;
-      _currentMapCenter = LatLng(pos.latitude, pos.longitude);
-    }
-  }
-
-  void _onCameraMove(CameraPosition position) {
-    setState(() {
-      _currentMapCenter = position.target;
-    });
-  }
-
-  void _goToCurrentLocation() async {
-    final locationProvider = context.read<LocationProvider>();
-    final pos = await locationProvider.getCurrentLocation();
-    if (pos != null && _mapController != null) {
-      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
-    }
-  }
-
-  void _zoomIn() {
-    _mapController?.animateCamera(CameraUpdate.zoomIn());
-  }
-
-  void _zoomOut() {
-    _mapController?.animateCamera(CameraUpdate.zoomOut());
   }
 
   Widget _buildRideCard(RideRequestModel ride, {bool showActions = false}) {
@@ -217,12 +231,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -260,13 +274,36 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ],
                 ),
               ),
-              Text(
-                "₹${ride.fare.toInt()}",
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Color(0xFF2EBD59),
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    "G�${ride.fare.toInt()}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                      color: Color(0xFFFF8A00),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      ride.vehicleType.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -361,6 +398,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
               children: [
                 _buildTripStat(Icons.directions, distance, "Distance"),
                 _buildTripStat(Icons.access_time, duration, "Duration"),
+                _buildTripStat(
+                  Icons.payment,
+                  ride.paymentMethod.toUpperCase(),
+                  "Payment",
+                ),
               ],
             ),
           ),
@@ -368,6 +410,30 @@ class _HomeDashboardState extends State<HomeDashboard> {
             const SizedBox(height: 20),
             Row(
               children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Reject ride
+                      context.read<RideViewModel>().rejectRide(ride.id);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE53935)),
+                      foregroundColor: const Color(0xFFE53935),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "REJECT",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
@@ -387,30 +453,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     ),
                     child: const Text(
                       "ACCEPT",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Cancel/Reject ride
-                      context.read<RideViewModel>().rejectRide(ride.id);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE53935)),
-                      foregroundColor: const Color(0xFFE53935),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      "REJECT",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -584,6 +626,118 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
           ),
 
+          // Quick Actions Section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Quick Actions",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildQuickAction(
+                      Icons.send,
+                      "Go Online",
+                      Colors.green,
+                      onTap: () => rideViewModel.toggleOnlineOffline(),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildQuickAction(
+                      Icons.account_balance_wallet,
+                      "Wallet",
+                      Colors.blue,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const WalletScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    _buildQuickAction(
+                      Icons.card_membership,
+                      "Incentives",
+                      Colors.purple,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const IncentivesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    _buildQuickAction(
+                      Icons.support_agent,
+                      "Support",
+                      Colors.red,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SupportScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Incoming Ride Requests Section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Incoming Ride Requests",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (rideViewModel.incomingRequests.isEmpty)
+                  Center(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 30),
+                        _AnimatedSearchingDots(),
+                        const SizedBox(height: 20),
+                        const Text(
+                          "No Ride Requests",
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                        const Text(
+                          "Waiting for nearby passengers...",
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...rideViewModel.incomingRequests.map(
+                    (ride) => _buildRideCard(ride, showActions: true),
+                  ),
+              ],
+            ),
+          ),
+
           // Pending/Accepted Rides Section
           if (pendingRides.isNotEmpty)
             Padding(
@@ -606,131 +760,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ],
               ),
             ),
-
-          // Earnings Summary Card
-          Transform.translate(
-            offset: const Offset(0, 0),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF8A00),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Today's Earnings",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            "₹2850",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.attach_money,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(color: Colors.white24),
-                  const SizedBox(height: 20),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "This Week",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            "₹15420",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "This Month",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            "₹58900",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      HomeScreen.of(context)?.setSelectedIndex(2);
-                    },
-                    icon: const Icon(Icons.analytics_outlined, size: 18),
-                    label: const Text("View Detailed Earnings"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size(double.infinity, 45),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
 
           if (driver != null && driver.bankAccounts.isNotEmpty)
             // Show saved bank details
@@ -807,135 +836,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ),
               ),
             ),
-
-          // Performance Metrics
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Performance Metrics",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1.5,
-                  children: [
-                    _buildMetricCard(
-                      "127",
-                      "Trips Completed",
-                      Icons.directions_car_filled_outlined,
-                      Colors.green.shade50,
-                      Colors.green,
-                    ),
-                    _buildMetricCard(
-                      "94%",
-                      "Acceptance Rate",
-                      Icons.track_changes,
-                      Colors.blue.shade50,
-                      Colors.blue,
-                    ),
-                    _buildMetricCard(
-                      "8.5h",
-                      "Online Hours",
-                      Icons.access_time,
-                      Colors.orange.shade50,
-                      Colors.orange,
-                    ),
-                    _buildMetricCard(
-                      "4.8",
-                      "Driver Rating",
-                      Icons.star_outline,
-                      Colors.yellow.shade50,
-                      Colors.orange,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 30),
-          // Quick Actions Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Quick Actions",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _buildQuickAction(
-                      Icons.send,
-                      "Go Online",
-                      Colors.green,
-                      onTap: () => rideViewModel.toggleOnlineOffline(),
-                    ),
-                    const SizedBox(width: 12),
-                    _buildQuickAction(
-                      Icons.account_balance_wallet,
-                      "Wallet",
-                      Colors.blue,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const WalletScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    _buildQuickAction(
-                      Icons.card_membership,
-                      "Incentives",
-                      Colors.purple,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const IncentivesScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    _buildQuickAction(
-                      Icons.support_agent,
-                      "Support",
-                      Colors.red,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SupportScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
 
           const SizedBox(height: 30),
           // Recent Activity Section
@@ -1019,8 +919,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     return _buildActivityItem(
                       ride.passengerName,
                       time,
-                      "${ride.pickupAddress.split(' ').take(2).join(' ')} → ${ride.dropAddress.split(' ').take(2).join(' ')}",
-                      "₹${ride.fare.toInt()}",
+                      "${ride.pickupAddress.split(' ').take(2).join(' ')} G�� ${ride.dropAddress.split(' ').take(2).join(' ')}",
+                      "G�${ride.fare.toInt()}",
                       "5",
                       avatarColor,
                     );
@@ -1034,139 +934,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildOnlineUI() {
+  Widget _buildWaitingScreen() {
     final rideViewModel = context.watch<RideViewModel>();
-    final locationProvider = context.watch<LocationProvider>();
     // Filter pending/accepted rides
     final pendingRides = rideViewModel.rideHistory
         .where((ride) => ride.status == 'pending' || ride.status == 'accepted')
         .toList();
     final hasRequests =
-        rideViewModel.incomingRequest != null || pendingRides.isNotEmpty;
+        rideViewModel.incomingRequests.isNotEmpty || pendingRides.isNotEmpty;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Full screen Google Map
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: locationProvider.currentPosition != null
-                  ? LatLng(
-                      locationProvider.currentPosition!.latitude,
-                      locationProvider.currentPosition!.longitude,
-                    )
-                  : const LatLng(11.0168, 76.9558),
-              zoom: 16,
-            ),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            zoomGesturesEnabled: false,
-            scrollGesturesEnabled: true,
-            tiltGesturesEnabled: false,
-            rotateGesturesEnabled: false,
-            onMapCreated: _onMapCreated,
-            onCameraMove: _onCameraMove,
-          ),
-
-          // Center pickup pin
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Pickup point label
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2EBD59),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    "Pickup Point",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Pin icon
-                const Icon(
-                  Icons.location_on,
-                  color: Color(0xFF4A90E2),
-                  size: 48,
-                ),
-                const SizedBox(height: 60), // Adjust to align pin center
-              ],
-            ),
-          ),
-
-          // Address card below center
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.45,
-            left: 24,
-            right: 24,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Current Location",
-                    style: TextStyle(
-                      color: Color(0xFF757575),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _currentAddress ?? "Fetching address...",
-                    style: const TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Top header
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Container(
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Top header
+            SafeArea(
+              child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                  horizontal: 24,
+                  vertical: 20,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1174,30 +961,23 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     const Text(
                       "TAXI NANBAN",
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
                       ),
                     ),
                     Stack(
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: const Color(0xFFF1F3F5),
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: IconButton(
                             icon: const Icon(
                               Icons.notifications_none,
                               color: Color(0xFF1A1A1A),
-                              size: 28,
+                              size: 26,
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -1243,246 +1023,250 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ),
               ),
             ),
-          ),
 
-          // Map controls (right side)
-          Positioned(
-            right: 16,
-            top: MediaQuery.of(context).size.height * 0.25,
-            child: Column(
-              children: [
-                _buildMapControlButton(Icons.my_location, _goToCurrentLocation),
-                const SizedBox(height: 12),
-                _buildMapControlButton(Icons.add, _zoomIn),
-                const SizedBox(height: 12),
-                _buildMapControlButton(Icons.remove, _zoomOut),
-              ],
-            ),
-          ),
-
-          // Online status and go offline button
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.12,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            // Quick Actions Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2EBD59),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   const Text(
-                    "Online",
+                    "Quick Actions",
                     style: TextStyle(
-                      color: Color(0xFF1A1A1A),
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      color: Color(0xFF1A1A1A),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  GestureDetector(
-                    onTap: () {
-                      rideViewModel.toggleOnlineOffline();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _buildQuickAction(
+                        Icons.account_balance_wallet,
+                        "Wallet",
+                        Colors.blue,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const WalletScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF4444),
-                        borderRadius: BorderRadius.circular(20),
+                      const SizedBox(width: 12),
+                      _buildQuickAction(
+                        Icons.card_membership,
+                        "Incentives",
+                        Colors.purple,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const IncentivesScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      child: const Text(
-                        "Go Offline",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      const SizedBox(width: 12),
+                      _buildQuickAction(
+                        Icons.support_agent,
+                        "Support",
+                        Colors.red,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SupportScreen(),
+                            ),
+                          );
+                        },
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
 
-          // Ride requests bottom sheet
-          if (hasRequests)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(32),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, -4),
+            // Incoming Ride Requests Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Incoming Ride Requests",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (rideViewModel.incomingRequests.isEmpty)
+                    Center(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 30),
+                          _AnimatedSearchingDots(),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "No Ride Requests",
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                          const Text(
+                            "Waiting for nearby passengers...",
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...rideViewModel.incomingRequests.map(
+                      (ride) => _buildRideCard(ride, showActions: true),
+                    ),
+                ],
+              ),
+            ),
+
+            // Pending Rides Section
+            if (pendingRides.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
                 ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0E0E0),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
                     const Text(
-                      "Available Ride Requests",
+                      "Pending Rides",
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1A1A1A),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (rideViewModel.incomingRequest != null)
-                      _buildRideCard(
-                        rideViewModel.incomingRequest!,
-                        showActions: true,
-                      ),
                     ...pendingRides.map(
                       (ride) => _buildRideCard(ride, showActions: true),
                     ),
                   ],
                 ),
               ),
-            ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildMapControlButton(IconData icon, VoidCallback onPressed) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: const Color(0xFF1A1A1A), size: 24),
-        onPressed: onPressed,
-      ),
-    );
-  }
-
-  Widget _buildDemandArea(String name, String distance, Color statusColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: statusColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.3),
-                  blurRadius: 4,
-                  spreadRadius: 1,
+            // Online Status and Timer
+            if (!hasRequests)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 40,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Color(0xFF1A1A1A),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Online indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: const Color(0xFF2EBD59),
+                          width: 2,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF2EBD59),
+                            size: 24,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            "ONLINE",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2EBD59),
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // Timer display
+                    Text(
+                      _formatDuration(_secondsElapsed),
+                      style: const TextStyle(
+                        fontSize: 60,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "Online Duration",
+                      style: TextStyle(fontSize: 16, color: Color(0xFF757575)),
+                    ),
+                    const SizedBox(height: 60),
+
+                    // Searching indicator
+                    const Text(
+                      "Searching for passengers...",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF424242),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Animated dots
+                    _AnimatedSearchingDots(),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                distance,
-                style: const TextStyle(
-                  color: Color(0xFF757575),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+
+            // Go Offline button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => rideViewModel.toggleOnlineOffline(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF4444),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                    shadowColor: const Color(0xFFFF4444).withValues(alpha: 0.4),
+                  ),
+                  child: const Text(
+                    "GO OFFLINE",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildOnlineStat(String value, String label, Color valueColor) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: valueColor,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF757575),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 
@@ -2049,11 +1833,11 @@ class _MapViewState extends State<MapView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildStatColumn('Earnings', '₹1,250'),
+                      _buildStatColumn('Earnings', 'G�1,250'),
                       const VerticalDivider(thickness: 1),
                       _buildStatColumn('Rides', '12'),
                       const VerticalDivider(thickness: 1),
-                      _buildStatColumn('Rating', '4.8 ★'),
+                      _buildStatColumn('Rating', '4.8 G��'),
                     ],
                   ),
                 ],
@@ -2061,7 +1845,8 @@ class _MapViewState extends State<MapView> {
             ),
           ),
           // Ride Request Popup
-          if (rideViewModel.incomingRequest != null) const RideRequestPopup(),
+          if (rideViewModel.incomingRequests.isNotEmpty)
+            const RideRequestPopup(),
         ],
       ),
     );
@@ -2081,6 +1866,81 @@ class _MapViewState extends State<MapView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AnimatedSearchingDots extends StatefulWidget {
+  const _AnimatedSearchingDots();
+
+  @override
+  State<_AnimatedSearchingDots> createState() => _AnimatedSearchingDotsState();
+}
+
+class _AnimatedSearchingDotsState extends State<_AnimatedSearchingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<int> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: false);
+
+    _animation = StepTween(begin: 0, end: 2).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Dot(isActive: _animation.value == index),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class Dot extends StatelessWidget {
+  final bool isActive;
+
+  const Dot({super.key, required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: isActive ? 16 : 12,
+      height: isActive ? 16 : 12,
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFF1976D2) : const Color(0xFFB0BEC5),
+        shape: BoxShape.circle,
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF1976D2).withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
     );
   }
 }

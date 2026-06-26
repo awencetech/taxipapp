@@ -24,7 +24,19 @@ const estimateFare = async (req, res) => {
 
 const createRide = async (req, res) => {
   try {
+    console.log('createRide - req.user:', req.user);
+    console.log('createRide - req.body:', req.body);
+    
     const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod } = req.body;
+    
+    // Validate required fields
+    if (!pickupLocation || !dropLocation || fare === undefined) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Missing required fields',
+        received: req.body 
+      });
+    }
     
     const ride = await Ride.create({
       user: req.user._id,
@@ -64,6 +76,10 @@ const createRide = async (req, res) => {
     const rideData = ride.toObject();
     rideData.user = { _id: req.user._id, name: req.user.name };
 
+    // Emit rideCreated event to user
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
+    io.to(req.user._id.toString()).emit('rideCreated', populatedRide);
+
     nearbyDrivers.forEach((driver) => {
       io.to(driver.user.toString()).emit('newRideRequest', rideData);
     });
@@ -73,7 +89,16 @@ const createRide = async (req, res) => {
       data: { ride, nearbyDriversCount: nearbyDrivers.length, notificationsCount: notifications.length },
     });
   } catch (error) {
-    res.status(400).json({ status: 'error', message: error.message });
+    console.error('=== createRide Error ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(400).json({ 
+      status: 'error', 
+      message: error.message,
+      errorName: error.name,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -96,10 +121,18 @@ const cancelRide = async (req, res) => {
     ride.cancellationReason = reason;
     await ride.save();
 
+    // Get io instance
+    const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
+
     // Notify driver if assigned
     if (ride.driver) {
-      const io = req.app.get('io');
       io.to(ride.driver.toString()).emit('rideCancelled', { rideId: ride._id });
+    }
+
+    // Notify user
+    if (ride.user) {
+      io.to(ride.user.toString()).emit('rideUpdated', populatedRide);
     }
 
     res.status(200).json({
@@ -273,8 +306,9 @@ const driverAcceptRide = async (req, res) => {
     await ride.save();
 
     const io = req.app.get('io');
-    const populatedRide = await Ride.findById(ride._id).populate('user');
+    const populatedRide = await Ride.findById(ride._id).populate('user driver');
     io.to(populatedRide.user._id.toString()).emit('rideAccepted', populatedRide);
+    io.to(populatedRide.user._id.toString()).emit('rideUpdated', populatedRide);
 
     res.status(200).json({
       status: 'success',
@@ -302,9 +336,12 @@ const driverRejectRide = async (req, res) => {
     ride.cancellationReason = reason || 'Rejected by driver';
     await ride.save();
 
+    const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
+
     if (ride.user) {
-      const io = req.app.get('io');
       io.to(ride.user.toString()).emit('rideCancelled', { rideId: ride._id });
+      io.to(ride.user.toString()).emit('rideUpdated', populatedRide);
     }
 
     res.status(200).json({
@@ -333,8 +370,10 @@ const driverArrived = async (req, res) => {
     await ride.save();
 
     const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
     if (ride.user) {
       io.to(ride.user.toString()).emit('driverArrived', { rideId: ride._id });
+      io.to(ride.user.toString()).emit('rideUpdated', populatedRide);
     }
 
     res.status(200).json({
@@ -364,8 +403,10 @@ const driverStartTrip = async (req, res) => {
     await ride.save();
 
     const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
     if (ride.user) {
       io.to(ride.user.toString()).emit('tripStarted', { rideId: ride._id });
+      io.to(ride.user.toString()).emit('rideUpdated', populatedRide);
     }
 
     res.status(200).json({
@@ -419,8 +460,10 @@ const driverCompleteTrip = async (req, res) => {
     }
 
     const io = req.app.get('io');
+    const populatedRide = await Ride.findById(ride._id).populate('driver');
     if (ride.user) {
       io.to(ride.user.toString()).emit('tripCompleted', { rideId: ride._id });
+      io.to(ride.user.toString()).emit('rideUpdated', populatedRide);
     }
 
     if (driver && driver.user) {

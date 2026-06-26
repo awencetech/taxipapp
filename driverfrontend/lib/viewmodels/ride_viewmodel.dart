@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:developer' as developer;
 import '../models/driver_models.dart';
 import '../services/socket_service.dart';
 import '../services/api_service.dart';
 import '../core/constants/app_constants.dart';
-import '../views/rides/trip_navigation_screen.dart';
+import '../views/rides/ride_details_screen.dart';
 
 class RideViewModel extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   final SocketService _socketService = SocketService();
   StreamSubscription<Map<String, dynamic>>? _rideRequestSubscription;
 
-  RideRequestModel? _incomingRequest;
+  final List<RideRequestModel> _incomingRequests = [];
   RideRequestModel? _currentRide;
   bool _isOnline = false;
   bool _isLoading = false;
@@ -26,7 +27,7 @@ class RideViewModel extends ChangeNotifier {
   String? _error;
   String? _driverId;
 
-  RideRequestModel? get incomingRequest => _incomingRequest;
+  List<RideRequestModel> get incomingRequests => _incomingRequests;
   RideRequestModel? get currentRide => _currentRide;
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
@@ -44,18 +45,42 @@ class RideViewModel extends ChangeNotifier {
   int get unreadCount => _unreadCount;
   String? get error => _error;
 
-  void initialize(String driverId) {
+  Future<void> initialize(String driverId) async {
     _driverId = driverId;
     _socketService.connect(driverId);
 
+    // Fetch pending rides from server
+    await fetchPendingRides();
+
     _rideRequestSubscription = _socketService.rideRequestStream.listen((data) {
-      _incomingRequest = RideRequestModel.fromJson(data);
-      notifyListeners();
+      developer.log('Received new ride request from socket: $data');
+      try {
+        final newRide = RideRequestModel.fromJson(data);
+        // Only add if not already in the list
+        if (!_incomingRequests.any((r) => r.id == newRide.id)) {
+          _incomingRequests.add(newRide);
+          notifyListeners();
+        }
+      } catch (e) {
+        developer.log('Error parsing ride request: $e');
+      }
     });
   }
 
   void toggleOnlineOffline() async {
     _isOnline = !_isOnline;
+
+    try {
+      await _apiService.put(
+        AppConstants.driverStatusUrl,
+        data: {
+          'isOnline': _isOnline,
+          'status': _isOnline ? 'available' : 'offline',
+        },
+      );
+    } catch (e) {
+      debugPrint('Error updating driver status: $e');
+    }
 
     if (_isOnline) {
       _startLocationUpdates();
@@ -144,16 +169,22 @@ class RideViewModel extends ChangeNotifier {
 
       if (response.data['status'] == 'success') {
         _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
-        _incomingRequest = null;
+        // Remove from incoming list
+        _incomingRequests.removeWhere((ride) => ride.id == rideId);
+
+        // Emit socket event: rideAccepted
+        _socketService.emit('rideAccepted', {
+          'rideId': rideId,
+          'driverId': _driverId,
+        });
+
         await fetchRideHistory(); // Refresh ride history to remove from pending
         notifyListeners();
 
         if (context.mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (context) => TripNavigationScreen(isToPickup: true),
-            ),
+            MaterialPageRoute(builder: (context) => const RideDetailsScreen()),
           );
         }
       }
@@ -183,7 +214,14 @@ class RideViewModel extends ChangeNotifier {
         data: {'rideId': rideId, 'reason': reason},
       );
 
-      _incomingRequest = null;
+      // Emit socket event: rideRejected
+      _socketService.emit('rideRejected', {
+        'rideId': rideId,
+        'driverId': _driverId,
+      });
+
+      // Remove from incoming list
+      _incomingRequests.removeWhere((ride) => ride.id == rideId);
       await fetchRideHistory(); // Refresh ride history
       notifyListeners();
     } catch (e) {
@@ -209,6 +247,13 @@ class RideViewModel extends ChangeNotifier {
 
       if (response.data['status'] == 'success') {
         _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+
+        // Emit socket event: driverArrived
+        _socketService.emit('driverArrived', {
+          'rideId': _currentRide!.id,
+          'driverId': _driverId,
+        });
+
         notifyListeners();
       }
     } catch (e) {
@@ -234,6 +279,13 @@ class RideViewModel extends ChangeNotifier {
 
       if (response.data['status'] == 'success') {
         _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
+
+        // Emit socket event: tripStarted
+        _socketService.emit('tripStarted', {
+          'rideId': _currentRide!.id,
+          'driverId': _driverId,
+        });
+
         notifyListeners();
       }
     } catch (e) {
@@ -258,6 +310,12 @@ class RideViewModel extends ChangeNotifier {
       );
 
       if (response.data['status'] == 'success') {
+        // Emit socket event: tripCompleted
+        _socketService.emit('tripCompleted', {
+          'rideId': _currentRide!.id,
+          'driverId': _driverId,
+        });
+
         _currentRide = null;
         await fetchRideHistory();
         notifyListeners();
@@ -285,6 +343,38 @@ class RideViewModel extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Fetch Current Ride Error: $e');
+    }
+  }
+
+  Future<void> fetchPendingRides() async {
+    try {
+      developer.log('Fetching pending rides...');
+      final response = await _apiService.get(AppConstants.pendingRidesUrl);
+      developer.log('Pending rides response: ${response.data}');
+
+      // Handle both response formats
+      bool isSuccess = false;
+      List<dynamic>? ridesData;
+
+      if (response.data['status'] == 'success') {
+        isSuccess = true;
+        ridesData = response.data['data']?['rides'];
+      } else if (response.data['success'] == true) {
+        isSuccess = true;
+        ridesData = response.data['data']?['rides'];
+      }
+
+      if (isSuccess && ridesData != null) {
+        for (var rideData in ridesData) {
+          final ride = RideRequestModel.fromJson(rideData);
+          if (!_incomingRequests.any((r) => r.id == ride.id)) {
+            _incomingRequests.add(ride);
+          }
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      developer.log('Error fetching pending rides: $e');
     }
   }
 
@@ -512,5 +602,50 @@ class RideViewModel extends ChangeNotifier {
     _stopLocationUpdates();
     _rideRequestSubscription?.cancel();
     super.dispose();
+  }
+
+  // For testing purposes: add sample ride requests
+  void addSampleRides() {
+    final sampleRides = [
+      RideRequestModel(
+        id: 'sample-ride-1',
+        passengerName: 'John Doe',
+        pickupAddress:
+            'Chennai Central Railway Station, Park Town, Chennai, Tamil Nadu',
+        dropAddress:
+            'T Nagar Bus Stand, Pondy Bazaar, T Nagar, Chennai, Tamil Nadu',
+        pickupCoords: [13.0827, 80.2707],
+        dropCoords: [13.0820, 80.2800],
+        fare: 250,
+        distance: 5.2,
+        estimatedTime: 15,
+        status: 'pending',
+        vehicleType: 'AUTO',
+        paymentMethod: 'cash',
+        createdAt: DateTime.now(),
+      ),
+      RideRequestModel(
+        id: 'sample-ride-2',
+        passengerName: 'Jane Smith',
+        pickupAddress: 'Anna Nagar Roundtana, Anna Nagar, Chennai, Tamil Nadu',
+        dropAddress: 'Phoenix Marketcity, Velachery, Chennai, Tamil Nadu',
+        pickupCoords: [13.0674, 80.2376],
+        dropCoords: [12.9772, 80.2209],
+        fare: 450,
+        distance: 12.5,
+        estimatedTime: 35,
+        status: 'pending',
+        vehicleType: 'BIKE',
+        paymentMethod: 'upi',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 2)),
+      ),
+    ];
+
+    for (var ride in sampleRides) {
+      if (!_incomingRequests.any((r) => r.id == ride.id)) {
+        _incomingRequests.add(ride);
+      }
+    }
+    notifyListeners();
   }
 }

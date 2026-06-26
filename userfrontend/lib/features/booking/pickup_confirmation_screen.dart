@@ -259,19 +259,19 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
                       const SizedBox(height: 20),
 
                       // Title
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.location_on,
                             color: Colors.green,
                             size: 36,
                           ),
-                          const SizedBox(width: 16),
+                          SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Select a pickup point',
                                   style: TextStyle(
                                     fontSize: 20,
@@ -279,7 +279,7 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
                                     color: AppColors.black,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                SizedBox(height: 4),
                                 Text(
                                   'Adjust your pickup location as needed',
                                   style: TextStyle(
@@ -423,11 +423,10 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
                                     'duration':
                                         widget.bookingProvider.estimatedTime,
                                     'vehicleType': widget
-                                        .bookingProvider.selectedRideType?.name,
-                                    'paymentMethod':
-                                        widget.selectedPaymentMethod,
-                                    'coupon': widget.appliedCoupon,
-                                    'rideStatus': 'searching_driver',
+                                        .bookingProvider.selectedRideType?.id,
+                                    'paymentMethod': widget
+                                        .selectedPaymentMethod
+                                        .toLowerCase(),
                                   });
 
                                   if (success && mounted) {
@@ -438,6 +437,16 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
                                             const SearchingDriverScreen(),
                                       ),
                                       (route) => route.isFirst,
+                                    );
+                                  } else if (mounted) {
+                                    // Show error
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                      content: Text(
+                                        'Failed to book ride: ${widget.bookingProvider.error ?? "Unknown error"}'
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
                                     );
                                   }
                                 },

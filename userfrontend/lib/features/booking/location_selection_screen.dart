@@ -26,7 +26,7 @@ class LocationSelectionScreen extends StatefulWidget {
 class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropController = TextEditingController();
-  LocationField _activeField = LocationField.drop;
+  LocationField _activeField = LocationField.pickup;
   bool _isSearching = false;
   bool _hasNavigated = false;
 
@@ -316,17 +316,35 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                               if (result != null &&
                                   result is PlaceDetails &&
                                   mounted) {
-                                context
-                                    .read<BookingProvider>()
-                                    .setDropLocation(result);
                                 final displayName = _isNumericOnly(result.name)
                                     ? result.address
                                     : result.name;
-                                _dropController.text = displayName;
+
+                                if (_activeField == LocationField.pickup) {
+                                  context
+                                      .read<BookingProvider>()
+                                      .setPickupLocation(result);
+                                  _pickupController.text = displayName;
+                                  // After selecting pickup, activate drop field
+                                  setState(() {
+                                    _activeField = LocationField.drop;
+                                  });
+                                } else {
+                                  context
+                                      .read<BookingProvider>()
+                                      .setDropLocation(result);
+                                  _dropController.text = displayName;
+                                }
+
+                                // If both are selected, calculate route and navigate
                                 if (context
-                                        .read<BookingProvider>()
-                                        .pickupLocation !=
-                                    null) {
+                                            .read<BookingProvider>()
+                                            .pickupLocation !=
+                                        null &&
+                                    context
+                                            .read<BookingProvider>()
+                                            .dropLocation !=
+                                        null) {
                                   await context
                                       .read<BookingProvider>()
                                       .calculateRoute();
@@ -389,32 +407,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
               Expanded(
                 child: Consumer<BookingProvider>(
                   builder: (context, bookingProvider, child) {
-                    // If both locations selected and not yet navigated, go to RideBookingScreen
-                    if (bookingProvider.pickupLocation != null &&
-                        bookingProvider.dropLocation != null &&
-                        !_isSearching &&
-                        !_hasNavigated) {
-                      // Use PostFrameCallback to avoid building during build
-                      WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (mounted) {
-                          // First calculate the route if not already calculated
-                          if (bookingProvider.distance == 0.0) {
-                            await bookingProvider.calculateRoute();
-                          }
-                          setState(() {
-                            _hasNavigated = true;
-                          });
-                          if (mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RideBookingScreen(),
-                              ),
-                            );
-                          }
-                        }
-                      });
-                    }
                     // Otherwise show search results or recent locations
                     return _isSearching
                         ? _buildSearchResults()

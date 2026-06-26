@@ -11,6 +11,19 @@ const rideSchema = new mongoose.Schema({
     ref: 'Driver',
     default: null,
   },
+  rideId: {
+    type: String,
+  },
+  userId: {
+    type: String,
+  },
+  driverId: {
+    type: String,
+  },
+  rejectedDrivers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver',
+  }],
   pickupLocation: {
     address: String,
     type: {
@@ -35,8 +48,8 @@ const rideSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'arrived', 'started', 'completed', 'cancelled'],
-    default: 'pending',
+    enum: ['searching', 'accepted', 'driver_arriving', 'arrived', 'trip_started', 'completed', 'cancelled'],
+    default: 'searching',
   },
   fare: {
     type: Number,

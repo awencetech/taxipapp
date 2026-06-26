@@ -28,6 +28,26 @@ const driverSchema = new mongoose.Schema({
     enum: ['available', 'busy', 'offline'],
     default: 'offline',
   },
+  isBusy: {
+    type: Boolean,
+    default: false,
+  },
+  currentRide: {
+    type: String,
+    default: null,
+  },
+  currentLatitude: {
+    type: Number,
+    default: 0.0,
+  },
+  currentLongitude: {
+    type: Number,
+    default: 0.0,
+  },
+  socketId: {
+    type: String,
+    default: null,
+  },
   currentLocation: {
     type: {
       type: String,
