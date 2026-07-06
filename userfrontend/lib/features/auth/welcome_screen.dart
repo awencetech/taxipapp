@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
+import 'phone_auth_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/auth_provider.dart';
@@ -252,10 +253,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               color: AppColors.card.withValues(alpha: 0.2),
                             ),
                           ),
-                          icon: const Icon(Icons.login),
-                          onPressed: _handleGoogleSignIn,
+                          icon: const Icon(Icons.phone),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const PhoneAuthScreen()),
+                            );
+                          },
                           label: const Text(
-                            "Continue with Google",
+                            "Continue with Phone",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -264,14 +272,24 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          "Continue as Guest",
-                          style: TextStyle(
-                            color: AppColors.card.withValues(alpha: 0.8),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.card,
+                            side: BorderSide(
+                              color: AppColors.card.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          icon: const Icon(Icons.login),
+                          onPressed: _handleGoogleSignIn,
+                          label: const Text(
+                            "Continue with Google",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       ),

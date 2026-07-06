@@ -98,7 +98,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            '₹450.75',
+                            '₹00.0',
                             style: TextStyle(
                               fontSize: 44,
                               fontWeight: FontWeight.bold,

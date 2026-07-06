@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_colors.dart';
-import 'features/auth/onboarding_screen.dart';
+import 'features/auth/welcome_screen.dart';
 import 'features/booking/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -49,8 +49,8 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero)
-        .animate(
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
         );
       }
     }

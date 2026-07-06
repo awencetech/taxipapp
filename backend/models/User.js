@@ -82,6 +82,7 @@ const userSchema = new mongoose.Schema({
     },
   ],
   googleId: String,
+  firebaseUid: String,
   fcmToken: String,
   ratings: {
     type: Number,

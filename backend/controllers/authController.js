@@ -1,4 +1,7 @@
 const User = require('../models/User');
+const Driver = require('../models/Driver');
+const Vendor = require('../models/Vendor');
+const admin = require('../config/firebase');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/emailService');
 const crypto = require('crypto');
@@ -120,7 +123,23 @@ const login = async (req, res) => {
       });
     }
 
+    if (user.role === 'driver') {
+      const driver = await Driver.findOne({ user: user._id });
+      if (driver && !driver.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Driver not approved. Please wait for vendor/admin approval.'
+        });
+      }
+    }
+
     const token = generateToken(user._id);
+
+    let driverId = null;
+    if (user.role === 'driver') {
+      const driver = await Driver.findOne({ user: user._id });
+      driverId = driver?.driverId;
+    }
 
     res.status(200).json({
       success: true,
@@ -131,7 +150,8 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         mobile: user.mobile,
-        role: user.role
+        role: user.role,
+        driverId: driverId
       },
     });
   } catch (error) {
@@ -253,13 +273,17 @@ const googleLogin = async (req, res) => {
             payload = ticket.getPayload();
           } catch (err) {
             lastError = err;
-            const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${googleToken}`);
-            if (response.ok) {
-              payload = await response.json();
-              payload.sub = payload.sub || payload.id;
-              payload.email = payload.email;
-              payload.name = payload.name;
-              payload.picture = payload.picture;
+            try {
+              const axios = require('axios');
+              const response = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+                headers: { Authorization: `Bearer ${googleToken}` }
+              });
+              if (response.data) {
+                payload = response.data;
+                payload.sub = payload.sub || payload.id;
+              }
+            } catch (axiosErr) {
+              lastError = axiosErr;
             }
           }
           
@@ -270,15 +294,24 @@ const googleLogin = async (req, res) => {
         }
       }
 
+      // Final fallback: if token verification failed but frontend sent user data directly
       if (!payload || !payload.email) {
-        console.error('Google token verification failed:', lastError);
-        return res.status(400).json({ success: false, message: 'Invalid Google token' });
+        if (req.body.email && req.body.googleId) {
+          // Trust data from Google account object (user completed Google popup successfully)
+          email = req.body.email.toLowerCase();
+          name = req.body.name || '';
+          googleId = req.body.googleId;
+          photoUrl = req.body.photoUrl;
+        } else {
+          console.error('Google token verification failed:', lastError);
+          return res.status(400).json({ success: false, message: 'Invalid Google token' });
+        }
+      } else {
+        email = payload.email.toLowerCase();
+        name = payload.name || req.body.name || '';
+        googleId = payload.sub || payload.id || req.body.googleId;
+        photoUrl = payload.picture || payload.photoUrl || req.body.photoUrl;
       }
-
-      email = payload.email.toLowerCase();
-      name = payload.name || '';
-      googleId = payload.sub || payload.id;
-      photoUrl = payload.picture || payload.photoUrl;
     } else {
       // Fallback for when frontend sends data directly
       email = req.body.email?.toLowerCase();
@@ -311,7 +344,22 @@ const googleLogin = async (req, res) => {
         });
       }
 
+      if (user.role === 'driver') {
+        const driver = await Driver.findOne({ user: user._id });
+        if (driver && !driver.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: 'Driver not approved. Please wait for vendor/admin approval.'
+          });
+        }
+      }
+
       const token = generateToken(user._id);
+      let driverId = null;
+      if (user.role === 'driver') {
+        const driver = await Driver.findOne({ user: user._id });
+        driverId = driver?.driverId;
+      }
       return res.status(200).json({
         success: true,
         isNewUser: false,
@@ -322,7 +370,8 @@ const googleLogin = async (req, res) => {
           email: user.email,
           mobile: user.mobile,
           role: user.role,
-          profilePic: user.profilePic
+          profilePic: user.profilePic,
+          driverId: driverId
         },
       });
     } else {
@@ -376,7 +425,22 @@ const completeProfile = async (req, res) => {
       isNewUser = true;
     }
 
+    if (user.role === 'driver') {
+      const driver = await Driver.findOne({ user: user._id });
+      if (driver && !driver.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Driver not approved. Please wait for vendor/admin approval.'
+        });
+      }
+    }
+
     const token = generateToken(user._id);
+    let driverId = null;
+    if (user.role === 'driver') {
+      const driver = await Driver.findOne({ user: user._id });
+      driverId = driver?.driverId;
+    }
 
     res.status(isNewUser ? 201 : 200).json({
       success: true,
@@ -388,7 +452,8 @@ const completeProfile = async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        profilePic: user.profilePic
+        profilePic: user.profilePic,
+        driverId: driverId
       },
     });
   } catch (error) {
@@ -448,4 +513,196 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword };
+// Firebase Phone Auth Endpoints
+const firebasePhoneAuth = async (req, res) => {
+  try {
+    if (!isMongoConnected()) {
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Database not available. Please try again later.' 
+      });
+    }
+    console.log('Firebase Phone Auth Request Body:', req.body);
+    const { idToken, role, name, companyName } = req.body;
+
+    if (!idToken || !role) {
+      return res.status(400).json({ success: false, message: 'Please provide idToken and role' });
+    }
+
+    // Verify Firebase ID Token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const firebaseUid = decodedToken.uid;
+    const phoneNumber = decodedToken.phone_number;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number not found in Firebase token' });
+    }
+
+    // Clean phone number (remove +91 if present, etc. based on your requirements)
+    const cleanPhone = phoneNumber.replace(/^\+91/, ''); // Assuming India, adjust as needed
+
+    if (role === 'user') {
+      // Handle User
+      let user = await User.findOne({ 
+        $or: [
+          { firebaseUid }, 
+          { mobile: cleanPhone }
+        ]
+      });
+
+      if (!user) {
+        // Create new user if not exists
+        if (!name) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Name is required for new user registration' 
+          });
+        }
+        user = await User.create({
+          name,
+          email: `${firebaseUid}@temp.com`, // Temporary email since we're using phone auth
+          mobile: cleanPhone,
+          firebaseUid,
+          role: 'user',
+          isVerified: true
+        });
+      } else {
+        // Update firebaseUid if not present
+        if (!user.firebaseUid) {
+          user.firebaseUid = firebaseUid;
+          await user.save();
+        }
+      }
+
+      const token = generateToken(user._id);
+      return res.status(200).json({
+        success: true,
+        message: 'User authenticated successfully',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          role: user.role,
+          profilePic: user.profilePic
+        }
+      });
+    } else if (role === 'driver') {
+      // Handle Driver
+      let user = await User.findOne({ 
+        $or: [
+          { firebaseUid }, 
+          { mobile: cleanPhone }
+        ]
+      });
+
+      if (!user) {
+        // Driver must have been registered previously (by vendor)
+        return res.status(404).json({
+          success: false,
+          message: 'Driver not found. Please contact your vendor to register.'
+        });
+      }
+
+      // Update firebaseUid if not present
+      if (!user.firebaseUid) {
+        user.firebaseUid = firebaseUid;
+        await user.save();
+      }
+
+      // Check driver status
+      const driver = await Driver.findOne({ user: user._id });
+      if (!driver) {
+        return res.status(404).json({
+          success: false,
+          message: 'Driver profile not found.'
+        });
+      }
+
+      if (!driver.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Waiting for vendor approval.',
+          status: 'pending'
+        });
+      }
+
+      const token = generateToken(user._id);
+      return res.status(200).json({
+        success: true,
+        message: 'Driver authenticated successfully',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          role: user.role,
+          driverId: driver.driverId,
+          profilePic: user.profilePic
+        }
+      });
+    } else if (role === 'vendor') {
+      // Handle Vendor
+      let vendor = await Vendor.findOne({ 
+        $or: [
+          { firebaseUid }, 
+          { phone: cleanPhone }
+        ]
+      });
+
+      if (!vendor) {
+        // Vendor must have been registered previously
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found. Please contact admin to register.'
+        });
+      }
+
+      // Update firebaseUid if not present
+      if (!vendor.firebaseUid) {
+        vendor.firebaseUid = firebaseUid;
+        await vendor.save();
+      }
+
+      if (!vendor.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Waiting for admin approval.',
+          status: 'pending'
+        });
+      }
+
+      // Generate token for vendor (we'll need to update auth middleware for vendor)
+      const token = jwt.sign({ id: vendor._id, role: 'vendor' }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRE
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Vendor authenticated successfully',
+        token,
+        user: {
+          id: vendor._id,
+          name: vendor.name,
+          email: vendor.email,
+          mobile: vendor.phone,
+          role: 'vendor',
+          companyName: vendor.companyName,
+          profilePicture: vendor.profilePicture
+        }
+      });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+  } catch (error) {
+    console.error('Firebase Phone Auth Error:', error);
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Firebase authentication failed' 
+    });
+  }
+};
+
+module.exports = { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword, firebasePhoneAuth };

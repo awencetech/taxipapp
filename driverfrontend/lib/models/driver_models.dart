@@ -38,6 +38,7 @@ class BankAccountModel {
 
 class DriverModel {
   final String id;
+  final String? driverId;
   final String name;
   final String email;
   final String mobile;
@@ -57,9 +58,16 @@ class DriverModel {
   final List<BankAccountModel> bankAccounts;
   // New: Documents
   final List<DocumentModel> documents;
+  // New: Stats
+  final int totalTrips;
+  final int completedTrips;
+  final int acceptanceRate;
+  final int onTimePercentage;
+  final DateTime? memberSince;
 
   DriverModel({
     required this.id,
+    this.driverId,
     required this.name,
     required this.email,
     required this.mobile,
@@ -76,6 +84,11 @@ class DriverModel {
     this.branchName = '',
     this.bankAccounts = const [],
     this.documents = const [],
+    this.totalTrips = 0,
+    this.completedTrips = 0,
+    this.acceptanceRate = 100,
+    this.onTimePercentage = 96,
+    this.memberSince,
   });
 
   factory DriverModel.fromJson(Map<String, dynamic> json) {
@@ -122,12 +135,13 @@ class DriverModel {
       }
       debugPrint('DriverModel.fromJson: Parsed ${docs.length} documents');
 
-      final driverId =
+      final driverIdFromJson =
           json['_id']?.toString() ?? json['id']?.toString() ?? 'unknown';
-      debugPrint('DriverModel.fromJson: Extracted driverId: $driverId');
+      debugPrint('DriverModel.fromJson: Extracted driverId: $driverIdFromJson');
 
       final driver = DriverModel(
-        id: driverId,
+        id: driverIdFromJson,
+        driverId: json['driverId'] as String?,
         name: (json['name'] as String?) ?? 'Unknown Driver',
         email: (json['email'] as String?) ?? '',
         mobile: (json['mobile'] as String?) ?? '',
@@ -147,6 +161,12 @@ class DriverModel {
         bankAccounts: accounts,
         // New documents
         documents: docs,
+        // New stats
+        totalTrips: (json['totalTrips'] as num?)?.toInt() ?? 0,
+        completedTrips: (json['completedTrips'] as num?)?.toInt() ?? 0,
+        acceptanceRate: (json['acceptanceRate'] as num?)?.toInt() ?? 100,
+        onTimePercentage: (json['onTimePercentage'] as num?)?.toInt() ?? 96,
+        memberSince: json['memberSince'] != null ? DateTime.tryParse(json['memberSince'].toString()) : null,
       );
 
       debugPrint('DriverModel.fromJson: Successfully created DriverModel!');
@@ -178,6 +198,7 @@ class DriverModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'driverId': driverId,
       'name': name,
       'email': email,
       'mobile': mobile,
@@ -301,6 +322,8 @@ class RideRequestModel {
   final String paymentMethod;
   final DateTime? createdAt;
   final String? cancellationReason;
+  final String?
+  polyline; // New: to store the route polyline from user's booking
 
   RideRequestModel({
     required this.id,
@@ -317,6 +340,7 @@ class RideRequestModel {
     this.paymentMethod = 'Cash',
     this.createdAt,
     this.cancellationReason,
+    this.polyline,
   });
 
   factory RideRequestModel.fromJson(Map<String, dynamic> json) {
@@ -325,10 +349,12 @@ class RideRequestModel {
     if (json['pickupLocation']?['coordinates'] != null &&
         json['pickupLocation']['coordinates'] is List) {
       final coords = json['pickupLocation']['coordinates'] as List;
-      pickupCoords = [
-        (coords[1] as num?)?.toDouble() ?? 0.0,
-        (coords[0] as num?)?.toDouble() ?? 0.0,
-      ];
+      if (coords.length >= 2) {
+        pickupCoords = [
+          (coords[1] as num?)?.toDouble() ?? 0.0,
+          (coords[0] as num?)?.toDouble() ?? 0.0,
+        ];
+      }
     }
 
     // Parse drop coords
@@ -336,10 +362,12 @@ class RideRequestModel {
     if (json['dropLocation']?['coordinates'] != null &&
         json['dropLocation']['coordinates'] is List) {
       final coords = json['dropLocation']['coordinates'] as List;
-      dropCoords = [
-        (coords[1] as num?)?.toDouble() ?? 0.0,
-        (coords[0] as num?)?.toDouble() ?? 0.0,
-      ];
+      if (coords.length >= 2) {
+        dropCoords = [
+          (coords[1] as num?)?.toDouble() ?? 0.0,
+          (coords[0] as num?)?.toDouble() ?? 0.0,
+        ];
+      }
     }
 
     // Get passenger name from user object
@@ -365,6 +393,7 @@ class RideRequestModel {
           ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       cancellationReason: json['cancellationReason'],
+      polyline: json['polyline']?.toString(),
     );
   }
 }

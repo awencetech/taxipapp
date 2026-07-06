@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/ride_viewmodel.dart';
 import 'viewmodels/theme_viewmodel.dart';
+import 'viewmodels/wallet_viewmodel.dart';
 import 'providers/location_provider.dart';
 import 'views/auth/login_screen.dart';
 import 'views/home/home_screen.dart';
@@ -17,6 +18,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => RideViewModel()),
         ChangeNotifierProvider(create: (_) => ThemeViewModel()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
+        ChangeNotifierProvider(create: (_) => WalletViewModel()),
       ],
       child: const DriverApp(),
     ),

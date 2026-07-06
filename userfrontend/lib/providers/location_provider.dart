@@ -210,8 +210,8 @@ class LocationProvider extends ChangeNotifier {
   }
 
   Future<void> _useDefaultLocation() async {
-    const defaultLat = 11.0168; // Coimbatore latitude
-    const defaultLng = 76.9558; // Coimbatore longitude
+    const defaultLat = 11.0168; // Coimbatore latitude (for map centering only)
+    const defaultLng = 76.9558; // Coimbatore longitude (for map centering only)
     _currentPosition = Position(
       latitude: defaultLat,
       longitude: defaultLng,
@@ -224,7 +224,7 @@ class LocationProvider extends ChangeNotifier {
       speed: 0.0,
       speedAccuracy: 0.0,
     );
-    _currentAddress = 'Coimbatore, Tamil Nadu';
+    _currentAddress = ''; // Don't set Coimbatore address automatically
     notifyListeners();
   }
 

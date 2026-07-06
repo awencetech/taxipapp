@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import '../models/driver_model.dart';
 import '../models/ride_model.dart';
 import '../models/payment_model.dart';
@@ -12,7 +14,8 @@ class BookingProvider extends ChangeNotifier {
   final SocketService _socketService = SocketService();
 
   RideModel? _currentRide;
-  List<RideModel> _rideHistory = [];
+  List<RideModel> _pendingRides = []; // For pending rides (in activity)
+  List<RideModel> _rideHistory = []; // For completed/canceled rides
   List<PaymentModel> _userPayments = [];
   List<DriverModel> _nearbyDrivers = [];
   bool _isLoading = false;
@@ -23,9 +26,14 @@ class BookingProvider extends ChangeNotifier {
   PlaceDetails? _dropLocation;
   double _distance = 0.0; // in km
   int _estimatedTime = 0; // in minutes
-  List<Map<String, dynamic>> _polylinePoints = [];
+  List<LatLng> _polylinePoints = [];
+  String _encodedPolyline = ''; // Store the encoded polyline string
+  String _distanceText = '';
+  String _durationText = '';
+  String? _lastRouteKey;
 
   RideModel? get currentRide => _currentRide;
+  List<RideModel> get pendingRides => _pendingRides;
   List<RideModel> get rideHistory => _rideHistory;
   List<PaymentModel> get userPayments => _userPayments;
   List<DriverModel> get nearbyDrivers => _nearbyDrivers;
@@ -37,17 +45,62 @@ class BookingProvider extends ChangeNotifier {
   PlaceDetails? get dropLocation => _dropLocation;
   double get distance => _distance;
   int get estimatedTime => _estimatedTime;
-  List<Map<String, dynamic>> get polylinePoints => _polylinePoints;
+  List<LatLng> get polylinePoints => _polylinePoints;
+  String get distanceText => _distanceText;
+  String get durationText => _durationText;
 
   BookingProvider() {
-    // Only listen to ride status stream, and only notify if current ride changes
+    // Listen to ride status stream
     _socketService.rideStatusStream.listen((data) {
-      if (_currentRide != null && data['rideId'] == _currentRide!.id) {
-        final newStatus = data['status'];
-        if (_currentRide!.status != newStatus) {
-          _currentRide = RideModel.fromMap(
-              {..._currentRide!.toMap(), 'status': newStatus});
+      final targetId = data['rideId'] ?? data['id'] ?? data['_id'];
+      if (_currentRide != null && targetId == _currentRide!.id) {
+        _currentRide = RideModel.fromMap({..._currentRide!.toMap(), ...data});
+        notifyListeners();
+      }
+    });
+
+    // Listen to driver location stream
+    _socketService.driverLocationStream.listen((data) {
+      if (_currentRide != null) {
+        // Update driver location in current ride
+        _currentRide = RideModel.fromMap({
+          ..._currentRide!.toMap(),
+          'driverLatitude': data['latitude'],
+          'driverLongitude': data['longitude'],
+        });
+        notifyListeners();
+      }
+    });
+
+    // Listen to ride created stream
+    _socketService.rideCreatedStream.listen((ride) {
+      // Check if ride already exists
+      final existingIndex = _rideHistory.indexWhere((r) => r.id == ride.id);
+      if (existingIndex == -1) {
+        // Insert at beginning to keep newest first
+        _rideHistory.insert(0, ride);
+        notifyListeners();
+      }
+    });
+
+    // Listen to ride updated stream
+    _socketService.rideUpdatedStream.listen((ride) {
+      // Check if ride is completed or canceled
+      final status = ride.status.toLowerCase();
+      if (status == 'completed' ||
+          status == 'canceled' ||
+          status == 'cancelled') {
+        // Move to history
+        moveToHistory(ride);
+      } else {
+        // Find and replace existing ride in pending
+        final pendingIndex = _pendingRides.indexWhere((r) => r.id == ride.id);
+        if (pendingIndex != -1) {
+          _pendingRides[pendingIndex] = ride;
           notifyListeners();
+        } else {
+          // If not in pending, add to pending
+          addToPendingRides(ride);
         }
       }
     });
@@ -77,10 +130,27 @@ class BookingProvider extends ChangeNotifier {
       }
 
       if (isSuccess && data != null) {
-        _rideHistory = data.map((e) => RideModel.fromMap(e)).toList();
+        final allRides = data.map((e) => RideModel.fromMap(e)).toList();
+        // Split into pending and history
+        _pendingRides = allRides.where((ride) {
+          final status = ride.status.toLowerCase();
+          return [
+            'searching',
+            'pending',
+            'accepted',
+            'arrived',
+            'trip_started',
+            'driver_arriving'
+          ].contains(status);
+        }).toList();
+        _rideHistory = allRides.where((ride) {
+          final status = ride.status.toLowerCase();
+          return ['completed', 'cancelled', 'canceled'].contains(status);
+        }).toList();
       } else {
         // If not success but no error, just set to empty list
         if (response.statusCode == 200 || response.statusCode == 304) {
+          _pendingRides = [];
           _rideHistory = [];
         } else {
           _error = response.data?['message']?.toString() ??
@@ -89,6 +159,7 @@ class BookingProvider extends ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
+      _pendingRides = [];
       _rideHistory = [];
     } finally {
       _isLoading = false;
@@ -141,9 +212,15 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Add the polyline to the ride data if we have it
+      if (_encodedPolyline.isNotEmpty) {
+        rideData['polyline'] = _encodedPolyline;
+      }
+
       final response = await _apiService.bookRide(rideData);
       if (response.statusCode == 201) {
         _currentRide = RideModel.fromMap(response.data['data']['ride']);
+        addToPendingRides(_currentRide!);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -159,6 +236,28 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // Add ride to pending list
+  void addToPendingRides(RideModel ride) {
+    // Check if already exists
+    final existingIndex = _pendingRides.indexWhere((r) => r.id == ride.id);
+    if (existingIndex == -1) {
+      _pendingRides.insert(0, ride);
+      notifyListeners();
+    }
+  }
+
+  // Move ride to history
+  void moveToHistory(RideModel ride) {
+    // Remove from pending
+    _pendingRides.removeWhere((r) => r.id == ride.id);
+    // Add to history if not already there
+    final existingIndex = _rideHistory.indexWhere((r) => r.id == ride.id);
+    if (existingIndex == -1) {
+      _rideHistory.insert(0, ride);
+    }
+    notifyListeners();
+  }
+
   Future<void> cancelRide(String rideId, String reason) async {
     _isLoading = true;
     _error = null;
@@ -167,7 +266,14 @@ class BookingProvider extends ChangeNotifier {
     try {
       final response = await _apiService.cancelRide(rideId, reason);
       if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchRideHistory();
+        // Find the ride in pending and move to history
+        final rideToCancel = _pendingRides.firstWhere((r) => r.id == rideId,
+            orElse: () => _rideHistory.firstWhere((r) => r.id == rideId,
+                orElse: () => throw Exception('Ride not found')));
+        // Update ride status to canceled
+        final canceledRide =
+            RideModel.fromMap({...rideToCancel.toMap(), 'status': 'canceled'});
+        moveToHistory(canceledRide);
       } else {
         _error = response.data['message'] ?? 'Failed to cancel ride';
       }
@@ -192,18 +298,35 @@ class BookingProvider extends ChangeNotifier {
   void setPickupLocation(PlaceDetails location) {
     _pickupLocation = location;
     notifyListeners();
+    if (_dropLocation != null) {
+      calculateRoute();
+    }
   }
 
   void setDropLocation(PlaceDetails location) {
     _dropLocation = location;
     notifyListeners();
+    if (_pickupLocation != null) {
+      calculateRoute();
+    }
   }
 
-  Future<void> calculateRoute() async {
+  Future<void> calculateRoute({int attempt = 1}) async {
     if (_pickupLocation == null || _dropLocation == null) return;
 
+    final routeKey =
+        '${_pickupLocation!.latitude.toStringAsFixed(5)},${_pickupLocation!.longitude.toStringAsFixed(5)}_${_dropLocation!.latitude.toStringAsFixed(5)},${_dropLocation!.longitude.toStringAsFixed(5)}';
+
+    // Perform caching: if coordinates haven't changed and we have a route, reuse it.
+    if (_lastRouteKey == routeKey && _polylinePoints.isNotEmpty) {
+      return;
+    }
+
     _isLoading = true;
-    notifyListeners();
+    _error = null;
+    if (attempt == 1) {
+      notifyListeners();
+    }
 
     try {
       final response = await _apiService.getDirections(
@@ -214,79 +337,171 @@ class BookingProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data;
-        _distance = data['distanceValue']?.toDouble() ?? 0.0;
-        _estimatedTime = data['durationValue']?.toInt() ?? 0;
-
-        if (data['polyline'] != null && data['polyline'].isNotEmpty) {
-          _polylinePoints = _decodePolyline(data['polyline']);
+        final responseData = response.data;
+        Map<String, dynamic>? data;
+        if (responseData['data'] != null) {
+          data = responseData['data'];
+        } else if (responseData['success'] == true ||
+            responseData['status'] == 'success') {
+          data = responseData;
         } else {
-          // Fallback: simple line
-          _polylinePoints = [
-            {
-              'latitude': _pickupLocation!.latitude,
-              'longitude': _pickupLocation!.longitude,
-            },
-            {
-              'latitude': _dropLocation!.latitude,
-              'longitude': _dropLocation!.longitude,
-            },
-          ];
+          data = responseData;
         }
+
+        final distanceValue = data?['distanceValue'];
+        if (distanceValue is int) {
+          _distance = distanceValue.toDouble();
+        } else if (distanceValue is double) {
+          _distance = distanceValue;
+        } else {
+          _distance = 0.0;
+        }
+
+        final durationValue = data?['durationValue'];
+        if (durationValue is int) {
+          _estimatedTime = durationValue;
+        } else if (durationValue is double) {
+          _estimatedTime = durationValue.toInt();
+        } else {
+          _estimatedTime = 0;
+        }
+
+        final dist = data?['distance'];
+        _distanceText = dist != null ? dist.toString() : '';
+
+        final dur = data?['duration'];
+        _durationText = dur != null ? dur.toString() : '';
+
+        final encodedPolyline = data?['polyline'];
+        _encodedPolyline = encodedPolyline?.toString() ?? '';
+        if (encodedPolyline != null && encodedPolyline.toString().isNotEmpty) {
+          final polylinePoints =
+              PolylinePoints().decodePolyline(encodedPolyline.toString());
+          _polylinePoints = polylinePoints
+              .map((point) => LatLng(point.latitude, point.longitude))
+              .toList();
+        } else {
+          _polylinePoints = [];
+        }
+
+        _lastRouteKey = routeKey;
+      } else {
+        throw Exception(response.data?['message']?.toString() ??
+            'Failed to fetch directions');
       }
     } catch (e) {
+      if (attempt < 3) {
+        // Retry with a 2-second delay
+        await Future.delayed(const Duration(seconds: 2));
+        return calculateRoute(attempt: attempt + 1);
+      }
       _error = e.toString();
-      // Fallback to dummy data if API fails
-      _distance = 5.2;
-      _estimatedTime = 15;
-      _polylinePoints = [
-        {
-          'latitude': _pickupLocation!.latitude,
-          'longitude': _pickupLocation!.longitude,
-        },
-        {
-          'latitude': _dropLocation!.latitude,
-          'longitude': _dropLocation!.longitude,
-        },
-      ];
+      _polylinePoints = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Helper to decode Google Polyline
-  List<Map<String, dynamic>> _decodePolyline(String encoded) {
-    List<Map<String, dynamic>> points = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
+  // New method to calculate route between driver and pickup
+  Future<void> calculateDriverToPickupRoute({
+    required double driverLat,
+    required double driverLng,
+    required double pickupLat,
+    required double pickupLng,
+    int attempt = 1,
+  }) async {
+    final routeKey =
+        '${driverLat.toStringAsFixed(5)},${driverLng.toStringAsFixed(5)}_${pickupLat.toStringAsFixed(5)},${pickupLng.toStringAsFixed(5)}';
 
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1F) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1F) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.add({
-        'latitude': lat / 1E5,
-        'longitude': lng / 1E5,
-      });
+    if (_lastRouteKey == routeKey && _polylinePoints.isNotEmpty) {
+      return;
     }
-    return points;
+
+    _isLoading = true;
+    _error = null;
+    if (attempt == 1) {
+      notifyListeners();
+    }
+
+    try {
+      final response = await _apiService.getDirections(
+        driverLat,
+        driverLng,
+        pickupLat,
+        pickupLng,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data;
+        Map<String, dynamic>? data;
+        if (responseData['data'] != null) {
+          data = responseData['data'];
+        } else if (responseData['success'] == true ||
+            responseData['status'] == 'success') {
+          data = responseData;
+        } else {
+          data = responseData;
+        }
+
+        final distanceValue = data?['distanceValue'];
+        if (distanceValue is int) {
+          _distance = distanceValue.toDouble();
+        } else if (distanceValue is double) {
+          _distance = distanceValue;
+        } else {
+          _distance = 0.0;
+        }
+
+        final durationValue = data?['durationValue'];
+        if (durationValue is int) {
+          _estimatedTime = durationValue;
+        } else if (durationValue is double) {
+          _estimatedTime = durationValue.toInt();
+        } else {
+          _estimatedTime = 0;
+        }
+
+        final dist = data?['distance'];
+        _distanceText = dist != null ? dist.toString() : '';
+
+        final dur = data?['duration'];
+        _durationText = dur != null ? dur.toString() : '';
+
+        final encodedPolyline = data?['polyline'];
+        _encodedPolyline = encodedPolyline?.toString() ?? '';
+        if (encodedPolyline != null && encodedPolyline.toString().isNotEmpty) {
+          final polylinePoints =
+              PolylinePoints().decodePolyline(encodedPolyline.toString());
+          _polylinePoints = polylinePoints
+              .map((point) => LatLng(point.latitude, point.longitude))
+              .toList();
+        } else {
+          _polylinePoints = [];
+        }
+
+        _lastRouteKey = routeKey;
+      } else {
+        throw Exception(response.data?['message']?.toString() ??
+            'Failed to fetch directions');
+      }
+    } catch (e) {
+      if (attempt < 3) {
+        await Future.delayed(const Duration(seconds: 2));
+        return calculateDriverToPickupRoute(
+          driverLat: driverLat,
+          driverLng: driverLng,
+          pickupLat: pickupLat,
+          pickupLng: pickupLng,
+          attempt: attempt + 1,
+        );
+      }
+      _error = e.toString();
+      _polylinePoints = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   void resetBooking() {
@@ -296,6 +511,10 @@ class BookingProvider extends ChangeNotifier {
     _distance = 0.0;
     _estimatedTime = 0;
     _polylinePoints = [];
+    _encodedPolyline = '';
+    _distanceText = '';
+    _durationText = '';
+    _lastRouteKey = null;
     notifyListeners();
   }
 }

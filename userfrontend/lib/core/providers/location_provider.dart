@@ -4,9 +4,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import '../services/google_maps_service.dart';
+import '../services/api_service.dart';
 
 class LocationProvider extends ChangeNotifier {
   final GoogleMapsService _mapsService = GoogleMapsService();
+  final ApiService _apiService = ApiService();
   final _uuid = const Uuid();
   String? _sessionToken;
 
@@ -15,14 +17,17 @@ class LocationProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<Position>? _positionStream;
   String _currentAddress = '';
+  bool _isFetchingLocation = false;
+  bool _autoFollow = true;
+  bool _isUpdating = false;
+  bool _hasPermissions = false;
+  bool _permanentlyDenied = false;
+  Timer? _locationUpdateTimer;
 
   // Search related
   List<dynamic> _suggestions = [];
   bool _isSearching = false;
   Timer? _debounce;
-
-  // Location fetch state
-  bool _isFetchingLocation = false;
 
   Position? get currentPosition => _currentPosition;
   bool get isLoading => _isLoading;
@@ -31,32 +36,43 @@ class LocationProvider extends ChangeNotifier {
   bool get isSearching => _isSearching;
   bool get isFetchingLocation => _isFetchingLocation;
   String get currentAddress => _currentAddress;
+  bool get autoFollow => _autoFollow;
+  bool get isUpdating => _isUpdating;
+  bool get hasPermissions => _hasPermissions;
+  bool get permanentlyDenied => _permanentlyDenied;
 
   LocationProvider() {
     _sessionToken = _uuid.v4();
     _initLocation();
   }
 
-  void onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      searchPlaces(query);
-    });
+  void setAutoFollow(bool value) {
+    _autoFollow = value;
+    notifyListeners();
   }
 
-  Future<bool> checkLocationPermission() async {
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  Future<bool> checkAndRequestPermissions() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _error = 'Location services are disabled. Please enable GPS.';
+      _hasPermissions = false;
       notifyListeners();
       return false;
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        _error = 'Location permission denied';
+        _error = 'Location permission is required.';
+        _hasPermissions = false;
+        _permanentlyDenied = false;
         notifyListeners();
         return false;
       }
@@ -64,11 +80,17 @@ class LocationProvider extends ChangeNotifier {
 
     if (permission == LocationPermission.deniedForever) {
       _error =
-          'Location permission permanently denied. Please enable in settings.';
+          'Location permission is permanently denied. Open settings to enable.';
+      _hasPermissions = false;
+      _permanentlyDenied = true;
       notifyListeners();
       return false;
     }
 
+    _hasPermissions = true;
+    _permanentlyDenied = false;
+    _error = null;
+    notifyListeners();
     return true;
   }
 
@@ -78,97 +100,66 @@ class LocationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final hasPermission = await checkLocationPermission();
-      if (kDebugMode) {
-        print(
-            '[Location] Permission status: ${hasPermission ? 'granted' : 'denied'}');
-      }
+      final hasPermission = await checkAndRequestPermissions();
 
       if (!hasPermission) {
         await _useDefaultLocation();
         _isFetchingLocation = false;
         notifyListeners();
-        return const LatLng(11.0168, 76.9558); // Coimbatore default
+        return const LatLng(11.0168, 76.9558);
       }
 
       Position? bestPosition;
 
-      // Web-optimized settings
+      // Optimized settings for all platforms
       const isWeb = kIsWeb;
       const accuracy =
-          isWeb ? LocationAccuracy.medium : LocationAccuracy.bestForNavigation;
-      const timeout = isWeb ? Duration(seconds: 30) : Duration(seconds: 10);
-      const acceptableAccuracy =
-          isWeb ? 5000.0 : 100.0; // 5km for Web, 100m for mobile
-      const maxRetries = isWeb ? 1 : 3;
+          isWeb ? LocationAccuracy.high : LocationAccuracy.bestForNavigation;
+      const timeout = isWeb ? Duration(seconds: 30) : Duration(seconds: 15);
+      const acceptableAccuracy = isWeb ? 2000.0 : 50.0; // More strict for mobile
+      const maxRetries = isWeb ? 1 : 2;
       int retryCount = 0;
 
       while (retryCount < maxRetries) {
         retryCount++;
-        if (kDebugMode) {
-          print(
-              '[Location] Attempt $retryCount/$maxRetries to fetch location (Web: $isWeb)');
-        }
-
         try {
-          _currentPosition = await Geolocator.getCurrentPosition(
+          // First try to get a fresh position
+          final position = await Geolocator.getCurrentPosition(
             desiredAccuracy: accuracy,
             timeLimit: timeout,
+            forceAndroidLocationManager: true,
           );
 
-          if (_currentPosition != null) {
-            if (kDebugMode) {
-              print('[Location] Raw position received:');
-              print('  Latitude: ${_currentPosition!.latitude}');
-              print('  Longitude: ${_currentPosition!.longitude}');
-              print('  Accuracy: ${_currentPosition!.accuracy}m');
-              print('  Timestamp: ${_currentPosition!.timestamp}');
-            }
+          if (kDebugMode) {
+            print('Fetched position: ${position.latitude}, ${position.longitude}, accuracy: ${position.accuracy}m');
+          }
 
-            // Check accuracy - more lenient on Web
-            if (_currentPosition!.accuracy <= acceptableAccuracy) {
-              bestPosition = _currentPosition;
-              if (kDebugMode) {
-                print(
-                    '[Location] Accuracy is acceptable (<=${acceptableAccuracy}m), using this position');
-              }
-              break;
-            } else {
-              if (kDebugMode) {
-                print(
-                    '[Location] Accuracy is less than ideal (${_currentPosition!.accuracy}m), but using it anyway on Web');
-              }
-              bestPosition = _currentPosition;
-              break; // Use whatever we get on Web
-            }
+          // Check if accuracy is good enough
+          if (position.accuracy <= acceptableAccuracy || retryCount == maxRetries) {
+            bestPosition = position;
+            break;
+          } else {
+            bestPosition = position; // Keep the best we have
           }
         } catch (e) {
           if (kDebugMode) {
-            print('[Location] Attempt $retryCount failed: $e');
+            print('Error fetching position (attempt $retryCount): $e');
           }
-          if (retryCount == maxRetries) {
-            break; // Don't rethrow on Web - just use last known or default
-          }
+          if (retryCount == maxRetries) break;
+          await Future.delayed(const Duration(seconds: 1));
         }
       }
 
-      // If we didn't get a position, try last known
+      // If no fresh position, try last known
       if (bestPosition == null) {
-        if (kDebugMode) {
-          print('[Location] Trying last known position');
-        }
         try {
           bestPosition = await Geolocator.getLastKnownPosition();
-          if (bestPosition != null) {
-            if (kDebugMode) {
-              print('[Location] Last known position found:');
-              print('  Latitude: ${bestPosition.latitude}');
-              print('  Longitude: ${bestPosition.longitude}');
-            }
+          if (kDebugMode && bestPosition != null) {
+            print('Using last known position: ${bestPosition!.latitude}, ${bestPosition!.longitude}');
           }
         } catch (e) {
           if (kDebugMode) {
-            print('[Location] Last known position not available: $e');
+            print('Error getting last known position: $e');
           }
         }
       }
@@ -176,18 +167,19 @@ class LocationProvider extends ChangeNotifier {
       _currentPosition = bestPosition;
 
       if (_currentPosition != null) {
+        if (kDebugMode) {
+          print('Final position: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+        }
         // Reverse geocode to get address
         await _reverseGeocode(
           LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
         );
-        if (kDebugMode) {
-          print('[Location] Final position:');
-          print('  Latitude: ${_currentPosition!.latitude}');
-          print('  Longitude: ${_currentPosition!.longitude}');
-          print('  Accuracy: ${_currentPosition!.accuracy}m');
-          print('  Address: $_currentAddress');
-        }
+        // Start continuous updates
+        await _startContinuousUpdates();
       } else {
+        if (kDebugMode) {
+          print('No position found, using default');
+        }
         await _useDefaultLocation();
       }
 
@@ -198,19 +190,19 @@ class LocationProvider extends ChangeNotifier {
           : null;
     } catch (e) {
       if (kDebugMode) {
-        print('[Location] Error fetching location: $e');
+        print('Error in getCurrentLocation: $e');
       }
       await _useDefaultLocation();
-      _error = 'Failed to get current location: ${e.toString()}';
+      _error = 'Unable to fetch current location. Please enable GPS.';
       _isFetchingLocation = false;
       notifyListeners();
-      return const LatLng(11.0168, 76.9558); // Coimbatore default
+      return const LatLng(11.0168, 76.9558);
     }
   }
 
   Future<void> _useDefaultLocation() async {
-    const defaultLat = 11.0168; // Coimbatore latitude
-    const defaultLng = 76.9558; // Coimbatore longitude
+    const defaultLat = 11.0168;
+    const defaultLng = 76.9558;
     _currentPosition = Position(
       latitude: defaultLat,
       longitude: defaultLng,
@@ -223,13 +215,55 @@ class LocationProvider extends ChangeNotifier {
       speed: 0.0,
       speedAccuracy: 0.0,
     );
-    _currentAddress = 'Coimbatore, Tamil Nadu';
+    _currentAddress = '';
     notifyListeners();
+  }
+
+  Future<void> _startContinuousUpdates() async {
+    // Cancel existing stream
+    await _positionStream?.cancel();
+    _locationUpdateTimer?.cancel();
+
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 10,
+    );
+
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen((Position position) {
+      _currentPosition = position;
+      _isUpdating = true;
+      notifyListeners();
+
+      // Send to backend every 5 seconds at max
+      _locationUpdateTimer ??= Timer(const Duration(seconds: 5), () {
+        _sendLocationToBackend();
+        _locationUpdateTimer = null;
+      });
+    });
+  }
+
+  Future<void> _sendLocationToBackend() async {
+    if (_currentPosition == null) return;
+
+    try {
+      await _apiService.updateUserLocation({
+        'latitude': _currentPosition!.latitude,
+        'longitude': _currentPosition!.longitude,
+      });
+    } catch (e) {
+      // Ignore backend errors for location updates
+      if (kDebugMode) {
+        print('Failed to send location to backend: $e');
+      }
+    }
   }
 
   Future<void> _reverseGeocode(LatLng coords) async {
     try {
-      final address = await _mapsService.reverseGeocode(coords.latitude, coords.longitude);
+      final address =
+          await _mapsService.reverseGeocode(coords.latitude, coords.longitude);
       _currentAddress = address;
     } catch (e) {
       _currentAddress = 'Current Location';
@@ -243,6 +277,13 @@ class LocationProvider extends ChangeNotifier {
     } catch (e) {
       return 'Unknown Location';
     }
+  }
+
+  void onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      searchPlaces(query);
+    });
   }
 
   Future<void> searchPlaces(String query) async {
@@ -288,11 +329,6 @@ class LocationProvider extends ChangeNotifier {
     }
   }
 
-  void clearError() {
-    _error = null;
-    notifyListeners();
-  }
-
   void clearSuggestions() {
     _suggestions = [];
     notifyListeners();
@@ -304,56 +340,18 @@ class LocationProvider extends ChangeNotifier {
   }
 
   Future<void> _initLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    _isLoading = true;
-    notifyListeners();
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _error = 'Location services are disabled.';
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _error = 'Location permissions are denied';
-        _isLoading = false;
-        notifyListeners();
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      _error = 'Location permissions are permanently denied';
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    _currentPosition = await Geolocator.getCurrentPosition();
-    _isLoading = false;
-    notifyListeners();
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
-    ).listen((Position position) {
-      _currentPosition = position;
-      notifyListeners();
-    });
+    // Don't do anything heavy here - let getCurrentLocation handle it
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _locationUpdateTimer?.cancel();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> openAppSettings() async {
+    await Geolocator.openAppSettings();
   }
 }

@@ -234,10 +234,20 @@ const getUserRides = async (req, res) => {
 // New Driver Specific APIs
 // ---------------------------
 
+// Helper function to get driver from req.user (whether req.user is User or Driver)
+async function getDriverFromRequest(req) {
+  const Driver = require('../models/Driver');
+  // Check if req.user is already a Driver
+  if (req.user.constructor.modelName === 'Driver') {
+    return req.user;
+  }
+  // Otherwise, find driver by user field
+  return await Driver.findOne({ user: req.user._id });
+}
+
 const getDriverHistory = async (req, res) => {
   try {
-    const Driver = require('../models/Driver');
-    let driver = await Driver.findOne({ user: req.user._id });
+    let driver = await getDriverFromRequest(req);
 
     if (!driver) {
       return res.status(404).json({ status: 'error', message: 'Driver not found' });
@@ -260,8 +270,7 @@ const getDriverHistory = async (req, res) => {
 
 const getDriverCurrentRide = async (req, res) => {
   try {
-    const Driver = require('../models/Driver');
-    let driver = await Driver.findOne({ user: req.user._id });
+    let driver = await getDriverFromRequest(req);
 
     if (!driver) {
       return res.status(404).json({ status: 'error', message: 'Driver not found' });
@@ -269,7 +278,7 @@ const getDriverCurrentRide = async (req, res) => {
 
     const ride = await Ride.findOne({
       driver: driver._id,
-      status: { $in: ['accepted', 'arrived', 'started'] },
+      status: { $in: ['accepted', 'arrived', 'trip_started'] },
     }).populate('user');
 
     res.status(200).json({
@@ -283,8 +292,7 @@ const getDriverCurrentRide = async (req, res) => {
 
 const driverAcceptRide = async (req, res) => {
   try {
-    const Driver = require('../models/Driver');
-    let driver = await Driver.findOne({ user: req.user._id });
+    let driver = await getDriverFromRequest(req);
 
     if (!driver) {
       return res.status(404).json({ status: 'error', message: 'Driver not found' });
@@ -321,6 +329,12 @@ const driverAcceptRide = async (req, res) => {
 
 const driverRejectRide = async (req, res) => {
   try {
+    // Get driver first to verify
+    let driver = await getDriverFromRequest(req);
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
     const { rideId, reason } = req.body;
     const ride = await Ride.findById(rideId);
 
@@ -355,6 +369,11 @@ const driverRejectRide = async (req, res) => {
 
 const driverArrived = async (req, res) => {
   try {
+    let driver = await getDriverFromRequest(req);
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
     const { rideId } = req.body;
     const ride = await Ride.findById(rideId);
 
@@ -387,6 +406,11 @@ const driverArrived = async (req, res) => {
 
 const driverStartTrip = async (req, res) => {
   try {
+    let driver = await getDriverFromRequest(req);
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
     const { rideId } = req.body;
     const ride = await Ride.findById(rideId);
 
@@ -398,7 +422,7 @@ const driverStartTrip = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Driver not at pickup' });
     }
 
-    ride.status = 'started';
+    ride.status = 'trip_started'; // Use backend's enum
     ride.startTime = Date.now();
     await ride.save();
 
@@ -420,6 +444,11 @@ const driverStartTrip = async (req, res) => {
 
 const driverCompleteTrip = async (req, res) => {
   try {
+    let driver = await getDriverFromRequest(req);
+    if (!driver) {
+      return res.status(404).json({ status: 'error', message: 'Driver not found' });
+    }
+
     const { rideId } = req.body;
     const ride = await Ride.findById(rideId);
 
@@ -427,7 +456,7 @@ const driverCompleteTrip = async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Ride not found' });
     }
 
-    if (ride.status !== 'started') {
+    if (ride.status !== 'trip_started') {
       return res.status(400).json({ status: 'error', message: 'Trip not started' });
     }
 
@@ -436,8 +465,7 @@ const driverCompleteTrip = async (req, res) => {
     await ride.save();
 
     // Create notifications for both user and driver
-    const Driver = require('../models/Driver');
-    const driver = await Driver.findById(ride.driver);
+    driver = await Driver.findById(ride.driver); // Ensure driver is populated
 
     // Notification for user
     await Notification.create({

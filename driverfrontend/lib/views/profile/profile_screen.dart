@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -10,6 +11,7 @@ import '../ratings/ratings_reviews_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../home/home_screen.dart';
 import 'bank_details_screen.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -147,6 +149,14 @@ class ProfileScreen extends StatelessWidget {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Format member since date
+    String formattedMemberSince = 'Jan 2023';
+    if (driver?.memberSince != null) {
+      formattedMemberSince = DateFormat(
+        'MMM yyyy',
+      ).format(driver!.memberSince!);
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -302,7 +312,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '(234 trips)',
+                        '(${driver?.completedTrips ?? 234} trips)',
                         style: TextStyle(color: Colors.grey[500], fontSize: 16),
                       ),
                     ],
@@ -317,9 +327,9 @@ class ProfileScreen extends StatelessWidget {
                       color: const Color(0xFFFF6D00),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'Member since Jan 2023',
-                      style: TextStyle(
+                    child: Text(
+                      'Member since $formattedMemberSince',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -331,16 +341,34 @@ class ProfileScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildQuickStat(context, '234', 'Total Trips'),
-                      _buildQuickStat(context, '4.8', 'Rating'),
-                      _buildQuickStat(context, '94%', 'Acceptance'),
-                      _buildQuickStat(context, '96%', 'On-Time'),
+                      _buildQuickStat(
+                        context,
+                        '${driver?.totalTrips ?? 234}',
+                        'Total Trips',
+                      ),
+                      _buildQuickStat(
+                        context,
+                        '${driver?.rating ?? 4.8}',
+                        'Rating',
+                      ),
+                      _buildQuickStat(
+                        context,
+                        '${driver?.acceptanceRate ?? 94}%',
+                        'Acceptance',
+                      ),
+                      _buildQuickStat(
+                        context,
+                        '${driver?.onTimePercentage ?? 96}%',
+                        'On-Time',
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 24),
                   // Details List
+                  _buildDriverIdItem(context, driver?.driverId ?? 'DRV000000'),
+                  const SizedBox(height: 24),
                   _buildDetailItem(
                     context,
                     Icons.phone_outlined,
@@ -554,6 +582,66 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriverIdItem(BuildContext context, String driverId) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF6D00).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF6D00).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.badge_outlined,
+              color: Color(0xFFFF6D00),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Driver ID',
+                  style: TextStyle(color: theme.hintColor, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  driverId,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF6D00),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_outlined, color: Color(0xFFFF6D00)),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: driverId));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Driver ID copied to clipboard!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
           ),
         ],
       ),

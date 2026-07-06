@@ -1,10 +1,20 @@
 const mongoose = require('mongoose');
 
 const driverSchema = new mongoose.Schema({
+  driverId: {
+    type: String,
+    unique: true,
+    required: true,
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    required: false,
   },
   vehicle: {
     type: mongoose.Schema.Types.ObjectId,
@@ -163,5 +173,19 @@ const driverSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 driverSchema.index({ currentLocation: '2dsphere' });
+
+// Auto-generate driverId before saving
+driverSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    const lastDriver = await mongoose.model('Driver').findOne().sort({ driverId: -1 }).exec();
+    let nextId = 1;
+    if (lastDriver && lastDriver.driverId) {
+      const lastNum = parseInt(lastDriver.driverId.replace('DRV', ''), 10);
+      nextId = lastNum + 1;
+    }
+    this.driverId = `DRV${String(nextId).padStart(6, '0')}`;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Driver', driverSchema);

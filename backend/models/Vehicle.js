@@ -4,7 +4,7 @@ const vehicleSchema = new mongoose.Schema({
   driver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
-    required: true,
+    required: false,
   },
   model: {
     type: String,
@@ -21,10 +21,19 @@ const vehicleSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['mini', 'sedan', 'suv', 'bike'],
+    enum: ['mini', 'sedan', 'suv', 'bike', 'auto'],
     default: 'sedan',
   },
   year: Number,
+  brand: String,
+  rcNumber: String,
+  insuranceExpiry: Date,
+  pollutionExpiry: Date,
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'maintenance'],
+    default: 'active',
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Vehicle', vehicleSchema);

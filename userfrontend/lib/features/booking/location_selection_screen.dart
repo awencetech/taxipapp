@@ -26,9 +26,10 @@ class LocationSelectionScreen extends StatefulWidget {
 class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropController = TextEditingController();
+  final FocusNode _pickupFocusNode = FocusNode();
+  final FocusNode _dropFocusNode = FocusNode();
   LocationField _activeField = LocationField.pickup;
   bool _isSearching = false;
-  bool _hasNavigated = false;
 
   @override
   void initState() {
@@ -105,9 +106,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
             bookingProvider.dropLocation != null) {
           await bookingProvider.calculateRoute();
           if (mounted) {
-            setState(() {
-              _hasNavigated = true;
-            });
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -130,6 +128,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   void dispose() {
     _pickupController.dispose();
     _dropController.dispose();
+    _pickupFocusNode.dispose();
+    _dropFocusNode.dispose();
     super.dispose();
   }
 
@@ -138,10 +138,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        // Reset the navigation flag when user navigates back
-        setState(() {
-          _hasNavigated = false;
-        });
+        // Reset booking when user navigates back
         context.read<BookingProvider>().resetBooking();
       },
       child: Scaffold(
@@ -164,9 +161,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                           icon: const Icon(Icons.arrow_back,
                               color: AppColors.black),
                           onPressed: () {
-                            setState(() {
-                              _hasNavigated = false;
-                            });
                             context.read<BookingProvider>().resetBooking();
                             Navigator.pop(context);
                           },
@@ -230,10 +224,12 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                               children: [
                                 TextField(
                                   controller: _pickupController,
+                                  focusNode: _pickupFocusNode,
                                   onTap: () {
                                     setState(() =>
                                         _activeField = LocationField.pickup);
                                   },
+                                  autofocus: true,
                                   style: const TextStyle(
                                       color: AppColors.black,
                                       fontSize: 16,
@@ -253,7 +249,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                                                   _pickupController.clear();
                                                   setState(() {
                                                     _isSearching = false;
-                                                    _hasNavigated = false;
                                                   });
                                                 },
                                               )
@@ -263,11 +258,11 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                                 const Divider(height: 24, thickness: 1),
                                 TextField(
                                   controller: _dropController,
+                                  focusNode: _dropFocusNode,
                                   onTap: () {
                                     setState(() =>
                                         _activeField = LocationField.drop);
                                   },
-                                  autofocus: true,
                                   style: const TextStyle(
                                       color: AppColors.black,
                                       fontSize: 16,
@@ -286,7 +281,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                                               _dropController.clear();
                                               setState(() {
                                                 _isSearching = false;
-                                                _hasNavigated = false;
                                               });
                                             },
                                           )
@@ -306,6 +300,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () async {
+                              final bookingProvider =
+                                  context.read<BookingProvider>();
                               final result = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -321,37 +317,22 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                                     : result.name;
 
                                 if (_activeField == LocationField.pickup) {
-                                  context
-                                      .read<BookingProvider>()
-                                      .setPickupLocation(result);
+                                  bookingProvider.setPickupLocation(result);
                                   _pickupController.text = displayName;
                                   // After selecting pickup, activate drop field
                                   setState(() {
                                     _activeField = LocationField.drop;
                                   });
                                 } else {
-                                  context
-                                      .read<BookingProvider>()
-                                      .setDropLocation(result);
+                                  bookingProvider.setDropLocation(result);
                                   _dropController.text = displayName;
                                 }
 
                                 // If both are selected, calculate route and navigate
-                                if (context
-                                            .read<BookingProvider>()
-                                            .pickupLocation !=
-                                        null &&
-                                    context
-                                            .read<BookingProvider>()
-                                            .dropLocation !=
-                                        null) {
-                                  await context
-                                      .read<BookingProvider>()
-                                      .calculateRoute();
+                                if (bookingProvider.pickupLocation != null &&
+                                    bookingProvider.dropLocation != null) {
+                                  await bookingProvider.calculateRoute();
                                   if (mounted) {
-                                    setState(() {
-                                      _hasNavigated = true;
-                                    });
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -574,24 +555,16 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                           longitude: 76.9558,
                         );
 
+                        final bookingProvider = context.read<BookingProvider>();
                         if (_activeField == LocationField.pickup) {
-                          context
-                              .read<BookingProvider>()
-                              .setPickupLocation(placeDetails);
+                          bookingProvider.setPickupLocation(placeDetails);
                           _pickupController.text = displayLabel;
                         } else {
-                          context
-                              .read<BookingProvider>()
-                              .setDropLocation(placeDetails);
+                          bookingProvider.setDropLocation(placeDetails);
                           _dropController.text = displayLabel;
                           // Calculate route and navigate
-                          await context
-                              .read<BookingProvider>()
-                              .calculateRoute();
+                          await bookingProvider.calculateRoute();
                           if (mounted) {
-                            setState(() {
-                              _hasNavigated = true;
-                            });
                             Navigator.push(
                               context,
                               MaterialPageRoute(

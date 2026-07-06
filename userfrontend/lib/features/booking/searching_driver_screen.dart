@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/providers/location_provider.dart';
-import 'driver_match_screen.dart';
 
 class SearchingDriverScreen extends StatefulWidget {
   const SearchingDriverScreen({super.key});
@@ -115,6 +114,8 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
     );
   }
 
+  bool _wasRideAccepted = false;
+
   @override
   Widget build(BuildContext context) {
     final bookingProvider = context.watch<BookingProvider>();
@@ -123,6 +124,23 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
     final isRideAccepted = currentRide != null &&
         (currentRide.status == 'accepted' ||
             currentRide.status == 'driver_arriving');
+
+    // Check if ride was just accepted
+    if (isRideAccepted &&
+        !_wasRideAccepted &&
+        currentRide.driverLatitude != null &&
+        currentRide.driverLongitude != null &&
+        bookingProvider.pickupLocation != null) {
+      _wasRideAccepted = true;
+      Future.microtask(() {
+        bookingProvider.calculateDriverToPickupRoute(
+          driverLat: currentRide.driverLatitude!,
+          driverLng: currentRide.driverLongitude!,
+          pickupLat: bookingProvider.pickupLocation!.latitude,
+          pickupLng: bookingProvider.pickupLocation!.longitude,
+        );
+      });
+    }
 
     // Build markers
     Set<Marker> markers = {};
@@ -199,11 +217,15 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Google Map
-            GoogleMap(
+      body: Stack(
+        children: [
+          // Google Map - limit height to 50%
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: GoogleMap(
               initialCameraPosition: CameraPosition(
                 target: locationProvider.currentPosition != null
                     ? LatLng(
@@ -213,21 +235,24 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
                     : const LatLng(11.0168, 76.9558),
                 zoom: 16,
               ),
+              mapType: MapType.satellite,
               onMapCreated: (GoogleMapController controller) {
                 _mapController.complete(controller);
               },
               myLocationEnabled: true,
-              myLocationButtonEnabled: false,
+              myLocationButtonEnabled: true,
               zoomGesturesEnabled: true,
               scrollGesturesEnabled: true,
-              rotateGesturesEnabled: false,
-              tiltGesturesEnabled: false,
+              rotateGesturesEnabled: true,
+              tiltGesturesEnabled: true,
               markers: markers,
               polylines: polylines,
             ),
+          ),
 
-            // Back button
-            Padding(
+          // Back button
+          SafeArea(
+            child: Padding(
               padding: const EdgeInsets.all(16),
               child: Container(
                 decoration: BoxDecoration(
@@ -247,102 +272,102 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
                 ),
               ),
             ),
+          ),
 
-            // Searching animated circle on map when not accepted
-            if (!isRideAccepted)
-              Positioned.fill(
-                child: Center(
-                  child: AnimatedBuilder(
-                    animation: _animation,
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: const Offset(0, -100),
-                        child: Container(
-                          width: 200,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.green.withValues(
-                                alpha: 0.2 * (1 - _animation.value)),
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 200 * (0.5 + _animation.value * 0.5),
-                              height: 200 * (0.5 + _animation.value * 0.5),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.green.withValues(
-                                    alpha: 0.3 * (1 - _animation.value)),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
+          // Searching animated circle on map when not accepted
+          if (!isRideAccepted)
+            Positioned.fill(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _animation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: const Offset(0, -100),
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.green
+                              .withValues(alpha: 0.2 * (1 - _animation.value)),
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 200 * (0.5 + _animation.value * 0.5),
+                            height: 200 * (0.5 + _animation.value * 0.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.green.withValues(
+                                  alpha: 0.3 * (1 - _animation.value)),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.location_on,
+                                color: Colors.white,
+                                size: 32,
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
+            ),
 
-            // Bottom sheet
-            DraggableScrollableSheet(
-              initialChildSize: 0.55,
-              minChildSize: 0.55,
-              maxChildSize: 0.9,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
+          // Bottom sheet
+          DraggableScrollableSheet(
+            initialChildSize: 0.45,
+            minChildSize: 0.40,
+            maxChildSize: 0.9,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
                   ),
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      // Drag indicator
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: AppColors.grey300,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    // Drag indicator
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey300,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                    ),
+                    const SizedBox(height: 24),
 
-                      // If ride is accepted, show driver info
-                      if (isRideAccepted)
-                        _buildDriverInfoCard(currentRide)
-                      else
-                        // Else show searching UI
-                        _buildSearchingUI(bookingProvider),
+                    // If ride is accepted, show driver info
+                    if (isRideAccepted)
+                      _buildDriverInfoCard(currentRide, bookingProvider)
+                    else
+                      // Else show searching UI
+                      _buildSearchingUI(bookingProvider),
 
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -564,8 +589,9 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
     );
   }
 
-  Widget _buildDriverInfoCard(dynamic currentRide) {
-    Color _getColorFromName(String colorName) {
+  Widget _buildDriverInfoCard(
+      dynamic currentRide, BookingProvider bookingProvider) {
+    Color getColorFromName(String colorName) {
       switch (colorName.toLowerCase()) {
         case "silver":
           return const Color(0xFFC0C0C0);
@@ -582,6 +608,10 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
       }
     }
 
+    // Calculate distance in km (bookingProvider.distance is already in km)
+    final distanceInKm = bookingProvider.distance;
+    final etaMinutes = bookingProvider.estimatedTime;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -594,11 +624,11 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Driver Found!',
                       style: TextStyle(
                         fontSize: 24,
@@ -606,10 +636,10 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
                         color: AppColors.black,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
-                      currentRide.driverName ?? 'Unknown Driver',
-                      style: const TextStyle(
+                      'Your captain is arriving soon',
+                      style: TextStyle(
                         fontSize: 16,
                         color: AppColors.grey600,
                       ),
@@ -630,6 +660,59 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
                     color: AppColors.grey400,
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ETA and Distance
+          Row(
+            children: [
+              const Icon(Icons.route, color: AppColors.primary, size: 24),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Distance',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.grey600,
+                    ),
+                  ),
+                  Text(
+                    '${distanceInKm.toStringAsFixed(1)} km',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 32),
+              const Icon(Icons.access_time,
+                  color: AppColors.secondary, size: 24),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Estimated Arrival',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.grey600,
+                    ),
+                  ),
+                  Text(
+                    '$etaMinutes mins',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -668,7 +751,9 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
                             size: 16, color: Color(0xFFFF9500)),
                         const SizedBox(width: 4),
                         Text(
-                          '${(currentRide.driverRating != null ? currentRide.driverRating.toStringAsFixed(1) : "5.0")} • 500 rides',
+                          currentRide.driverRating != null
+                              ? currentRide.driverRating!.toStringAsFixed(1)
+                              : "5.0",
                           style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.grey600,
@@ -700,48 +785,55 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      currentRide.driverVehicleType ?? 'Car',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 24,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: _getColorFromName("Silver"),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: AppColors.grey300),
+                        Text(
+                          currentRide.driverVehicleType ?? 'Car',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.black,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Silver',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.grey600,
-                          ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: getColorFromName(
+                                    currentRide.driverVehicleColor ?? "Silver"),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.grey300),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              currentRide.driverVehicleColor ?? 'Silver',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.grey600,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
+                    Text(
+                      currentRide.driverVehicleNumber ?? 'MH 01 AB 1234',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondary,
+                      ),
+                    ),
                   ],
-                ),
-              ),
-              Text(
-                currentRide.driverVehicleNumber ?? 'TN 01 AB 1234',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.secondary,
                 ),
               ),
             ],
@@ -785,7 +877,12 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen>
   }
 
   void _cancelRide() {
-    context.read<BookingProvider>().resetBooking();
+    final bookingProvider = context.read<BookingProvider>();
+    if (bookingProvider.currentRide != null) {
+      // Add to pending rides
+      bookingProvider.addToPendingRides(bookingProvider.currentRide!);
+    }
+    bookingProvider.resetBooking();
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 }

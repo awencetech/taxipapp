@@ -125,6 +125,33 @@ class AuthService {
     }
   }
 
+  Future<UserModel?> firebasePhoneSignIn(String idToken, String role, {String? name}) async {
+    try {
+      final response = await _apiService.firebasePhoneAuth({
+        'idToken': idToken,
+        'role': role,
+        if (name != null) 'name': name,
+      });
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final userData = response.data['user'];
+        final user = UserModel.fromMap(userData);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('jwt_token', response.data['token']);
+        await prefs.setString('user_id', user.id);
+
+        _userController.add(user);
+        return user;
+      } else {
+        final message = response.data['message'] ?? 'Firebase phone auth failed';
+        throw Exception(message);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> forgotPassword(String email) async {
     try {
       final response = await _apiService.forgotPassword(email);

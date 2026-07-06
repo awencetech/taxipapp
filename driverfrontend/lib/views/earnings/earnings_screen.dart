@@ -272,7 +272,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
               // Bank Details (if available)
               if (nonNullDriver != null &&
-                  nonNullDriver.bankName.isNotEmpty) ...[
+                  nonNullDriver.bankAccounts.isNotEmpty) ...[
                 pw.Text(
                   'Bank Details',
                   style: pw.TextStyle(
@@ -281,10 +281,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   ),
                 ),
                 pw.SizedBox(height: 16),
-                pw.Text('Bank: ${nonNullDriver.bankName}'),
-                if (nonNullDriver.accountNumber.length >= 4)
+                pw.Text('Bank: ${nonNullDriver.bankAccounts[0].bankName}'),
+                if (nonNullDriver.bankAccounts[0].accountNumber.length >= 4)
                   pw.Text(
-                    'Account: **** **** **** ${nonNullDriver.accountNumber.substring(nonNullDriver.accountNumber.length - 4)}',
+                    'Account: **** **** **** ${nonNullDriver.bankAccounts[0].accountNumber.substring(nonNullDriver.bankAccounts[0].accountNumber.length - 4)}',
                   ),
               ],
             ],
@@ -475,7 +475,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BankDetailsScreen(),
+                            builder: (context) => const BankDetailsScreen(),
                           ),
                         );
                       },

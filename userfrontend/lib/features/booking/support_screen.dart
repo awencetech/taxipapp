@@ -387,7 +387,7 @@ class GetHelpTab extends StatelessWidget {
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.2,
             children: quickSupportOptions.map((option) {
               return _QuickSupportCard(option);
             }).toList(),

@@ -28,45 +28,55 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final bool _hasClearedRecentDestinations = false;
   GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  Set<Circle> _circles = {};
+  MapType _currentMapType = MapType.normal;
 
   // Vehicle options data
   final List<Map<String, dynamic>> vehicleOptions = const [
     {
       'name': 'Mini',
       'startingPrice': '₹80',
-      'icon': Icons.directions_car,
+      'imageUrl':
+          'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&auto=format&fit=crop&q=80',
       'color': Color(0xFF4A90E2),
       'eta': '2 mins',
     },
     {
       'name': 'Sedan',
       'startingPrice': '₹120',
-      'icon': Icons.directions_car_filled,
+      'imageUrl':
+          'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=400&auto=format&fit=crop&q=80',
       'color': Color(0xFFFF9500),
       'eta': '3 mins',
     },
     {
       'name': 'SUV',
       'startingPrice': '₹180',
-      'icon': Icons.airport_shuttle,
+      'imageUrl':
+          'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=400&auto=format&fit=crop&q=80',
       'color': Color(0xFF50E3C2),
       'eta': '5 mins',
     },
     {
       'name': 'Auto',
       'startingPrice': '₹50',
-      'icon': Icons.local_taxi,
+      'imageUrl':
+          'https://images.unsplash.com/photo-1604712042546-7a9b125b0b76?w=400&auto=format&fit=crop&q=80',
       'color': Color(0xFF4CD964),
       'eta': '1 min',
     },
     {
       'name': 'Bike',
       'startingPrice': '₹40',
-      'icon': Icons.motorcycle,
+      'imageUrl':
+          'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400&auto=format&fit=crop&q=80',
       'color': Color(0xFFFF2D55),
       'eta': '1 min',
     },
   ];
+
+  late LocationProvider _locationProvider;
 
   @override
   void initState() {
@@ -76,15 +86,107 @@ class _HomeScreenState extends State<HomeScreen> {
         Provider.of<BookingProvider>(context, listen: false).fetchRideHistory();
         Provider.of<NotificationProvider>(context, listen: false)
             .fetchNotifications();
+        _locationProvider =
+            Provider.of<LocationProvider>(context, listen: false);
+        _locationProvider.addListener(_onLocationChanged);
       }
     });
   }
 
+  void _onLocationChanged() {
+    if (mounted) {
+      _updateMarkersAndCircles();
+    }
+  }
+
+  @override
+  void dispose() {
+    _locationProvider.removeListener(_onLocationChanged);
+    super.dispose();
+  }
+
   Future<void> _goToCurrentLocation() async {
-    final locationProvider = context.read<LocationProvider>();
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
     final position = await locationProvider.getCurrentLocation();
-    if (position != null && _mapController != null) {
-      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(position, 16));
+    if (position != null) {
+      await _animateToPosition(position);
+    }
+  }
+
+  Future<void> _animateToPosition(LatLng position) async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: position,
+            zoom: 17,
+            tilt: 45,
+            bearing: 0,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _updateMarkersAndCircles() {
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+
+    if (locationProvider.currentPosition != null) {
+      final position = LatLng(
+        locationProvider.currentPosition!.latitude,
+        locationProvider.currentPosition!.longitude,
+      );
+
+      // Update user marker
+      if (mounted) {
+        setState(() {
+          _markers = {
+            Marker(
+              markerId: const MarkerId('user_location'),
+              position: position,
+              infoWindow: const InfoWindow(title: 'You are here'),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueBlue),
+            ),
+          };
+
+          // Update accuracy circle
+          _circles = {
+            Circle(
+              circleId: const CircleId('accuracy'),
+              center: position,
+              radius: locationProvider.currentPosition!.accuracy,
+              fillColor: Colors.blue.withValues(alpha: 0.1),
+              strokeColor: Colors.blue.withValues(alpha: 0.5),
+              strokeWidth: 1,
+            ),
+          };
+        });
+      }
+
+      // Auto-follow if enabled
+      if (locationProvider.autoFollow) {
+        _animateToPosition(position);
+      }
+    } else {
+      // If no position, set empty sets
+      if (mounted) {
+        setState(() {
+          _markers = {};
+          _circles = {};
+        });
+      }
+    }
+  }
+
+  void _onCameraMove(CameraPosition position) {
+    // Disable auto-follow when user manually moves the map
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    if (locationProvider.autoFollow) {
+      locationProvider.setAutoFollow(false);
     }
   }
 
@@ -135,200 +237,106 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedIndex,
         children: [
           // Home Screen (tab 0)
-          SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Container with max width 1200px
-                  ConstrainedBox(
+          Stack(
+            children: [
+              // Fixed Map Section
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                     constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Consumer<NotificationProvider>(
-                            builder: (context, notificationProvider, child) {
-                              return Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        Consumer<NotificationProvider>(
+                          builder: (context, notificationProvider, child) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFFF6B00),
+                                            Color(0xFFFF8A00)
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x33FF6B00),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.local_taxi,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    RichText(
+                                      text: const TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: 'TAXI',
+                                            style: TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF111827),
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: ' ',
+                                          ),
+                                          TextSpan(
+                                            text: 'NANBAN',
+                                            style: TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFFFF6B00),
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const NotificationsListScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Stack(
                                     children: [
                                       Container(
-                                        width: 40,
-                                        height: 40,
+                                        width: 48,
+                                        height: 48,
                                         decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFFFF6B00),
-                                              Color(0xFFFF8C00)
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
+                                          color: AppColors.white,
                                           borderRadius:
-                                              BorderRadius.circular(10),
+                                              BorderRadius.circular(12),
                                           boxShadow: const [
-                                            BoxShadow(
-                                              color: Color(0x33FF6B00),
-                                              blurRadius: 8,
-                                              offset: Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Icon(
-                                          Icons.local_taxi,
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      RichText(
-                                        text: const TextSpan(
-                                          children: [
-                                            TextSpan(
-                                              text: 'TAXI',
-                                              style: TextStyle(
-                                                fontSize: 28,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFF111827),
-                                                letterSpacing: -0.5,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: ' ',
-                                            ),
-                                            TextSpan(
-                                              text: 'NANBAN',
-                                              style: TextStyle(
-                                                fontSize: 28,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFFFF6B00),
-                                                letterSpacing: -0.5,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const NotificationsListScreen(),
-                                        ),
-                                      );
-                                    },
-                                    child: Stack(
-                                      children: [
-                                        Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.white,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Colors.black12,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.notifications,
-                                            color: AppColors.secondary,
-                                            size: 24,
-                                          ),
-                                        ),
-                                        if (notificationProvider.unreadCount >
-                                            0)
-                                          Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            child: Container(
-                                              width: 20,
-                                              height: 20,
-                                              decoration: const BoxDecoration(
-                                                color: Colors.red,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  notificationProvider
-                                                              .unreadCount >
-                                                          9
-                                                      ? '9+'
-                                                      : '${notificationProvider.unreadCount}',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          // Map Section
-                          Container(
-                            height: 320,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 16,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: Stack(
-                                children: [
-                                  GoogleMap(
-                                    initialCameraPosition: const CameraPosition(
-                                      target: LatLng(11.0168, 76.9558),
-                                      zoom: 15,
-                                    ),
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: false,
-                                    zoomControlsEnabled: false,
-                                    scrollGesturesEnabled: true,
-                                    zoomGesturesEnabled: true,
-                                    rotateGesturesEnabled: false,
-                                    tiltGesturesEnabled: false,
-                                    onMapCreated: (controller) {
-                                      _mapController = controller;
-                                      _goToCurrentLocation();
-                                    },
-                                  ),
-                                  Positioned(
-                                    bottom: 16,
-                                    right: 16,
-                                    child: GestureDetector(
-                                      onTap: _goToCurrentLocation,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(14),
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFFF6B00),
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
                                             BoxShadow(
                                               color: Colors.black12,
                                               blurRadius: 8,
@@ -337,18 +345,369 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ],
                                         ),
                                         child: const Icon(
-                                          Icons.my_location,
-                                          color: Colors.white,
+                                          Icons.notifications,
+                                          color: AppColors.secondary,
                                           size: 24,
                                         ),
                                       ),
-                                    ),
+                                      if (notificationProvider.unreadCount > 0)
+                                        Positioned(
+                                          right: 0,
+                                          top: 0,
+                                          child: Container(
+                                            width: 20,
+                                            height: 20,
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                notificationProvider
+                                                            .unreadCount >
+                                                        9
+                                                    ? '9+'
+                                                    : '${notificationProvider.unreadCount}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                ],
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Map
+                        Container(
+                          height: 300,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 16,
+                                offset: Offset(0, 4),
                               ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Consumer<LocationProvider>(
+                              builder: (context, locationProvider, child) {
+                                return Stack(
+                                  children: [
+                                    GoogleMap(
+                                      key: const PageStorageKey('homeMap'),
+                                      initialCameraPosition:
+                                          const CameraPosition(
+                                        target: LatLng(11.0168, 76.9558),
+                                        zoom: 15,
+                                      ),
+                                      mapType: _currentMapType,
+                                      myLocationEnabled: false,
+                                      myLocationButtonEnabled: false,
+                                      zoomControlsEnabled: false,
+                                      scrollGesturesEnabled: true,
+                                      zoomGesturesEnabled: true,
+                                      rotateGesturesEnabled: true,
+                                      tiltGesturesEnabled: true,
+                                      indoorViewEnabled: true,
+                                      trafficEnabled: true,
+                                      mapToolbarEnabled: false,
+                                      markers: _markers,
+                                      circles: _circles,
+                                      onMapCreated: (controller) {
+                                        _mapController = controller;
+                                        // Initial marker update
+                                        _updateMarkersAndCircles();
+                                        // Try to get current location
+                                        _goToCurrentLocation();
+                                      },
+                                      onCameraMove: _onCameraMove,
+                                    ),
+                                    // Loading indicator
+                                    if (locationProvider.isFetchingLocation)
+                                      Container(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
+                                        child: const Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              CircularProgressIndicator(
+                                                color: Colors.white,
+                                              ),
+                                              SizedBox(height: 12),
+                                              Text(
+                                                'Fetching current location...',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    // Error state
+                                    if (locationProvider.error != null)
+                                      Container(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.7),
+                                        padding: const EdgeInsets.all(16),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                locationProvider.error!,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  if (locationProvider
+                                                      .permanentlyDenied) {
+                                                    locationProvider
+                                                        .openAppSettings();
+                                                  } else {
+                                                    locationProvider
+                                                        .clearError();
+                                                    _goToCurrentLocation();
+                                                  }
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      const Color(0xFFFF6B00),
+                                                ),
+                                                child: Text(
+                                                  locationProvider
+                                                          .permanentlyDenied
+                                                      ? 'Open Settings'
+                                                      : 'Retry',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    // Zoom controls (left side)
+                                    Positioned(
+                                      bottom: 16,
+                                      left: 16,
+                                      child: Column(
+                                        children: [
+                                          // Zoom in button
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 8),
+                                            child: GestureDetector(
+                                              onTap: () async {
+                                                if (_mapController != null) {
+                                                  final currentZoom =
+                                                      (await _mapController!
+                                                              .getZoomLevel()) +
+                                                          1;
+                                                  _mapController!.animateCamera(
+                                                    CameraUpdate.zoomTo(
+                                                        currentZoom),
+                                                  );
+                                                }
+                                              },
+                                              child: Container(
+                                                width: 48,
+                                                height: 48,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black12,
+                                                      blurRadius: 8,
+                                                      offset: Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Icon(
+                                                  Icons.add,
+                                                  color: AppColors.secondary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          // Zoom out button
+                                          GestureDetector(
+                                            onTap: () async {
+                                              if (_mapController != null) {
+                                                final currentZoom =
+                                                    (await _mapController!
+                                                            .getZoomLevel()) -
+                                                        1;
+                                                _mapController!.animateCamera(
+                                                  CameraUpdate.zoomTo(
+                                                      currentZoom),
+                                                );
+                                              }
+                                            },
+                                            child: Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: const BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black12,
+                                                    blurRadius: 8,
+                                                    offset: Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: const Icon(
+                                                Icons.remove,
+                                                color: AppColors.secondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Map type button (right side)
+                                    Positioned(
+                                      bottom: 16,
+                                      right: 16,
+                                      child: Column(
+                                        children: [
+                                          // Live Location Button
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 8),
+                                            child: GestureDetector(
+                                              onTap: locationProvider
+                                                      .isFetchingLocation
+                                                  ? null
+                                                  : _goToCurrentLocation,
+                                              child: Container(
+                                                width: 48,
+                                                height: 48,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFFFF6B00),
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black12,
+                                                      blurRadius: 8,
+                                                      offset: Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Icon(
+                                                  Icons.my_location,
+                                                  color: Colors.white,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          // Map type button
+                                          GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                switch (_currentMapType) {
+                                                  case MapType.normal:
+                                                    _currentMapType =
+                                                        MapType.satellite;
+                                                    break;
+                                                  case MapType.satellite:
+                                                    _currentMapType =
+                                                        MapType.hybrid;
+                                                    break;
+                                                  case MapType.hybrid:
+                                                    _currentMapType =
+                                                        MapType.terrain;
+                                                    break;
+                                                  case MapType.terrain:
+                                                  case MapType.none:
+                                                    _currentMapType =
+                                                        MapType.normal;
+                                                    break;
+                                                }
+                                              });
+                                            },
+                                            child: Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: const BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black12,
+                                                    blurRadius: 8,
+                                                    offset: Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Icon(
+                                                _currentMapType ==
+                                                        MapType.normal
+                                                    ? Icons.map
+                                                    : _currentMapType ==
+                                                            MapType.satellite
+                                                        ? Icons.satellite
+                                                        : _currentMapType ==
+                                                                MapType.hybrid
+                                                            ? Icons.layers
+                                                            : Icons.terrain,
+                                                color: AppColors.secondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(height: 24),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Scrollable Bottom Content
+              Positioned(
+                top: 420, // header + map height + increased gap
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                          left: 20, right: 20, top: 16, bottom: 100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
                           // Where To? Search Field
                           Consumer<LocationProvider>(
                             builder: (context, locationProvider, child) {
@@ -448,23 +807,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            Container(
-                                              width: 44,
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: vehicle['color'],
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              child: Icon(
-                                                vehicle['icon'],
-                                                color: AppColors.white,
-                                                size: 24,
-                                              ),
+                                        Container(
+                                          width: double.infinity,
+                                          height: 70,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            child: Image.network(
+                                              vehicle['imageUrl'],
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.grey[300],
+                                                  child: const Icon(
+                                                    Icons.directions_car,
+                                                    size: 40,
+                                                    color: Colors.grey,
+                                                  ),
+                                                );
+                                              },
                                             ),
-                                          ],
+                                          ),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
@@ -481,15 +849,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             color: AppColors.grey600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${vehicle['eta']} away',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.secondary,
-                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                       ],
@@ -681,18 +1040,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               final List<RideModel> recentRides = [];
                               try {
+                                // Add all pending rides first
+                                if (bookingProvider.pendingRides.isNotEmpty) {
+                                  recentRides
+                                      .addAll(bookingProvider.pendingRides);
+                                }
+                                // Then add completed rides from history
                                 if (bookingProvider.rideHistory.isNotEmpty) {
                                   recentRides.addAll(
                                     bookingProvider.rideHistory.where((ride) {
                                       final status = ride.status.toLowerCase();
-                                      return [
-                                        'completed',
-                                        'accepted',
-                                        'ongoing',
-                                        'arrived',
-                                        'started',
-                                        'pending'
-                                      ].contains(status);
+                                      return ['completed'].contains(status);
                                     }).toList()
                                       ..sort((a, b) {
                                         if (a.createdAt == null ||
@@ -903,7 +1261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   'FIRST RIDE FREE!',
                                   style: TextStyle(
                                     fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w900,
                                     color: Colors.white,
                                     letterSpacing: 1.2,
                                   ),
@@ -967,9 +1325,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
           // Activity Screen (tab 1)
           const RideHistoryScreen(),

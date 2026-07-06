@@ -17,7 +17,7 @@ class RideViewModel extends ChangeNotifier {
   RideRequestModel? _currentRide;
   bool _isOnline = false;
   bool _isLoading = false;
-  int _onlineSeconds = 0;
+  DateTime? _onlineStartTime;
   Timer? _onlineTimer;
   StreamSubscription<Position>? _positionStream;
   final List<RideRequestModel> _nearbyRides = [];
@@ -31,12 +31,14 @@ class RideViewModel extends ChangeNotifier {
   RideRequestModel? get currentRide => _currentRide;
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
-  int get onlineSeconds => _onlineSeconds;
 
   String get onlineDuration {
-    int minutes = _onlineSeconds ~/ 60;
-    int seconds = _onlineSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    if (_onlineStartTime == null) return '00:00:00';
+    final Duration elapsed = DateTime.now().difference(_onlineStartTime!);
+    int hours = elapsed.inHours;
+    int minutes = elapsed.inMinutes.remainder(60);
+    int seconds = elapsed.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   List<RideRequestModel> get nearbyRides => _nearbyRides;
@@ -49,7 +51,8 @@ class RideViewModel extends ChangeNotifier {
     _driverId = driverId;
     _socketService.connect(driverId);
 
-    // Fetch pending rides from server
+    // Fetch current active ride (if any), pending rides, and ride history
+    await fetchCurrentRide();
     await fetchPendingRides();
 
     _rideRequestSubscription = _socketService.rideRequestStream.listen((data) {
@@ -94,18 +97,18 @@ class RideViewModel extends ChangeNotifier {
   }
 
   void _startOnlineTimer() {
-    _onlineSeconds = 0;
-    _onlineTimer?.cancel();
-    _onlineTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _onlineSeconds++;
-      notifyListeners();
-    });
+    _onlineStartTime = DateTime.now();
+    if (_onlineTimer == null || !_onlineTimer!.isActive) {
+      _onlineTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        notifyListeners();
+      });
+    }
   }
 
   void _stopOnlineTimer() {
     _onlineTimer?.cancel();
     _onlineTimer = null;
-    _onlineSeconds = 0;
+    _onlineStartTime = null;
   }
 
   void _startLocationUpdates() async {
@@ -169,8 +172,9 @@ class RideViewModel extends ChangeNotifier {
 
       if (response.data['status'] == 'success') {
         _currentRide = RideRequestModel.fromJson(response.data['data']['ride']);
-        // Remove from incoming list
+        // Remove from both incoming list and ride history
         _incomingRequests.removeWhere((ride) => ride.id == rideId);
+        _rideHistory.removeWhere((ride) => ride.id == rideId);
 
         // Emit socket event: rideAccepted
         _socketService.emit('rideAccepted', {
@@ -178,7 +182,6 @@ class RideViewModel extends ChangeNotifier {
           'driverId': _driverId,
         });
 
-        await fetchRideHistory(); // Refresh ride history to remove from pending
         notifyListeners();
 
         if (context.mounted) {
@@ -220,9 +223,9 @@ class RideViewModel extends ChangeNotifier {
         'driverId': _driverId,
       });
 
-      // Remove from incoming list
+      // Remove from both incoming list and ride history
       _incomingRequests.removeWhere((ride) => ride.id == rideId);
-      await fetchRideHistory(); // Refresh ride history
+      _rideHistory.removeWhere((ride) => ride.id == rideId);
       notifyListeners();
     } catch (e) {
       debugPrint('Reject Ride Error: $e');
@@ -385,7 +388,6 @@ class RideViewModel extends ChangeNotifier {
 
     try {
       final response = await _apiService.get(AppConstants.driverHistoryUrl);
-      debugPrint('Ride history response: ${response.data}');
 
       // Handle both response formats
       bool isSuccess = false;

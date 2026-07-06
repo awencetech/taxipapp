@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/booking_provider.dart';
@@ -16,7 +17,20 @@ import 'features/booking/ride_map_screen.dart';
 import 'features/booking/driver_match_screen.dart';
 import 'features/booking/home_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyCANjdwwqHJTgWoinu2lrW6Bgeubd_533g",
+      authDomain: "taxiapp-88e0f.firebaseapp.com",
+      projectId: "taxiapp-88e0f",
+      storageBucket: "taxiapp-88e0f.firebasestorage.app",
+      messagingSenderId: "652222620401",
+      appId: "1:652222620401:android:5dc47dab34c59f4539ff50",
+    ),
+  );
+
   runApp(
     MultiProvider(
       providers: [

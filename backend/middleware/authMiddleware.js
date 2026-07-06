@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Driver = require('../models/Driver');
+const Vendor = require('../models/Vendor');
 
 const protect = async (req, res, next) => {
   let token;
@@ -24,17 +26,28 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       console.log('Token decoded:', decoded);
       
-      req.user = await User.findById(decoded.id);
-      console.log('Found user:', req.user);
+      // First check if it's a user
+      let user = await User.findById(decoded.id);
+      // If not a user, check if it's a driver
+      if (!user) {
+        user = await Driver.findById(decoded.id);
+      }
+      // If not a driver, check if it's a vendor
+      if (!user) {
+        user = await Vendor.findById(decoded.id);
+      }
       
-      if (!req.user) {
-        console.log('User not found for decoded id');
+      console.log('Found user/driver/vendor:', user);
+      
+      if (!user) {
+        console.log('User or driver or vendor not found for decoded id');
         return res.status(401).json({
           success: false,
-          message: 'The user belonging to this token no longer exists.',
+          message: 'The user/driver/vendor belonging to this token no longer exists.',
         });
       }
       
+      req.user = user; // Set req.user to either User, Driver, or Vendor
       console.log('=== Auth Middleware: Success, calling next() ===');
       next();
     } catch (error) {

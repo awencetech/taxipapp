@@ -29,11 +29,8 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       body: SafeArea(
         child: Consumer<BookingProvider>(
           builder: (context, provider, child) {
-            // Only upcoming rides
-            final upcomingRides = provider.rideHistory
-                .where((ride) => ['pending', 'accepted', 'arrived', 'started']
-                    .contains(ride.status.toLowerCase()))
-                .toList();
+            // Use pendingRides for upcoming rides
+            final upcomingRides = provider.pendingRides;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,

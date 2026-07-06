@@ -14,6 +14,7 @@ class RideType {
   final int maxPassengers;
   final IconData icon;
   final Color iconColor;
+  final String imageUrl;
 
   const RideType({
     required this.id,
@@ -27,6 +28,7 @@ class RideType {
     required this.maxPassengers,
     required this.icon,
     required this.iconColor,
+    required this.imageUrl,
   });
 
   static List<RideType> getDummyRides(double distanceKm) {
@@ -43,6 +45,7 @@ class RideType {
         maxPassengers: 1,
         icon: Icons.two_wheeler,
         iconColor: const Color(0xFFFF6B00),
+        imageUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400&auto=format&fit=crop&q=80',
       ),
       RideType(
         id: 'auto',
@@ -56,6 +59,7 @@ class RideType {
         maxPassengers: 3,
         icon: Icons.electric_rickshaw,
         iconColor: const Color(0xFF2E7D32),
+        imageUrl: 'https://images.unsplash.com/photo-1604712042546-7a9b125b0b76?w=400&auto=format&fit=crop&q=80',
       ),
       RideType(
         id: 'economy',
@@ -69,6 +73,7 @@ class RideType {
         maxPassengers: 4,
         icon: Icons.directions_car,
         iconColor: const Color(0xFF1565C0),
+        imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&auto=format&fit=crop&q=80',
       ),
       RideType(
         id: 'premium',
@@ -82,6 +87,7 @@ class RideType {
         maxPassengers: 4,
         icon: Icons.local_taxi,
         iconColor: const Color(0xFF6A1B9A),
+        imageUrl: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=400&auto=format&fit=crop&q=80',
       ),
       RideType(
         id: 'xl',
@@ -95,6 +101,7 @@ class RideType {
         maxPassengers: 6,
         icon: Icons.airport_shuttle,
         iconColor: const Color(0xFFC62828),
+        imageUrl: 'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=400&auto=format&fit=crop&q=80',
       ),
     ];
   }

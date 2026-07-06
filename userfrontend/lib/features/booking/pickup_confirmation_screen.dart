@@ -32,6 +32,8 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
   LatLng? _selectedPickupLocation;
   PlaceDetails? _updatedPickupDetails;
   final Set<Marker> _markers = {};
+  bool _isFetchingLocation = false;
+  bool _isFetchingAddress = false;
 
   @override
   void initState() {
@@ -42,11 +44,13 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
         widget.bookingProvider.pickupLocation!.longitude,
       );
       _updatedPickupDetails = widget.bookingProvider.pickupLocation;
-      _addMarkers();
+      _addMarker();
+    } else {
+      _fetchCurrentLocation();
     }
   }
 
-  void _addMarkers() {
+  void _addMarker() {
     if (_selectedPickupLocation != null) {
       setState(() {
         _markers.clear();
@@ -54,6 +58,7 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
           Marker(
             markerId: const MarkerId('pickup'),
             position: _selectedPickupLocation!,
+            anchor: const Offset(0.5, 1.0), // Anchor at bottom center of marker
             icon: BitmapDescriptor.defaultMarkerWithHue(
                 BitmapDescriptor.hueGreen),
           ),
@@ -62,22 +67,77 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
     }
   }
 
+  Future<void> _fetchCurrentLocation() async {
+    if (_isFetchingLocation) return;
+
+    setState(() {
+      _isFetchingLocation = true;
+    });
+
+    final locationProvider = context.read<LocationProvider>();
+    final position = await locationProvider.getCurrentLocation();
+
+    if (position != null && mounted) {
+      setState(() {
+        _selectedPickupLocation = LatLng(
+          position.latitude,
+          position.longitude,
+        );
+        _addMarker();
+      });
+
+      final controller = await _mapController.future;
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_selectedPickupLocation!, 16),
+      );
+
+      setState(() {
+        _isFetchingAddress = true;
+      });
+
+      final address = await locationProvider.getAddressFromLatLng(
+        _selectedPickupLocation!.latitude,
+        _selectedPickupLocation!.longitude,
+      );
+
+      if (mounted) {
+        setState(() {
+          _updatedPickupDetails = PlaceDetails(
+            placeId: '',
+            name: address,
+            address: address,
+            latitude: _selectedPickupLocation!.latitude,
+            longitude: _selectedPickupLocation!.longitude,
+          );
+          _isFetchingAddress = false;
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isFetchingLocation = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Google Map
-            GoogleMap(
+      body: Stack(
+        children: [
+          // Google Map
+          Positioned.fill(
+            child: GoogleMap(
               initialCameraPosition: CameraPosition(
                 target:
                     _selectedPickupLocation ?? const LatLng(11.0168, 76.9558),
                 zoom: 16,
               ),
+              mapType: MapType.satellite,
               markers: _markers,
-              myLocationEnabled: true,
+              myLocationEnabled: false,
               myLocationButtonEnabled: false,
               zoomGesturesEnabled: true,
               scrollGesturesEnabled: true,
@@ -98,27 +158,59 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
               },
               onCameraIdle: () async {
                 if (_selectedPickupLocation != null) {
+                  _addMarker();
+                  setState(() {
+                    _isFetchingAddress = true;
+                  });
                   final locationProvider = context.read<LocationProvider>();
                   final address = await locationProvider.getAddressFromLatLng(
                     _selectedPickupLocation!.latitude,
                     _selectedPickupLocation!.longitude,
                   );
-                  setState(() {
-                    _updatedPickupDetails = PlaceDetails(
-                      placeId: '',
-                      name: address,
-                      address: address,
-                      latitude: _selectedPickupLocation!.latitude,
-                      longitude: _selectedPickupLocation!.longitude,
-                    );
-                    _addMarkers();
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _updatedPickupDetails = PlaceDetails(
+                        placeId: '',
+                        name: address,
+                        address: address,
+                        latitude: _selectedPickupLocation!.latitude,
+                        longitude: _selectedPickupLocation!.longitude,
+                      );
+                      _isFetchingAddress = false;
+                    });
+                  }
                 }
               },
             ),
+          ),
 
-            // Back button
-            Padding(
+          // Loading indicator
+          if (_isFetchingLocation)
+            Container(
+              color: Colors.black.withValues(alpha: 0.3),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Fetching current location...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Back button
+          SafeArea(
+            child: Padding(
               padding: const EdgeInsets.all(16),
               child: Container(
                 decoration: BoxDecoration(
@@ -138,342 +230,225 @@ class _PickupConfirmationScreenState extends State<PickupConfirmationScreen> {
                 ),
               ),
             ),
+          ),
 
-            // Center pickup marker overlay
-            if (_selectedPickupLocation != null)
-              Center(
-                child: Transform.translate(
-                  offset: const Offset(0, -24),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Animated pulse circle
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(seconds: 1),
-                        builder: (context, value, child) {
-                          return Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.green
-                                  .withValues(alpha: 0.2 * (1 - value)),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Transform.scale(
-                              scale: 0.5 + value * 0.5,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.green
-                                      .withValues(alpha: 0.3 * (1 - value)),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      // Main pin
-                      const Icon(
-                        Icons.location_on,
-                        color: Colors.green,
-                        size: 48,
-                      ),
-                    ],
-                  ),
+          // My Location Floating Action Button
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FloatingActionButton(
+                  heroTag: 'pickup_my_location',
+                  backgroundColor: Colors.white,
+                  onPressed: _isFetchingLocation ? null : _fetchCurrentLocation,
+                  child: _isFetchingLocation
+                      ? const CircularProgressIndicator(strokeWidth: 2)
+                      : const Icon(Icons.my_location, color: Colors.black),
                 ),
               ),
+            ),
+          ),
 
-            // My location button
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
+          // Bottom sheet
+          DraggableScrollableSheet(
+            initialChildSize: 0.4,
+            minChildSize: 0.4,
+            maxChildSize: 0.7,
+            builder: (context, scrollController) {
+              return Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
                     ),
                   ],
                 ),
-                child: IconButton(
-                  icon: const Icon(Icons.my_location),
-                  onPressed: () async {
-                    final locationProvider = context.read<LocationProvider>();
-                    final pos = await locationProvider.getCurrentLocation();
-                    if (pos != null && _mapController.isCompleted) {
-                      setState(() {
-                        _selectedPickupLocation = pos;
-                      });
-                      _addMarkers();
-                      final controller = await _mapController.future;
-                      controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(pos, 16),
-                      );
-                    }
-                  },
-                ),
-              ),
-            ),
-
-            // Bottom sheet
-            DraggableScrollableSheet(
-              initialChildSize: 0.4,
-              minChildSize: 0.4,
-              maxChildSize: 0.7,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      // Drag indicator
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: AppColors.grey300,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Title
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            color: Colors.green,
-                            size: 36,
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Select a pickup point',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.black,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Adjust your pickup location as needed',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.grey600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Selected address
-                      Container(
-                        padding: const EdgeInsets.all(16),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    // Drag indicator
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
                         decoration: BoxDecoration(
-                          color: AppColors.grey100,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.green,
-                            width: 2,
-                          ),
-                        ),
-                        child: Text(
-                          _updatedPickupDetails?.name ?? 'Select a location',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.black,
-                          ),
+                          color: AppColors.grey300,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                    ),
+                    const SizedBox(height: 20),
 
-                      // Save location options
-                      const Text(
-                        'Save this location as',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.grey600,
+                    // Title
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.green,
+                          size: 36,
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Select a pickup point',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.black,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Adjust your pickup location as needed',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.grey600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Selected address
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.grey100,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.green,
+                          width: 2,
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      Row(
+                      child: Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(Icons.home),
-                              label: const Text('Home'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.grey100,
-                                foregroundColor: AppColors.black,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                            child: Text(
+                              _updatedPickupDetails?.name ??
+                                  'Select a location',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.black,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(Icons.work),
-                              label: const Text('Work'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.grey100,
-                                foregroundColor: AppColors.black,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                          if (_isFetchingAddress)
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
                               ),
                             ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                    ),
+                    const SizedBox(height: 32),
 
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add new'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.grey100,
-                            foregroundColor: AppColors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                    // Confirm pickup button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _updatedPickupDetails == null ||
+                                _isFetchingAddress
+                            ? null
+                            : () async {
+                                // Update booking provider with new pickup details
+                                widget.bookingProvider
+                                    .setPickupLocation(_updatedPickupDetails!);
 
-                      // Confirm pickup button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _updatedPickupDetails == null
-                              ? null
-                              : () async {
-                                  // Update booking provider with new pickup details
-                                  widget.bookingProvider.setPickupLocation(
-                                      _updatedPickupDetails!);
+                                // Create ride
+                                final success =
+                                    await widget.bookingProvider.requestRide({
+                                  'pickupLocation': {
+                                    'type': 'Point',
+                                    'coordinates': [
+                                      _updatedPickupDetails!.longitude,
+                                      _updatedPickupDetails!.latitude
+                                    ],
+                                    'address': _updatedPickupDetails!.address
+                                  },
+                                  'dropLocation': {
+                                    'type': 'Point',
+                                    'coordinates': [
+                                      widget.bookingProvider.dropLocation!
+                                          .longitude,
+                                      widget.bookingProvider.dropLocation!
+                                          .latitude
+                                    ],
+                                    'address': widget
+                                        .bookingProvider.dropLocation!.address
+                                  },
+                                  'fare': widget.calculatedFare,
+                                  'distance': widget.bookingProvider.distance,
+                                  'duration':
+                                      widget.bookingProvider.estimatedTime,
+                                  'vehicleType': widget
+                                      .bookingProvider.selectedRideType?.id,
+                                  'paymentMethod': widget.selectedPaymentMethod
+                                      .toLowerCase(),
+                                });
 
-                                  // Create ride
-                                  final success =
-                                      await widget.bookingProvider.requestRide({
-                                    'pickupLocation': {
-                                      'type': 'Point',
-                                      'coordinates': [
-                                        _updatedPickupDetails!.longitude,
-                                        _updatedPickupDetails!.latitude
-                                      ],
-                                      'address': _updatedPickupDetails!.address
-                                    },
-                                    'dropLocation': {
-                                      'type': 'Point',
-                                      'coordinates': [
-                                        widget.bookingProvider.dropLocation!
-                                            .longitude,
-                                        widget.bookingProvider.dropLocation!
-                                            .latitude
-                                      ],
-                                      'address': widget
-                                          .bookingProvider.dropLocation!.address
-                                    },
-                                    'fare': widget.calculatedFare,
-                                    'distance': widget.bookingProvider.distance,
-                                    'duration':
-                                        widget.bookingProvider.estimatedTime,
-                                    'vehicleType': widget
-                                        .bookingProvider.selectedRideType?.id,
-                                    'paymentMethod': widget
-                                        .selectedPaymentMethod
-                                        .toLowerCase(),
-                                  });
-
-                                  if (success && mounted) {
-                                    Navigator.pushAndRemoveUntil(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const SearchingDriverScreen(),
-                                      ),
-                                      (route) => route.isFirst,
-                                    );
-                                  } else if (mounted) {
-                                    // Show error
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                if (success && mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SearchingDriverScreen(),
+                                    ),
+                                    (route) => route.isFirst,
+                                  );
+                                } else if (mounted) {
+                                  // Show error
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        'Failed to book ride: ${widget.bookingProvider.error ?? "Unknown error"}'
-                                      ),
+                                          'Failed to book ride: ${widget.bookingProvider.error ?? "Unknown error"}'),
                                       backgroundColor: Colors.red,
                                     ),
-                                    );
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFC107),
-                            disabledBackgroundColor: AppColors.grey300,
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFC107),
+                          disabledBackgroundColor: AppColors.grey300,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Text(
-                            'Confirm Pickup',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        ),
+                        child: const Text(
+                          'Confirm Pickup',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

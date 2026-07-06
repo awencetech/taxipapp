@@ -283,6 +283,11 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('fetchDriverProfile: ERROR CAUGHT!');
       debugPrint('fetchDriverProfile: Error: $e');
       debugPrint('fetchDriverProfile: Stack trace: $stackTrace');
+      final errorMsg = e.toString().toLowerCase();
+      if (errorMsg.contains('403') || errorMsg.contains('not approved') || errorMsg.contains('approved')) {
+        _error = 'Driver not approved. Please wait for vendor/admin approval.';
+        await logout();
+      }
     } finally {
       debugPrint(
         'fetchDriverProfile: Finally block, setting _isLoading to false',

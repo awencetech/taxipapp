@@ -14,9 +14,11 @@ class RideModel {
   final String? driverName;
   final String? driverVehicleType;
   final String? driverVehicleNumber;
+  final String? driverVehicleColor;
   final double? driverRating;
   final double? driverLatitude;
   final double? driverLongitude;
+  final String? polyline; // New: route polyline
 
   RideModel({
     required this.id,
@@ -33,9 +35,11 @@ class RideModel {
     this.driverName,
     this.driverVehicleType,
     this.driverVehicleNumber,
+    this.driverVehicleColor,
     this.driverRating,
     this.driverLatitude,
     this.driverLongitude,
+    this.polyline,
   });
 
   factory RideModel.fromMap(Map<String, dynamic> map) {
@@ -54,8 +58,9 @@ class RideModel {
     String getAddress(dynamic location) {
       if (location is Map) {
         if (location['address'] != null) return location['address'].toString();
-        if (location['locationAddress'] != null)
+        if (location['locationAddress'] != null) {
           return location['locationAddress'].toString();
+        }
       }
       return '';
     }
@@ -75,6 +80,7 @@ class RideModel {
     String? driverName;
     String? driverVehicleType;
     String? driverVehicleNumber;
+    String? driverVehicleColor;
     double? driverRating;
     double? driverLatitude;
     double? driverLongitude;
@@ -83,6 +89,7 @@ class RideModel {
       driverName = map['driver']['name']?.toString();
       driverVehicleType = map['driver']['vehicleType']?.toString();
       driverVehicleNumber = map['driver']['vehicleNumber']?.toString();
+      driverVehicleColor = map['driver']['vehicleColor']?.toString();
       driverRating =
           parseDouble(map['driver']['rating'] ?? map['driver']['ratings']);
       driverLatitude = parseDouble(map['driver']['currentLatitude']);
@@ -114,6 +121,7 @@ class RideModel {
       driverName: driverName,
       driverVehicleType: driverVehicleType,
       driverVehicleNumber: driverVehicleNumber,
+      driverVehicleColor: driverVehicleColor,
       driverRating: driverRating,
       driverLatitude: driverLatitude,
       driverLongitude: driverLongitude,
@@ -126,6 +134,7 @@ class RideModel {
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt'].toString())
           : null,
+      polyline: map['polyline']?.toString(),
     );
   }
 
@@ -143,6 +152,7 @@ class RideModel {
       'createdAt': createdAt?.toIso8601String(),
       'driverLatitude': driverLatitude,
       'driverLongitude': driverLongitude,
+      'polyline': polyline,
     };
   }
 }

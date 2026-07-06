@@ -30,7 +30,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           builder: (context, provider, child) {
             // Only completed and cancelled rides
             final historyRides = provider.rideHistory
-                .where((ride) => ['completed', 'cancelled']
+                .where((ride) => ['completed', 'cancelled', 'canceled']
                     .contains(ride.status.toLowerCase()))
                 .toList();
 
@@ -123,7 +123,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       statusText = 'Completed';
     } else {
       statusColor = Colors.red;
-      statusText = 'Cancelled';
+      statusText = 'Canceled';
     }
 
     // Format date and time

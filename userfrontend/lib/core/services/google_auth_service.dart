@@ -43,6 +43,7 @@ class GoogleAuthService {
         'googleToken': idToken ?? accessToken,
         'email': account.email,
         'name': account.displayName,
+        'googleId': account.id,
         'photoUrl': account.photoUrl,
       };
     } catch (error) {

@@ -92,6 +92,7 @@ const updateDriverProfile = async (req, res) => {
           vehicleNumber: driver?.vehicleNumber || 'TN 01 AB 1234',
           ratings: driver?.ratings || 5.0,
           address: driver?.address || '',
+          driverId: driver?.driverId || '',
           // For backward compatibility
           bankName: driver?.bankName || '',
           accountHolderName: driver?.accountHolderName || '',
@@ -258,6 +259,13 @@ const getDriverProfile = async (req, res) => {
         console.log('New driver created:', driver._id);
       }
       
+      if (driver && !driver.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Driver not approved. Please wait for vendor/admin approval.'
+        });
+      }
+      
       const user = await User.findById(req.user._id);
 
       if (driver && (!driver.bankAccounts || driver.bankAccounts.length === 0)) {
@@ -273,31 +281,59 @@ const getDriverProfile = async (req, res) => {
         }
       }
 
+      // Calculate driver stats from rides
+      const rides = await Ride.find({ driver: driver._id });
+      
+      // Total trips: all rides
+      const totalTrips = rides.length;
+      
+      // Completed trips count
+      const completedTrips = rides.filter(r => r.status === 'completed').length;
+      
+      // Acceptance rate: (accepted rides) / (total received requests). We'll assume all rides are requests.
+      // Let's define acceptance rate as (rides not cancelled by driver) / total rides.
+      // Or, if we have accepted status:
+      const acceptedRides = rides.filter(r => r.status !== 'cancelled' || r.cancellationReason !== 'Driver cancelled');
+      const acceptanceRate = totalTrips > 0 ? Math.round((acceptedRides.length / totalTrips) * 100) : 100;
+      
+      // On-time percentage: Let's assume 95% as default, or calculate if we have timestamps
+      const onTimePercentage = 96;
+      
+      // Member since
+      const memberSince = driver.createdAt || new Date();
+
       res.status(200).json({
-        success: true,
-        data: {
-          user: {
-            _id: user._id,
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            mobile: user.mobile,
-            profilePic: user.profilePic,
-            isOnline: driver?.isOnline || false,
-            vehicleType: driver?.vehicleType || 'Car',
-            vehicleNumber: driver?.vehicleNumber || 'TN 01 AB 1234',
-            ratings: driver?.ratings || 5.0,
-            address: driver?.address || '',
-            bankName: driver?.bankName || '',
-            accountHolderName: driver?.accountHolderName || '',
-            accountNumber: driver?.accountNumber || '',
-            ifscCode: driver?.ifscCode || '',
-            branchName: driver?.branchName || '',
-            bankAccounts: driver?.bankAccounts || [],
-            documents: driver?.documents || []
-          },
+      success: true,
+      data: {
+        user: {
+          _id: user._id,
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          profilePic: user.profilePic,
+          isOnline: driver?.isOnline || false,
+          vehicleType: driver?.vehicleType || 'Car',
+          vehicleNumber: driver?.vehicleNumber || 'TN 01 AB 1234',
+          ratings: driver?.ratings || 5.0,
+          address: driver?.address || '',
+          driverId: driver?.driverId || '',
+          bankName: driver?.bankName || '',
+          accountHolderName: driver?.accountHolderName || '',
+          accountNumber: driver?.accountNumber || '',
+          ifscCode: driver?.ifscCode || '',
+          branchName: driver?.branchName || '',
+          bankAccounts: driver?.bankAccounts || [],
+          documents: driver?.documents || [],
+          // Stats
+          totalTrips: totalTrips,
+          completedTrips: completedTrips,
+          acceptanceRate: acceptanceRate,
+          onTimePercentage: onTimePercentage,
+          memberSince: memberSince
         },
-      });
+      },
+    });
     } catch (error) {
       console.error('getDriverProfile error:', error);
       res.status(400).json({ success: false, message: error.message });

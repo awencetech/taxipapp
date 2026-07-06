@@ -197,6 +197,21 @@ class ApiService {
     }
   }
 
+  Future<Response> firebasePhoneAuth(Map<String, dynamic> data) async {
+    try {
+      return await _dio.post(
+        '/auth/firebase-phone',
+        data: jsonEncode(data),
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+    } catch (e) {
+      developer.log('FirebasePhoneAuth error: $e');
+      rethrow;
+    }
+  }
+
   Future<Response> getProfile() async {
     try {
       return await _dio.get('/users/me');
@@ -571,6 +586,16 @@ class ApiService {
       });
     } catch (e) {
       developer.log('GetDirections error: $e');
+      rethrow;
+    }
+  }
+
+  // User Location Update
+  Future<Response> updateUserLocation(Map<String, dynamic> data) async {
+    try {
+      return await _dio.post('/users/location', data: jsonEncode(data));
+    } catch (e) {
+      developer.log('UpdateUserLocation error: $e');
       rethrow;
     }
   }

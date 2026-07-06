@@ -34,6 +34,16 @@ const vendorSchema = new mongoose.Schema({
     minlength: 6,
     select: false,
   },
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true,
+  },
+  firebaseUid: {
+    type: String,
+    sparse: true,
+    unique: true,
+  },
   companyName: {
     type: String,
     required: [true, 'Please provide company name'],
@@ -42,6 +52,10 @@ const vendorSchema = new mongoose.Schema({
     type: String,
   },
   isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isApproved: {
     type: Boolean,
     default: false,
   },

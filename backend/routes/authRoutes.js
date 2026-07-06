@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword } = require('../controllers/authController');
+const { register, login, forgotPassword, verifyOTP, resetPassword, googleLogin, completeProfile, changePassword, firebasePhoneAuth } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
 /**
@@ -64,5 +64,31 @@ router.post('/complete-profile', completeProfile);
 
 // Protected route for changing password
 router.put('/change-password', protect, changePassword);
+
+/**
+ * @swagger
+ * /auth/firebase-phone:
+ *   post:
+ *     summary: Authenticate with Firebase Phone Auth
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Firebase ID Token from phone auth
+ *               role:
+ *                 type: string
+ *                 description: User role (user, driver, vendor)
+ *                 enum: [user, driver, vendor]
+ *               name:
+ *                 type: string
+ *                 description: Name (required for new user registration)
+ */
+router.post('/firebase-phone', firebasePhoneAuth);
 
 module.exports = router;

@@ -22,6 +22,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   StreamSubscription<Position>? _locationSubscription;
+  bool _hasFittedRoute = false;
+  String? _lastRideStatus;
 
   String _distance = '';
   String _duration = '';
@@ -35,6 +37,18 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final rideViewModel = Provider.of<RideViewModel>(context);
+    final currentStatus = rideViewModel.currentRide?.status;
+    if (currentStatus != _lastRideStatus) {
+      _lastRideStatus = currentStatus;
+      _hasFittedRoute = false; // Reset to refit camera when route changes
+      _fetchRoute();
+    }
+  }
+
+  @override
   void dispose() {
     _mapController?.dispose();
     _locationSubscription?.cancel();
@@ -42,7 +56,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   Future<void> _loadMap() async {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
     final rideViewModel = Provider.of<RideViewModel>(context, listen: false);
     final ride = rideViewModel.currentRide;
 
@@ -53,140 +70,187 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   Future<void> _fetchRoute() async {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
     final rideViewModel = Provider.of<RideViewModel>(context, listen: false);
     final ride = rideViewModel.currentRide;
 
     if (ride == null || locationProvider.currentPosition == null) return;
 
-    // Driver location
+    // First, get pickup and drop locations
+    LatLng pickup = LatLng(ride.pickupCoords[0], ride.pickupCoords[1]);
+    LatLng drop = LatLng(ride.dropCoords[0], ride.dropCoords[1]);
+
+    // Determine origin and destination based on ride status
     LatLng origin = LatLng(
       locationProvider.currentPosition!.latitude,
       locationProvider.currentPosition!.longitude,
     );
-
-    // Destination is pickup address if not arrived yet, else drop address
     LatLng destination;
     if (ride.status == 'accepted') {
-      destination = LatLng(ride.pickupCoords[0], ride.pickupCoords[1]);
+      destination = pickup; // Heading to pickup
     } else {
-      destination = LatLng(ride.dropCoords[0], ride.dropCoords[1]);
+      destination = drop; // Heading to drop
     }
 
+    // Fetch the route from origin to destination
+    List<LatLng> routePoints = [];
     try {
-      final directionsData = await _mapsService.getDirections(origin, destination);
+      final directionsData = await _mapsService.getDirections(
+        origin,
+        destination,
+      );
 
       setState(() {
         _distance = directionsData['distance'] ?? '';
         _duration = directionsData['duration'] ?? '';
       });
 
-      final List<LatLng> polylinePoints = [];
-      if (directionsData['polyline'] != null && directionsData['polyline'].isNotEmpty) {
-        final points = PolylinePoints().decodePolyline(directionsData['polyline']);
+      if (directionsData['polyline'] != null &&
+          directionsData['polyline'].isNotEmpty) {
+        final points = PolylinePoints().decodePolyline(
+          directionsData['polyline'],
+        );
         for (var point in points) {
-          polylinePoints.add(LatLng(point.latitude, point.longitude));
+          routePoints.add(LatLng(point.latitude, point.longitude));
         }
       }
+    } catch (e) {
+      debugPrint('Error fetching route in RideDetailsScreen: $e');
+    }
 
-      setState(() {
-        _polylines.clear();
+    setState(() {
+      _polylines.clear();
+      // Add the route polyline
+      if (routePoints.isNotEmpty) {
         _polylines.add(
           Polyline(
             polylineId: const PolylineId('route'),
-            color: const Color(0xFF2EBD59),
+            color: const Color(0xFF1976D2), // Blue color for navigation
             width: 6,
-            points: polylinePoints,
+            points: routePoints,
           ),
         );
+      }
 
-        _markers.clear();
-        // Driver position marker
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('current'),
-            position: origin,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-            infoWindow: const InfoWindow(title: 'Your Location'),
+      _markers.clear();
+      // Driver position marker
+      final driverPos = LatLng(
+        locationProvider.currentPosition!.latitude,
+        locationProvider.currentPosition!.longitude,
+      );
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: driverPos,
+          infoWindow: const InfoWindow(title: 'Your Location'),
+        ),
+      );
+
+      // Pickup position marker (passenger location) - green marker
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: pickup,
+          infoWindow: InfoWindow(
+            title: 'Passenger',
+            snippet: ride.passengerName,
           ),
-        );
+        ),
+      );
 
-        // Pickup position marker
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('pickup'),
-            position: LatLng(ride.pickupCoords[0], ride.pickupCoords[1]),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-            infoWindow: InfoWindow(title: 'Pickup Location', snippet: ride.pickupAddress),
-          ),
-        );
+      // Drop position marker - red marker
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('drop'),
+          position: drop,
+          infoWindow: InfoWindow(title: 'Drop-off', snippet: ride.dropAddress),
+        ),
+      );
+    });
 
-        // Drop position marker
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('drop'),
-            position: LatLng(ride.dropCoords[0], ride.dropCoords[1]),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(title: 'Drop Location', snippet: ride.dropAddress),
-          ),
-        );
-      });
-
-      _zoomToFit();
-    } catch (e) {
-      debugPrint('Error fetching route in RideDetailsScreen: $e');
+    // Fit the camera to include driver, pickup, and drop
+    if (!_hasFittedRoute) {
+      List<LatLng> boundsPoints = [];
+      if (routePoints.isNotEmpty) {
+        boundsPoints.addAll(routePoints);
+      } else {
+        boundsPoints.add(origin);
+        boundsPoints.add(destination);
+        boundsPoints.add(pickup);
+        boundsPoints.add(drop);
+      }
+      if (boundsPoints.isNotEmpty) {
+        _zoomToFit(boundsPoints);
+        _hasFittedRoute = true;
+      }
     }
   }
 
   void _startLocationUpdates() {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    _locationSubscription = locationProvider.currentPosition != null
-        ? null
-        : Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              distanceFilter: 10,
-            ),
-          ).listen((position) {
-            setState(() {
-              _markers.removeWhere((marker) => marker.markerId == const MarkerId('current'));
-              _markers.add(
-                Marker(
-                  markerId: const MarkerId('current'),
-                  position: LatLng(position.latitude, position.longitude),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-                  infoWindow: const InfoWindow(title: 'Your Location'),
-                ),
-              );
-            });
-            _fetchRoute();
-          });
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
+
+    // First update with current position
+    if (locationProvider.currentPosition != null) {
+      final position = locationProvider.currentPosition!;
+      _updateMapWithDriverPosition(position);
+    }
+
+    _locationSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 20, // Only update when moved 20m
+          ),
+        ).listen((position) {
+          _updateMapWithDriverPosition(position);
+        });
   }
 
-  Future<void> _zoomToFit() async {
-    if (_mapController == null || _markers.isEmpty) return;
-
-    final bounds = _calculateBounds();
-    await _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+  void _updateMapWithDriverPosition(Position position) {
+    setState(() {
+      // Update driver marker
+      _markers.removeWhere(
+        (marker) => marker.markerId == const MarkerId('driver'),
+      );
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: LatLng(position.latitude, position.longitude),
+          infoWindow: const InfoWindow(title: 'Your Location'),
+        ),
+      );
+    });
   }
 
-  LatLngBounds _calculateBounds() {
+  Future<void> _zoomToFit(List<LatLng> routePoints) async {
+    if (_mapController == null || routePoints.isEmpty) return;
+
+    // Find min and max lat/lng from route
     double minLat = double.infinity;
     double maxLat = -double.infinity;
     double minLng = double.infinity;
     double maxLng = -double.infinity;
 
-    for (var marker in _markers) {
-      final position = marker.position;
-      if (position.latitude < minLat) minLat = position.latitude;
-      if (position.latitude > maxLat) maxLat = position.latitude;
-      if (position.longitude < minLng) minLng = position.longitude;
-      if (position.longitude > maxLng) maxLng = position.longitude;
+    for (LatLng point in routePoints) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
     }
 
-    return LatLngBounds(
+    final LatLngBounds bounds = LatLngBounds(
       southwest: LatLng(minLat, minLng),
       northeast: LatLng(maxLat, maxLng),
+    );
+
+    await _mapController?.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 80), // 80px padding
     );
   }
 
@@ -207,14 +271,22 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     final rideViewModel = Provider.of<RideViewModel>(context, listen: false);
     final ride = rideViewModel.currentRide;
     if (ride == null) return;
-    
+
     // Launch Google Maps navigation
-    final double lat = ride.status == 'accepted' ? ride.pickupCoords[0] : ride.dropCoords[0];
-    final double lng = ride.status == 'accepted' ? ride.pickupCoords[1] : ride.dropCoords[1];
-    
-    final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+    final double lat = ride.status == 'accepted'
+        ? ride.pickupCoords[0]
+        : ride.dropCoords[0];
+    final double lng = ride.status == 'accepted'
+        ? ride.pickupCoords[1]
+        : ride.dropCoords[1];
+
+    final googleMapsUrl =
+        'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
     if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-      await launchUrl(Uri.parse(googleMapsUrl), mode: LaunchMode.externalApplication);
+      await launchUrl(
+        Uri.parse(googleMapsUrl),
+        mode: LaunchMode.externalApplication,
+      );
     }
   }
 
@@ -293,16 +365,21 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
               zoom: 14,
             ),
             myLocationEnabled: true,
-            myLocationButtonEnabled: false,
+            myLocationButtonEnabled: true,
+            compassEnabled: true,
+            scrollGesturesEnabled: true,
+            zoomGesturesEnabled: true,
+            rotateGesturesEnabled: true,
+            tiltGesturesEnabled: true,
             markers: _markers,
             polylines: _polylines,
             onMapCreated: (controller) {
               _mapController = controller;
-              _zoomToFit();
+              // We'll fit route when we have data
             },
           ),
 
-          // Header Overlay
+          // Header Overlay with ETA and Distance
           Positioned(
             top: 50,
             left: 20,
@@ -320,173 +397,305 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                    onPressed: () => Navigator.pop(context),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.black87,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              titleText,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              ride.status == 'accepted'
+                                  ? ride.pickupAddress
+                                  : ride.dropAddress,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          titleText,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          ride.status == 'accepted' ? ride.pickupAddress : ride.dropAddress,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                  // ETA and Distance row
+                  if (_distance.isNotEmpty || _duration.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_distance.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.route,
+                                    color: Color(0xFF1976D2),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _distance,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1A1A1A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(width: 12),
+                          if (_duration.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.access_time,
+                                    color: Color(0xFFFF9800),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _duration,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1A1A1A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
 
           // Rider Details and Actions Bottom Sheet
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 20,
-                    offset: Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Drag indicator
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.38,
+            minChildSize: 0.32,
+            maxChildSize: 0.90,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 20,
+                      offset: Offset(0, -4),
                     ),
+                  ],
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
                   ),
-
-                  // Passenger profile and name
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.orange.shade50,
-                        child: const Icon(Icons.person, color: Colors.orange, size: 30),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ride.passengerName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Color(0xFF1A1A1A),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "Passenger",
-                              style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                            ),
-                          ],
+                  children: [
+                    // Drag indicator
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      // Actions buttons
-                      _buildIconButton(Icons.call, Colors.green, _makePhoneCall),
-                      const SizedBox(width: 8),
-                      _buildIconButton(Icons.chat_bubble_outline, Colors.blue, _openMessage),
-                      const SizedBox(width: 8),
-                      _buildIconButton(Icons.navigation_outlined, Colors.orange, _navigateExternal),
-                    ],
-                  ),
+                    ),
 
-                  const SizedBox(height: 20),
-                  const Divider(height: 1),
-                  const SizedBox(height: 16),
-
-                  // Rider Details Grid/List
-                  _buildDetailRow("Pickup", ride.pickupAddress, iconColor: Colors.green),
-                  const SizedBox(height: 8),
-                  _buildDetailRow("Drop", ride.dropAddress, iconColor: Colors.red),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildDetailRow("Fare", "₹${ride.fare.toInt()}", iconColor: Colors.green, isBold: true)),
-                      Expanded(child: _buildDetailRow("Distance", "${ride.distance.toStringAsFixed(1)} km")),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildDetailRow("Estimated Time", "${ride.estimatedTime} mins")),
-                      Expanded(child: _buildDetailRow("Payment Method", ride.paymentMethod)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDetailRow("Ride Type", ride.vehicleType),
-
-                  const SizedBox(height: 24),
-
-                  // Main Status Action Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: rideViewModel.isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ElevatedButton(
-                            onPressed: onActionButtonPressed,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: actionButtonColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
-                            child: Text(
-                              actionButtonText.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
+                    // Passenger profile and name
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.orange.shade50,
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.orange,
+                            size: 30,
                           ),
-                  ),
-                ],
-              ),
-            ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ride.passengerName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "Passenger",
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Actions buttons
+                        _buildIconButton(
+                          Icons.call,
+                          Colors.green,
+                          _makePhoneCall,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildIconButton(
+                          Icons.chat_bubble_outline,
+                          Colors.blue,
+                          _openMessage,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildIconButton(
+                          Icons.navigation_outlined,
+                          Colors.orange,
+                          _navigateExternal,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+
+                    // Rider Details Grid/List
+                    _buildDetailRow(
+                      "Pickup",
+                      ride.pickupAddress,
+                      iconColor: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDetailRow(
+                      "Drop",
+                      ride.dropAddress,
+                      iconColor: Colors.red,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDetailRow(
+                            "Fare",
+                            "₹${ride.fare.toInt()}",
+                            iconColor: Colors.green,
+                            isBold: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildDetailRow(
+                            "Distance",
+                            "${ride.distance.toStringAsFixed(1)} km",
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDetailRow(
+                            "Estimated Time",
+                            "${ride.estimatedTime} mins",
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildDetailRow(
+                            "Payment Method",
+                            ride.paymentMethod,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDetailRow("Ride Type", ride.vehicleType),
+
+                    const SizedBox(height: 24),
+
+                    // Main Status Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: rideViewModel.isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : ElevatedButton(
+                              onPressed: onActionButtonPressed,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: actionButtonColor,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                              child: Text(
+                                actionButtonText.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -508,7 +717,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? iconColor, bool isBold = false}) {
+  Widget _buildDetailRow(
+    String label,
+    String value, {
+    Color? iconColor,
+    bool isBold = false,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
