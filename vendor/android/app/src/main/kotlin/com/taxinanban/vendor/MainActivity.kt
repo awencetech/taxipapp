@@ -1,4 +1,4 @@
-package com.taxinanban.driver.driverfrontend
+package com.taxinanban.vendor
 
 import io.flutter.embedding.android.FlutterActivity
 

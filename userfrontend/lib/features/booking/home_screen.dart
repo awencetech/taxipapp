@@ -28,8 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final bool _hasClearedRecentDestinations = false;
   GoogleMapController? _mapController;
-  Set<Marker> _markers = {};
-  Set<Circle> _circles = {};
   MapType _currentMapType = MapType.normal;
 
   // Vehicle options data
@@ -139,44 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
         locationProvider.currentPosition!.longitude,
       );
 
-      // Update user marker
-      if (mounted) {
-        setState(() {
-          _markers = {
-            Marker(
-              markerId: const MarkerId('user_location'),
-              position: position,
-              infoWindow: const InfoWindow(title: 'You are here'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueBlue),
-            ),
-          };
-
-          // Update accuracy circle
-          _circles = {
-            Circle(
-              circleId: const CircleId('accuracy'),
-              center: position,
-              radius: locationProvider.currentPosition!.accuracy,
-              fillColor: Colors.blue.withValues(alpha: 0.1),
-              strokeColor: Colors.blue.withValues(alpha: 0.5),
-              strokeWidth: 1,
-            ),
-          };
-        });
-      }
-
       // Auto-follow if enabled
       if (locationProvider.autoFollow) {
         _animateToPosition(position);
-      }
-    } else {
-      // If no position, set empty sets
-      if (mounted) {
-        setState(() {
-          _markers = {};
-          _circles = {};
-        });
       }
     }
   }
@@ -407,23 +370,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                     GoogleMap(
                                       key: const PageStorageKey('homeMap'),
                                       initialCameraPosition:
-                                          const CameraPosition(
-                                        target: LatLng(11.0168, 76.9558),
-                                        zoom: 15,
-                                      ),
+                                          locationProvider.currentPosition != null
+                                              ? CameraPosition(
+                                                  target: LatLng(
+                                                    locationProvider.currentPosition!.latitude,
+                                                    locationProvider.currentPosition!.longitude,
+                                                  ),
+                                                  zoom: 17,
+                                                )
+                                              : const CameraPosition(
+                                                  target: LatLng(11.0168, 76.9558),
+                                                  zoom: 15,
+                                                ),
                                       mapType: _currentMapType,
-                                      myLocationEnabled: false,
+                                      myLocationEnabled: true,
                                       myLocationButtonEnabled: false,
                                       zoomControlsEnabled: false,
                                       scrollGesturesEnabled: true,
                                       zoomGesturesEnabled: true,
-                                      rotateGesturesEnabled: true,
-                                      tiltGesturesEnabled: true,
-                                      indoorViewEnabled: true,
-                                      trafficEnabled: true,
+                                      rotateGesturesEnabled: false,
+                                      tiltGesturesEnabled: false,
+                                      indoorViewEnabled: false,
+                                      trafficEnabled: false,
                                       mapToolbarEnabled: false,
-                                      markers: _markers,
-                                      circles: _circles,
+                                      liteModeEnabled:
+                                          false, // Keep false for full functionality but we disabled heavy features
                                       onMapCreated: (controller) {
                                         _mapController = controller;
                                         // Initial marker update
@@ -433,25 +404,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                       },
                                       onCameraMove: _onCameraMove,
                                     ),
-                                    // Loading indicator
+                                    // Small loading indicator in corner
                                     if (locationProvider.isFetchingLocation)
-                                      Container(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.5),
-                                        child: const Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              CircularProgressIndicator(
-                                                color: Colors.white,
+                                      Positioned(
+                                        top: 16,
+                                        right: 80,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(20),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Colors.black12,
+                                                blurRadius: 8,
+                                                offset: Offset(0, 2),
                                               ),
-                                              SizedBox(height: 12),
+                                            ],
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Color(0xFFFF6B00),
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
                                               Text(
-                                                'Fetching current location...',
+                                                'Getting location...',
                                                 style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14,
+                                                  color: Color(0xFF111827),
+                                                  fontSize: 12,
                                                 ),
                                               ),
                                             ],

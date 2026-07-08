@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/booking_provider.dart';
-import '../../core/providers/location_provider.dart';
 import '../../core/providers/search_provider.dart';
 import '../../core/providers/address_provider.dart';
 import '../../core/models/place_prediction_model.dart';
@@ -58,10 +57,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   }
 
   void _initializePickupFromLocation() {
-    final locationProvider = context.read<LocationProvider>();
-    if (locationProvider.currentAddress.isNotEmpty) {
-      _pickupController.text = locationProvider.currentAddress;
-    }
+    // Don't pre-populate pickup field—keep it empty!
   }
 
   void _onPickupTextChanged() {

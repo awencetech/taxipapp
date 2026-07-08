@@ -1,3 +1,4 @@
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -111,60 +112,55 @@ class LocationProvider extends ChangeNotifier {
 
       Position? bestPosition;
 
-      // Optimized settings for all platforms
+      // Better location settings for live location
       const isWeb = kIsWeb;
       const accuracy =
-          isWeb ? LocationAccuracy.high : LocationAccuracy.bestForNavigation;
-      const timeout = isWeb ? Duration(seconds: 30) : Duration(seconds: 15);
-      const acceptableAccuracy = isWeb ? 2000.0 : 50.0; // More strict for mobile
-      const maxRetries = isWeb ? 1 : 2;
+          isWeb ? LocationAccuracy.medium : LocationAccuracy.bestForNavigation;
+      const timeout = isWeb ? Duration(seconds: 15) : Duration(seconds: 30);
+      const maxRetries = 3;
       int retryCount = 0;
 
+      // Try last known position first for quick initial display
+      try {
+        bestPosition = await Geolocator.getLastKnownPosition();
+        if (bestPosition != null) {
+          _currentPosition = bestPosition;
+          notifyListeners(); // Update UI quickly with last known
+          if (kDebugMode) {
+            print('Using last known position initially: ${bestPosition.latitude}, ${bestPosition.longitude}');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error getting last known position: $e');
+        }
+      }
+
+      // Then fetch fresh position
       while (retryCount < maxRetries) {
         retryCount++;
         try {
-          // First try to get a fresh position
           final position = await Geolocator.getCurrentPosition(
             desiredAccuracy: accuracy,
             timeLimit: timeout,
-            forceAndroidLocationManager: true,
           );
 
           if (kDebugMode) {
-            print('Fetched position: ${position.latitude}, ${position.longitude}, accuracy: ${position.accuracy}m');
+            print('Fetched fresh position: ${position.latitude}, ${position.longitude}, accuracy: ${position.accuracy}m');
           }
 
-          // Check if accuracy is good enough
-          if (position.accuracy <= acceptableAccuracy || retryCount == maxRetries) {
-            bestPosition = position;
-            break;
-          } else {
-            bestPosition = position; // Keep the best we have
-          }
+          bestPosition = position;
+          _currentPosition = bestPosition;
+          notifyListeners(); // Update UI with fresh position
+          break;
         } catch (e) {
           if (kDebugMode) {
             print('Error fetching position (attempt $retryCount): $e');
           }
           if (retryCount == maxRetries) break;
-          await Future.delayed(const Duration(seconds: 1));
+          await Future.delayed(const Duration(seconds: 2));
         }
       }
-
-      // If no fresh position, try last known
-      if (bestPosition == null) {
-        try {
-          bestPosition = await Geolocator.getLastKnownPosition();
-          if (kDebugMode && bestPosition != null) {
-            print('Using last known position: ${bestPosition!.latitude}, ${bestPosition!.longitude}');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error getting last known position: $e');
-          }
-        }
-      }
-
-      _currentPosition = bestPosition;
 
       if (_currentPosition != null) {
         if (kDebugMode) {

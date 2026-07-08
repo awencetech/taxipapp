@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.vendorfrontend"
+    namespace = "com.taxinanban.vendor"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.vendorfrontend"
+        applicationId = "com.taxinanban.vendor"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
