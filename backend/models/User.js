@@ -10,11 +10,18 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Please provide your email'],
+    required: function() { return !this.googleId && !this.firebaseUid; }, // Required only if not social/phone login
     unique: true,
+    sparse: true, // Allows multiple nulls for email
     lowercase: true,
     trim: true,
-    validate: [validator.isEmail, 'Please provide a valid email'],
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Skip validation if empty (for social/phone login)
+        return validator.isEmail(v);
+      },
+      message: 'Please provide a valid email'
+    },
   },
   mobile: {
     type: String,
@@ -32,7 +39,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: function() { return !this.googleId; }, // Required only if not social login
+    required: function() { return !this.googleId && !this.firebaseUid; }, // Required only if not social/phone login
     minlength: 6,
     select: false,
   },

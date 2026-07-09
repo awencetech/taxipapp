@@ -569,7 +569,6 @@ const firebasePhoneAuth = async (req, res) => {
         }
         user = await User.create({
           name,
-          email: `${firebaseUid}@temp.com`, // Temporary email since we're using phone auth
           mobile: cleanPhone,
           firebaseUid,
           role: 'user',
