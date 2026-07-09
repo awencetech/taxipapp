@@ -1,9 +1,9 @@
 class AppConstants {
   static const String appName = 'Taxi Nanban Driver';
 
-  // Use 10.0.2.2 for Android Emulator, 127.0.0.1 for iOS Simulator or Web
-  static const String baseUrl = 'http://127.0.0.1:5000/api/v1';
-  static const String socketUrl = 'http://127.0.0.1:5000';
+  // Local network backend URL
+  static const String baseUrl = 'http://192.168.31.100:5000/api/v1';
+  static const String socketUrl = 'http://192.168.31.100:5000';
 
   // Authentication APIs
   static const String loginUrl = '/auth/login';
