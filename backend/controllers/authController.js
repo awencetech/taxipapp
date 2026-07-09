@@ -522,6 +522,15 @@ const firebasePhoneAuth = async (req, res) => {
         message: 'Database not available. Please try again later.' 
       });
     }
+
+    // Check if Firebase Admin is initialized
+    if (!admin.apps.length) {
+      return res.status(500).json({
+        success: false,
+        message: 'Firebase Admin not initialized. Please check service account configuration.'
+      });
+    }
+
     console.log('Firebase Phone Auth Request Body:', req.body);
     const { idToken, role, name, companyName } = req.body;
 

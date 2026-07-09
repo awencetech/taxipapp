@@ -471,7 +471,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                               for (var app in Firebase.apps) {
                                 print("=== Firebase app: ${app.name}");
                               }
-                              final authProvider = context.read&lt;AuthProvider&gt;();
+                              final authProvider = context.read<AuthProvider>();
                               final user = FirebaseAuth.instance.currentUser;
                               if (user == null) {
                                 if (mounted) {
