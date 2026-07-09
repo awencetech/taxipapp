@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'viewmodels/auth_viewmodel.dart';
@@ -12,10 +13,13 @@ import 'services/profile_service.dart';
 import 'services/api_service.dart';
 import 'views/auth/login_screen.dart';
 import 'views/dashboard/dashboard_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(
     MultiProvider(
       providers: [
