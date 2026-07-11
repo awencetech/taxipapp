@@ -7,50 +7,21 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:996214358508:android:6a37bc3069b489b008c0c9",
-        "android_client_info": {
-          "package_name": "com.taxinanban.driver"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD-CmbYwVROOd5kDXbqf56ZKb8CCWycy28"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:996214358508:android:6679115214114a7308c0c9",
-        "android_client_info": {
-          "package_name": "com.taxinanban.user"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD-CmbYwVROOd5kDXbqf56ZKb8CCWycy28"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:996214358508:android:20394dcae931e7b008c0c9",
         "android_client_info": {
           "package_name": "com.taxinanban.vendor"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "996214358508-hv3jeqp2j64u5bqa9qnu7gr040jgbc5u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.taxinanban.vendor",
+            "certificate_hash": "699a92da0fe457bc4b04fbc201c0a3cbf9f6a59d"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyD-CmbYwVROOd5kDXbqf56ZKb8CCWycy28"

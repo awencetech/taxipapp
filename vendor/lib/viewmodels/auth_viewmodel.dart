@@ -200,7 +200,7 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         clientId: kIsWeb
-            ? '1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com'
+            ? '996214358508-qiq5q5lovamh98dio6sj27ps69pm8evk.apps.googleusercontent.com'
             : null,
         scopes: ['email', 'profile'],
       );
@@ -320,7 +320,7 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         clientId: kIsWeb
-            ? '1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com'
+            ? '996214358508-qiq5q5lovamh98dio6sj27ps69pm8evk.apps.googleusercontent.com'
             : null,
         scopes: ['email', 'profile'],
       );
