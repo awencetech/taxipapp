@@ -11,14 +11,21 @@ class AuthService {
   Stream<DriverModel?> get userStream => _userController.stream;
 
   Future<DriverModel?> signUp(
-      String name, String email, String password, String mobile) async {
+    String name,
+    String email,
+    String password,
+    String mobile,
+  ) async {
     try {
-      final response = await _apiService.post(AppConstants.registerUrl, data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'mobile': mobile,
-      });
+      final response = await _apiService.post(
+        AppConstants.registerUrl,
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'mobile': mobile,
+        },
+      );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final userData = response.data['user'];
@@ -41,10 +48,10 @@ class AuthService {
 
   Future<DriverModel?> signIn(String email, String password) async {
     try {
-      final response = await _apiService.post(AppConstants.loginUrl, data: {
-        'email': email,
-        'password': password,
-      });
+      final response = await _apiService.post(
+        AppConstants.loginUrl,
+        data: {'email': email, 'password': password},
+      );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final userData = response.data['user'];
@@ -66,9 +73,13 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> googleSignIn(
-      Map<String, dynamic> userData) async {
+    Map<String, dynamic> userData,
+  ) async {
     try {
-      final response = await _apiService.post(AppConstants.googleLoginUrl, data: userData);
+      final response = await _apiService.post(
+        AppConstants.googleLoginUrl,
+        data: userData,
+      );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['isNewUser'] == true) {
@@ -88,10 +99,7 @@ class AuthService {
           await prefs.setString(AppConstants.driverIdKey, user.id);
 
           _userController.add(user);
-          return {
-            'isNewUser': false,
-            'user': user,
-          };
+          return {'isNewUser': false, 'user': user};
         }
       } else {
         final message = response.data['message'] ?? 'Google login failed';
@@ -104,7 +112,10 @@ class AuthService {
 
   Future<DriverModel?> completeProfile(Map<String, dynamic> userData) async {
     try {
-      final response = await _apiService.post(AppConstants.completeProfileUrl, data: userData);
+      final response = await _apiService.post(
+        AppConstants.completeProfileUrl,
+        data: userData,
+      );
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           response.data['success'] == true) {
@@ -126,20 +137,21 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> firebasePhoneSignIn(String idToken, String role, {String? name}) async {
+  Future<Map<String, dynamic>> firebasePhoneSignIn(
+    String idToken,
+    String role, {
+    String? name,
+  }) async {
     try {
       final response = await _apiService.firebasePhoneAuth({
         'idToken': idToken,
         'role': role,
-        if (name != null) 'name': name,
+        'name': name,
       });
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['isNewDriver'] == true) {
-          return {
-            'isNewDriver': true,
-            'mobile': response.data['mobile'],
-          };
+          return {'isNewDriver': true, 'mobile': response.data['mobile']};
         } else {
           final userData = response.data['user'];
           final user = DriverModel.fromJson(userData);
@@ -149,13 +161,11 @@ class AuthService {
           await prefs.setString(AppConstants.driverIdKey, user.id);
 
           _userController.add(user);
-          return {
-            'isNewDriver': false,
-            'user': user,
-          };
+          return {'isNewDriver': false, 'user': user};
         }
       } else {
-        final message = response.data['message'] ?? 'Firebase phone auth failed';
+        final message =
+            response.data['message'] ?? 'Firebase phone auth failed';
         throw Exception(message);
       }
     } catch (e) {
@@ -186,13 +196,15 @@ class AuthService {
   }
 
   Future<DriverModel?> updateProfile(
-      String name, String email, String mobile) async {
+    String name,
+    String email,
+    String mobile,
+  ) async {
     try {
-      final response = await _apiService.put(AppConstants.updateDriverProfileUrl, data: {
-        'name': name,
-        'email': email,
-        'mobile': mobile,
-      });
+      final response = await _apiService.put(
+        AppConstants.updateDriverProfileUrl,
+        data: {'name': name, 'email': email, 'mobile': mobile},
+      );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final userData = response.data['data']['user'];
