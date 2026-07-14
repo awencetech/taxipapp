@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'google_onboarding_screen.dart';
 import '../home/home_screen.dart';
+import 'pending_approval_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -18,26 +19,54 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _vehicleNumberController = TextEditingController();
-  final _vehicleColorController = TextEditingController();
-  final _vehicleModelController = TextEditingController();
-  final _manufacturingYearController = TextEditingController();
-  final _rcNumberController = TextEditingController();
-  final _drivingLicenseController = TextEditingController();
 
-  bool _obscurePassword = true;
-  String? _selectedVehicleType;
+  // Validation state
+  bool _isNameValid = false;
+  bool _isEmailValid = false;
+  bool _isPhoneValid = false;
+  bool _isPasswordValid = false;
+  bool _isVehicleTypeSelected = false;
   bool _isVehicleNumberValid = false;
 
-  static const List<String> vehicleTypes = [
-    'Bike',
-    'Auto',
-    'Sedan',
-    'Hatchback',
-    'SUV',
-    'Mini Cab',
-    'Taxi',
-    'Van',
+  // Password visibility
+  bool _obscurePassword = true;
+
+  // Vehicle type
+  String? _selectedVehicleType;
+
+  // Password strength
+  String _passwordStrength = 'Weak';
+  Color _passwordStrengthColor = Colors.red;
+
+  // Vehicle type list with icons
+  final List<Map<String, dynamic>> vehicleTypes = [
+    {'name': 'Auto Rickshaw', 'icon': Icons.electric_rickshaw},
+    {'name': 'Bike', 'icon': Icons.two_wheeler},
+    {'name': 'Scooter', 'icon': Icons.moped},
+    {'name': 'Sedan', 'icon': Icons.directions_car},
+    {'name': 'Hatchback', 'icon': Icons.directions_car_outlined},
+    {'name': 'SUV', 'icon': Icons.directions_car_filled},
+    {'name': 'Mini SUV', 'icon': Icons.directions_car_filled_outlined},
+    {'name': 'Prime Sedan', 'icon': Icons.directions_car_rounded},
+    {'name': 'XL', 'icon': Icons.car_rental},
+    {'name': 'Premium', 'icon': Icons.local_taxi},
+    {'name': 'Luxury', 'icon': Icons.car_repair},
+    {'name': 'EV Car', 'icon': Icons.electric_car},
+    {'name': 'EV Bike', 'icon': Icons.electric_bike},
+    {'name': 'Pickup Van', 'icon': Icons.local_shipping},
+    {'name': 'Mini Truck', 'icon': Icons.local_shipping_outlined},
+    {'name': 'Tempo Traveller', 'icon': Icons.airport_shuttle},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_validateName);
+    _emailController.addListener(_validateEmail);
+    _phoneController.addListener(_validatePhone);
+    _passwordController.addListener(_validatePassword);
+    _vehicleNumberController.addListener(_validateVehicleNumber);
+  }
 
   @override
   void dispose() {
@@ -46,18 +75,167 @@ class _SignupScreenState extends State<SignupScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _vehicleNumberController.dispose();
-    _vehicleColorController.dispose();
-    _vehicleModelController.dispose();
-    _manufacturingYearController.dispose();
-    _rcNumberController.dispose();
-    _drivingLicenseController.dispose();
     super.dispose();
   }
 
+  // 1. Name Validation
+  void _validateName() {
+    String name = _nameController.text.trim();
+    // Auto capitalize first letter of each word
+    name = _capitalizeFirstLetterOfEachWord(name);
+    // Update text with auto-capitalized value
+    if (_nameController.text != name) {
+      _nameController.value = TextEditingValue(
+        text: name,
+        selection: TextSelection.fromPosition(
+          TextPosition(offset: name.length),
+        ),
+      );
+    }
+    // Validate
+    final RegExp nameRegex = RegExp(r'^[a-zA-Z ]{3,40}$');
+    setState(() {
+      _isNameValid = nameRegex.hasMatch(name);
+    });
+  }
+
+  String _capitalizeFirstLetterOfEachWord(String input) {
+    if (input.isEmpty) return input;
+    List<String> words = input.split(' ');
+    for (int i = 0; i < words.length; i++) {
+      if (words[i].isNotEmpty) {
+        words[i] = words[i][0].toUpperCase() + words[i].substring(1).toLowerCase();
+      }
+    }
+    return words.join(' ');
+  }
+
+  // 2. Email Validation
+  void _validateEmail() {
+    String email = _emailController.text.trim();
+    final RegExp emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
+    setState(() {
+      _isEmailValid = emailRegex.hasMatch(email);
+    });
+  }
+
+  // 3. Phone Validation
+  void _validatePhone() {
+    String phone = _phoneController.text.trim();
+    // Remove non-digit characters
+    String cleaned = phone.replaceAll(RegExp(r'[^\d]'), '');
+    // Limit to 10 digits
+    if (cleaned.length > 10) {
+      cleaned = cleaned.substring(0, 10);
+      _phoneController.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.fromPosition(
+          TextPosition(offset: cleaned.length),
+        ),
+      );
+    }
+    // Validate
+    final RegExp phoneRegex = RegExp(r'^[6-9]\d{9}$');
+    setState(() {
+      _isPhoneValid = phoneRegex.hasMatch(cleaned);
+    });
+  }
+
+  // 4. Password Validation
+  void _validatePassword() {
+    String password = _passwordController.text.trim();
+    final RegExp hasUppercase = RegExp(r'[A-Z]');
+    final RegExp hasLowercase = RegExp(r'[a-z]');
+    final RegExp hasDigit = RegExp(r'\d');
+    final RegExp hasSpecial = RegExp(r'[@#$%&!*?]');
+
+    bool isValid = password.length >= 8 &&
+        hasUppercase.hasMatch(password) &&
+        hasLowercase.hasMatch(password) &&
+        hasDigit.hasMatch(password) &&
+        hasSpecial.hasMatch(password);
+
+    // Calculate strength
+    int strength = 0;
+    if (password.length >= 8) strength++;
+    if (hasUppercase.hasMatch(password)) strength++;
+    if (hasLowercase.hasMatch(password)) strength++;
+    if (hasDigit.hasMatch(password)) strength++;
+    if (hasSpecial.hasMatch(password)) strength++;
+
+    String strengthText = 'Weak';
+    Color strengthColor = Colors.red;
+    if (strength <= 2) {
+      strengthText = 'Weak';
+      strengthColor = Colors.red;
+    } else if (strength <= 3) {
+      strengthText = 'Medium';
+      strengthColor = Colors.orange;
+    } else {
+      strengthText = 'Strong';
+      strengthColor = Colors.green;
+    }
+
+    setState(() {
+      _isPasswordValid = isValid;
+      _passwordStrength = strengthText;
+      _passwordStrengthColor = strengthColor;
+    });
+  }
+
+  // 5. Vehicle Number Validation
+  void _validateVehicleNumber() {
+    String value = _vehicleNumberController.text.trim().toUpperCase();
+    // Auto format
+    String formatted = _formatVehicleNumber(value);
+    // Update text
+    if (_vehicleNumberController.text != formatted) {
+      _vehicleNumberController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.fromPosition(
+          TextPosition(offset: formatted.length),
+        ),
+      );
+    }
+    // Validate
+    final RegExp vehicleRegex = RegExp(r'^[A-Z]{2}\s[0-9]{2}\s[A-Z]{1,2}\s[0-9]{4}$');
+    setState(() {
+      _isVehicleNumberValid = vehicleRegex.hasMatch(formatted);
+    });
+  }
+
+  String _formatVehicleNumber(String input) {
+    // Remove spaces and non-alphanumeric characters, convert to uppercase
+    String clean = input.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    String formatted = '';
+    for (int i = 0; i < clean.length; i++) {
+      if (i == 2 || i == 4 || (i == 6 || (i == 5 && clean.length >= 6))) {
+        // Insert space after 2 chars, then after next 2 chars, then after next 1-2 chars
+        if (i == 2 || i == 4 || (i == 6) || (i == 5 && clean.length > 6)) {
+          formatted += ' ';
+        }
+      }
+      formatted += clean[i];
+      if (formatted.length >= 13) { // TN 58 AV 2345 is 13 chars
+        break;
+      }
+    }
+    return formatted;
+  }
+
+  bool _isFormValid() {
+    return _isNameValid &&
+        _isEmailValid &&
+        _isPhoneValid &&
+        _isPasswordValid &&
+        _isVehicleTypeSelected &&
+        _isVehicleNumberValid;
+  }
+
   void _handleSignup() async {
-    if (_formKey.currentState!.validate()) {
+    if (_isFormValid()) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      final success = await authViewModel.register(
+      final result = await authViewModel.register(
         _nameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text.trim(),
@@ -66,11 +244,14 @@ class _SignupScreenState extends State<SignupScreen> {
         _vehicleNumberController.text.trim(),
       );
 
-      if (success && mounted) {
-        debugPrint('SignupScreen: Signup success reported by AuthViewModel');
+      if (result['success'] && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(authViewModel.error ?? 'Signup Failed')),
+          SnackBar(content: Text(result['message'] ?? 'Signup Failed')),
         );
       }
     }
@@ -84,18 +265,31 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (result['success'] == true) {
       if (result['isNewUser'] == true) {
-        // New driver — go to onboarding to complete profile
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const GoogleOnboardingScreen()),
         );
       } else {
-        // Existing driver — go home
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+        // Check status
+        final status = result['status'];
+        if (status == 'APPROVED') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
+        } else if (status == 'PENDING') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+          );
+        } else if (status == 'REJECTED') {
+          // Navigate to RejectedScreen (from pending_approval_screen.dart)
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => RejectedScreen(rejectionReason: result['rejectionReason'])),
+          );
+        }
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,38 +301,6 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  void _formatVehicleNumber(String value) {
-    final cleanValue = value.toUpperCase().replaceAll(' ', '');
-    String formatted = '';
-
-    for (int i = 0; i < cleanValue.length; i++) {
-      if (i == 2 || i == 4 || i == 7) {
-        formatted += ' ';
-      }
-      formatted += cleanValue[i];
-    }
-
-    _vehicleNumberController.value = TextEditingValue(
-      text: formatted,
-      selection: TextSelection.fromPosition(
-        TextPosition(offset: formatted.length),
-      ),
-    );
-
-    final isValid = _validateVehicleNumber(formatted);
-    setState(() {
-      _isVehicleNumberValid = isValid;
-    });
-  }
-
-  bool _validateVehicleNumber(String? value) {
-    if (value == null || value.isEmpty) return false;
-    final RegExp regex = RegExp(
-      r'^[A-Z]{2}\s?[0-9]{1,2}\s?[A-Z]{1,3}\s?[0-9]{1,4}$',
-    );
-    return regex.hasMatch(value);
-  }
-
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
@@ -148,7 +310,7 @@ class _SignupScreenState extends State<SignupScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Hero Header ───────────────────────────────────────────────
+            // Header
             Container(
               width: double.infinity,
               height: 200,
@@ -159,8 +321,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   colors: [Color(0xFF2D2D2D), Color(0xFFE65100)],
                 ),
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -172,21 +333,13 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
                     ),
                   ),
                   const SizedBox(height: 10),
                   const Text(
                     'Create Account',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                   const Text(
                     'Join our fleet and start driving',
@@ -196,7 +349,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
 
-            // ── Form Card ─────────────────────────────────────────────────
+            // Form Card
             Transform.translate(
               offset: const Offset(0, -30),
               child: Container(
@@ -214,31 +367,21 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 child: Column(
                   children: [
-                    // ── Google Sign-Up Button ─────────────────────────────
+                    // Google Sign Up Button
                     SizedBox(
                       width: double.infinity,
                       height: 54,
                       child: OutlinedButton(
-                        onPressed: authViewModel.isLoading
-                            ? null
-                            : _handleGoogleSignUp,
+                        onPressed: authViewModel.isLoading ? null : _handleGoogleSignUp,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                              color: Color(0xFFDDDDDD), width: 1.5),
+                          side: const BorderSide(color: Color(0xFFDDDDDD), width: 1.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
                           ),
                           backgroundColor: Colors.white,
                         ),
                         child: authViewModel.isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Color(0xFF4285F4),
-                                ),
-                              )
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF4285F4)))
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -246,311 +389,263 @@ class _SignupScreenState extends State<SignupScreen> {
                                   const SizedBox(width: 12),
                                   const Text(
                                     'Sign up with Google',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1A1A1A),
-                                      letterSpacing: 0.2,
-                                    ),
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A), letterSpacing: 0.2),
                                   ),
                                 ],
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 22),
-
-                    // ── Divider ───────────────────────────────────────────
+                    // Divider
                     Row(
                       children: [
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.shade300,
-                            thickness: 1,
-                          ),
-                        ),
+                        Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'or sign up with email',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 13,
-                            ),
-                          ),
+                          child: Text('or sign up with email', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                         ),
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.shade300,
-                            thickness: 1,
-                          ),
-                        ),
+                        Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
-                    // ── Email / Password Form ─────────────────────────────
+                    // Form Fields
                     Form(
                       key: _formKey,
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildField(
+                          // Name Field
+                          Text('Name', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          TextFormField(
                             controller: _nameController,
-                            hint: 'Full Name',
-                            label: 'Name',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildField(
-                            controller: _emailController,
-                            hint: 'Email Address',
-                            label: 'Email',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          const SizedBox(height: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Phone',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF1A1A1A),
-                                    ),
-                                  ),
-                                ],
+                            decoration: InputDecoration(
+                              hintText: 'Full Name',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: _isNameValid
+                                    ? const BorderSide(color: Colors.green, width: 2)
+                                    : BorderSide.none,
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Container(
-                                    height: 56,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    decoration: BoxDecoration(color: const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(16)),
-                                    alignment: Alignment.center,
-                                    child: const Text('+91', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      decoration: InputDecoration(
-                                        hintText: '9876543210',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        filled: true,
-                                        fillColor: const Color(0xFFF5F5F5),
-                                      ),
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Required';
-                                        }
-                                        // Remove any non-digit characters
-                                        final cleaned = value.replaceAll(RegExp(r'[^\d]'), '');
-                                        if (cleaned.length != 10) {
-                                          return 'Phone number must be exactly 10 digits';
-                                        }
-                                        return null;
-                                      },
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              suffixIcon: _isNameValid
+                                  ? const Icon(Icons.check_circle, color: Colors.green)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Email Field
+                          Text('Email', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              hintText: 'Email Address',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: _isEmailValid
+                                    ? const BorderSide(color: Colors.green, width: 2)
+                                    : BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              suffixIcon: _isEmailValid
+                                  ? const Icon(Icons.check_circle, color: Colors.green)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Phone Field
+                          Text('Phone', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Container(
+                                height: 56,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F5F5),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Text('+91', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  maxLength: 10,
+                                  decoration: InputDecoration(
+                                    hintText: '9876543210',
+                                    counterText: '',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: _isPhoneValid
+                                          ? const BorderSide(color: Colors.green, width: 2)
+                                          : BorderSide.none,
                                     ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F5F5),
+                                    suffixIcon: _isPhoneValid
+                                        ? const Icon(Icons.check_circle, color: Colors.green)
+                                        : null,
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildField(
+                          // Password Field
+                          Text('Password', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          TextFormField(
                             controller: _passwordController,
-                            hint: '********',
-                            label: 'Password',
                             obscureText: _obscurePassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.grey,
+                            decoration: InputDecoration(
+                              hintText: '********',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: _isPasswordValid
+                                    ? const BorderSide(color: Colors.green, width: 2)
+                                    : BorderSide.none,
                               ),
-                              onPressed: () => setState(
-                                () =>
-                                    _obscurePassword = !_obscurePassword,
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isPasswordValid)
+                                    const Icon(Icons.check_circle, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.grey,
+                                    ),
+                                    onPressed: () => setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    }),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Strength: $_passwordStrength',
+                            style: TextStyle(color: _passwordStrengthColor, fontSize: 12),
                           ),
                           const SizedBox(height: 16),
                           // Vehicle Type Dropdown
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Vehicle Type',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF1A1A1A),
-                                ),
+                          Text('Vehicle Type', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              hintText: 'Select Vehicle Type',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: _isVehicleTypeSelected
+                                    ? const BorderSide(color: Colors.green, width: 2)
+                                    : BorderSide.none,
                               ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                decoration: InputDecoration(
-                                  hintText: 'Select Vehicle Type',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F5F5),
-                                  prefixIcon: const Icon(
-                                    Icons.directions_car,
-                                    color: Colors.grey,
-                                  ),
-                                  suffixIcon:
-                                      const Icon(Icons.arrow_drop_down),
-                                ),
-                                initialValue: _selectedVehicleType,
-                                items: vehicleTypes.map((type) {
-                                  return DropdownMenuItem<String>(
-                                    value: type,
-                                    child: Text(type),
-                                  );
-                                }).toList(),
-                                validator: (value) {
-                                  if (value == null) {
-                                    return 'Please select a vehicle type.';
-                                  }
-                                  return null;
-                                },
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedVehicleType = value;
-                                  });
-                                },
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
                               ),
-                            ],
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              prefixIcon: _selectedVehicleType != null
+                                  ? Icon(
+                                      vehicleTypes.firstWhere((element) => element['name'] == _selectedVehicleType)['icon'],
+                                      color: Colors.grey,
+                                    )
+                                  : const Icon(Icons.directions_car, color: Colors.grey),
+                              suffixIcon: const Icon(Icons.arrow_drop_down),
+                            ),
+                            items: vehicleTypes.map((type) {
+                              return DropdownMenuItem<String>(
+                                value: type['name'],
+                                child: Row(
+                                  children: [
+                                    Icon(type['icon']),
+                                    const SizedBox(width: 8),
+                                    Text(type['name']),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedVehicleType = value;
+                                _isVehicleTypeSelected = value != null;
+                              });
+                            },
                           ),
                           const SizedBox(height: 16),
-                          // Vehicle Number Field with Validation
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Vehicle Number',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF1A1A1A),
-                                ),
+                          // Vehicle Number Field
+                          Text('Vehicle Number', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A1A))),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _vehicleNumberController,
+                            decoration: InputDecoration(
+                              hintText: 'TN 01 AB 1234',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: _isVehicleNumberValid
+                                    ? const BorderSide(color: Colors.green, width: 2)
+                                    : BorderSide.none,
                               ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _vehicleNumberController,
-                                onChanged: _formatVehicleNumber,
-                                decoration: InputDecoration(
-                                  hintText: 'TN 01 AB 1234',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: _isVehicleNumberValid
-                                        ? const BorderSide(
-                                            color: Colors.green,
-                                            width: 2,
-                                          )
-                                        : BorderSide.none,
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFFF6D00),
-                                      width: 2,
-                                    ),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.red,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F5F5),
-                                  prefixIcon: const Icon(
-                                    Icons.local_car_wash,
-                                    color: Colors.grey,
-                                  ),
-                                  suffixIcon: _isVehicleNumberValid
-                                      ? const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                        )
-                                      : null,
-                                ),
-                                validator: (value) {
-                                  if (!_validateVehicleNumber(value)) {
-                                    return 'Enter a valid vehicle number.';
-                                  }
-                                  return null;
-                                },
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFFFF6D00), width: 2),
                               ),
-                            ],
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              suffixIcon: _isVehicleNumberValid
+                                  ? const Icon(Icons.check_circle, color: Colors.green)
+                                  : null,
+                            ),
                           ),
-                          // Show additional fields only if vehicle type is selected
-                          if (_selectedVehicleType != null) ...[
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _vehicleColorController,
-                              hint: 'e.g., White, Black',
-                              label: 'Vehicle Color',
-                              isOptional: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _vehicleModelController,
-                              hint: 'e.g., Honda City, Swift Dzire',
-                              label: 'Model Name',
-                              isOptional: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _manufacturingYearController,
-                              hint: 'e.g., 2020',
-                              label: 'Manufacturing Year',
-                              keyboardType: TextInputType.number,
-                              isOptional: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _rcNumberController,
-                              hint: 'RC Number (optional)',
-                              label: 'RC Number',
-                              isOptional: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _drivingLicenseController,
-                              hint: 'Driving License (optional)',
-                              label: 'Driving License Number',
-                              isOptional: true,
-                            ),
-                          ],
                           const SizedBox(height: 32),
+                          // Sign Up Button
                           SizedBox(
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed: authViewModel.isLoading
-                                  ? null
-                                  : _handleSignup,
+                              onPressed: _isFormValid() && !authViewModel.isLoading
+                                  ? _handleSignup
+                                  : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF6D00),
+                                backgroundColor: _isFormValid()
+                                    ? const Color(0xFFFF6D00)
+                                    : Colors.grey.shade300,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(28),
@@ -558,19 +653,15 @@ class _SignupScreenState extends State<SignupScreen> {
                                 elevation: 0,
                               ),
                               child: authViewModel.isLoading
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
+                                  ? const CircularProgressIndicator(color: Colors.white)
                                   : const Text(
                                       'SIGN UP',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                     ),
                             ),
                           ),
                           const SizedBox(height: 24),
+                          // Login Link
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -579,10 +670,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 onTap: () => Navigator.pop(context),
                                 child: const Text(
                                   'Login',
-                                  style: TextStyle(
-                                    color: Color(0xFFFF6D00),
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: TextStyle(color: Color(0xFFFF6D00), fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
@@ -599,65 +687,9 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-
-  Widget _buildField({
-    required TextEditingController controller,
-    required String hint,
-    required String label,
-    TextInputType keyboardType = TextInputType.text,
-    bool obscureText = false,
-    Widget? suffixIcon,
-    bool isOptional = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-            if (isOptional)
-              const Text(
-                ' (optional)',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hint,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF5F5F5),
-            suffixIcon: suffixIcon,
-          ),
-          validator: (value) {
-            if (!isOptional && (value == null || value.isEmpty)) {
-              return 'Required';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
 }
 
-// ── Google "G" Logo (painted, no external assets needed) ─────────────────────
-
+// Google Logo Widget
 class _GoogleLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -681,7 +713,7 @@ class _GoogleLogoPainter extends CustomPainter {
       ..strokeWidth = r * 0.38
       ..strokeCap = StrokeCap.butt;
 
-    // Red arc (top-left)
+    // Red arc
     arcPaint.color = const Color(0xFFEA4335);
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.78),
@@ -691,7 +723,7 @@ class _GoogleLogoPainter extends CustomPainter {
       arcPaint,
     );
 
-    // Blue arc (top-right + right)
+    // Blue arc
     arcPaint.color = const Color(0xFF4285F4);
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.78),
@@ -701,7 +733,7 @@ class _GoogleLogoPainter extends CustomPainter {
       arcPaint,
     );
 
-    // Green arc (bottom-right)
+    // Green arc
     arcPaint.color = const Color(0xFF34A853);
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.78),
@@ -711,7 +743,7 @@ class _GoogleLogoPainter extends CustomPainter {
       arcPaint,
     );
 
-    // Yellow arc (bottom-left)
+    // Yellow arc
     arcPaint.color = const Color(0xFFFBBC05);
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.78),
@@ -721,7 +753,7 @@ class _GoogleLogoPainter extends CustomPainter {
       arcPaint,
     );
 
-    // Horizontal bar (right arm of G) in blue
+    // Blue bar
     final barPaint = Paint()
       ..color = const Color(0xFF4285F4)
       ..style = PaintingStyle.fill;
@@ -730,7 +762,7 @@ class _GoogleLogoPainter extends CustomPainter {
       barPaint,
     );
 
-    // White mask over inner arc to create ring effect
+    // White mask
     final maskPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;

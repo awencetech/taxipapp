@@ -664,7 +664,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(
+  Future<Map<String, dynamic>> register(
     String name,
     String email,
     String password,
@@ -701,7 +701,7 @@ class AuthViewModel extends ChangeNotifier {
           _error = 'Token not found in response';
           _isLoading = false;
           notifyListeners();
-          return false;
+          return {'success': false, 'message': _error};
         }
 
         final prefs = await SharedPreferences.getInstance();
@@ -714,18 +714,26 @@ class AuthViewModel extends ChangeNotifier {
 
         if (driverResponse.statusCode == 200 ||
             driverResponse.statusCode == 201) {
-          await fetchDriverProfile();
           _isLoading = false;
           notifyListeners();
-          return true;
+          return {'success': true, 'message': 'Registration submitted'};
+        } else {
+          _error = 'Failed to submit driver details';
+          _isLoading = false;
+          notifyListeners();
+          return {'success': false, 'message': _error};
         }
+      } else {
+        _error = response.data['message'] ?? 'Signup failed';
+        _isLoading = false;
+        notifyListeners();
+        return {'success': false, 'message': _error};
       }
-      return false;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'success': false, 'message': _error};
     }
   }
 
