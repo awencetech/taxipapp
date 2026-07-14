@@ -91,10 +91,18 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
                     Icons.arrow_back_ios,
                     color: Color(0xFF212529),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
+                  onPressed: () async {
+                    // Clear SharedPreferences
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.clear();
+
+                    // Navigate to LoginScreen
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
+                    }
                   },
                 ),
               ),
@@ -213,10 +221,18 @@ class RejectedScreen extends StatelessWidget {
                     Icons.arrow_back_ios,
                     color: Color(0xFF212529),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
+                  onPressed: () async {
+                    // Clear SharedPreferences
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.clear();
+
+                    // Navigate to LoginScreen
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
+                    }
                   },
                 ),
               ),
