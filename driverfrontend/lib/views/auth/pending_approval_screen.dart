@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:driverfrontend/views/home/home_screen.dart';
 import 'package:driverfrontend/viewmodels/auth_viewmodel.dart';
 import 'google_onboarding_screen.dart';
+import 'login_screen.dart';
 
 class PendingApprovalScreen extends StatefulWidget {
   const PendingApprovalScreen({super.key});
@@ -91,7 +92,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
                     color: Color(0xFF212529),
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
                   },
                 ),
               ),
@@ -211,7 +214,9 @@ class RejectedScreen extends StatelessWidget {
                     color: Color(0xFF212529),
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
                   },
                 ),
               ),
