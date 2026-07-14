@@ -3,6 +3,126 @@ const Ride = require('../models/Ride');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const jwt = require('jsonwebtoken');
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE,
+  });
+};
+
+const registerPendingDriver = async (req, res) => {
+  try {
+    const { name, lastName, email, mobile, vehicleType, vehicleNumber, firebaseUid, googleId, countryCode } = req.body;
+    let driver = null;
+
+    if (firebaseUid) {
+      driver = await Driver.findOne({ firebaseUid });
+    } else if (googleId) {
+      driver = await Driver.findOne({ googleId });
+    } else if (mobile) {
+      driver = await Driver.findOne({ mobile });
+    }
+
+    if (driver) {
+      driver.name = name || driver.name;
+      driver.lastName = lastName || driver.lastName;
+      driver.email = email || driver.email;
+      driver.vehicleType = vehicleType || driver.vehicleType;
+      driver.vehicleNumber = vehicleNumber || driver.vehicleNumber;
+      driver.status = 'pending';
+      driver.accountStatus = 'pending';
+      driver.rejectionReason = null;
+      await driver.save();
+    } else {
+      driver = await Driver.create({
+        name,
+        lastName,
+        email,
+        mobile,
+        firebaseUid,
+        googleId,
+        vehicleType,
+        vehicleNumber,
+        status: 'pending',
+        accountStatus: 'pending',
+      });
+    }
+
+    // Create a notification for the driver
+    await Notification.create({
+      driver: driver._id,
+      title: 'Registration Submitted',
+      message: 'Your driver registration has been submitted successfully. Waiting for vendor approval.',
+      type: 'approval',
+      data: { driverId: driver.driverId },
+    });
+
+    // Get all vendors and send them notification
+    const Vendor = require('../models/Vendor');
+    const vendors = await Vendor.find();
+    for (let vendor of vendors) {
+      await Notification.create({
+        vendor: vendor._id,
+        title: 'New Driver Registration',
+        message: `New driver ${name} has registered for approval.`,
+        type: 'approval',
+        data: { driverId: driver._id },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { driver },
+    });
+  } catch (error) {
+    console.error('Register Pending Driver Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const getDriverStatus = async (req, res) => {
+  try {
+    let driver;
+    if (req.user?.role === 'driver' && req.user?.driverId) {
+      driver = await Driver.findById(req.user._id);
+    } else if (req.params?.driverId) {
+      driver = await Driver.findOne({ driverId: req.params.driverId });
+    } else {
+      const { firebaseUid, googleId, mobile } = req.query;
+      if (firebaseUid) {
+        driver = await Driver.findOne({ firebaseUid });
+      } else if (googleId) {
+        driver = await Driver.findOne({ googleId });
+      } else if (mobile) {
+        driver = await Driver.findOne({ mobile });
+      }
+    }
+
+    if (!driver) {
+      return res.status(404).json({ success: false, message: 'Driver not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        status: driver.status,
+        accountStatus: driver.accountStatus,
+        rejectionReason: driver.rejectionReason,
+        isApproved: driver.status === 'approved',
+      },
+    });
+  } catch (error) {
+    console.error('Get Driver Status Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 const updateDriverProfile = async (req, res) => {
   try {
@@ -11,56 +131,65 @@ const updateDriverProfile = async (req, res) => {
     
     const { name, mobile, vehicleType, vehicleNumber, address, bankName, accountHolderName, accountNumber, ifscCode, branchName, bankAccounts } = req.body;
     
-    // Update User model
-    const userUpdate = {};
-    if (name) userUpdate.name = name;
-    if (mobile) userUpdate.mobile = mobile;
-    
-    // Handle profile picture upload
-    if (req.file) {
-      // Construct the full URL for the uploaded file
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const profilePicUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-      userUpdate.profilePic = profilePicUrl;
-      console.log('Profile pic URL:', profilePicUrl);
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      userUpdate,
-      { new: true, runValidators: true }
-    );
-
-    // Update Driver model
-    const driverUpdate = {};
-    if (vehicleType) driverUpdate.vehicleType = vehicleType;
-    if (vehicleNumber) driverUpdate.vehicleNumber = vehicleNumber;
-    if (address !== undefined) driverUpdate.address = address;
-    if (bankName !== undefined) driverUpdate.bankName = bankName;
-    if (accountHolderName !== undefined) driverUpdate.accountHolderName = accountHolderName;
-    if (accountNumber !== undefined) driverUpdate.accountNumber = accountNumber;
-    if (ifscCode !== undefined) driverUpdate.ifscCode = ifscCode;
-    if (branchName !== undefined) driverUpdate.branchName = branchName;
-    if (bankAccounts !== undefined) {
-      if (Array.isArray(bankAccounts) && bankAccounts.length <= 3) {
-        driverUpdate.bankAccounts = bankAccounts;
-      }
-    }
-    
-    let driver = await Driver.findOne({ user: req.user._id });
-    if (!driver) {
-      driver = await Driver.create({
-        user: req.user._id,
-        ...driverUpdate,
-        licenseNumber: 'TEMP-LICENSE-123'
-      });
+    // Check if req.user is a Driver or User
+    let driver, user;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+      user = driver;
     } else {
-      driver = await Driver.findOneAndUpdate(
-        { user: req.user._id },
-        driverUpdate,
-        { new: true }
+      // Old user-linked Driver
+      // Update User model
+      const userUpdate = {};
+      if (name) userUpdate.name = name;
+      if (mobile) userUpdate.mobile = mobile;
+      
+      // Handle profile picture upload
+      if (req.file) {
+        // Construct the full URL for the uploaded file
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const profilePicUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+        userUpdate.profilePic = profilePicUrl;
+        console.log('Profile pic URL:', profilePicUrl);
+      }
+      
+      user = await User.findByIdAndUpdate(
+        req.user._id,
+        userUpdate,
+        { new: true, runValidators: true }
       );
+
+      // Update Driver model
+      const driverUpdate = {};
+      if (vehicleType) driverUpdate.vehicleType = vehicleType;
+      if (vehicleNumber) driverUpdate.vehicleNumber = vehicleNumber;
+      if (address !== undefined) driverUpdate.address = address;
+      if (bankName !== undefined) driverUpdate.bankName = bankName;
+      if (accountHolderName !== undefined) driverUpdate.accountHolderName = accountHolderName;
+      if (accountNumber !== undefined) driverUpdate.accountNumber = accountNumber;
+      if (ifscCode !== undefined) driverUpdate.ifscCode = ifscCode;
+      if (branchName !== undefined) driverUpdate.branchName = branchName;
+      if (bankAccounts !== undefined) {
+        if (Array.isArray(bankAccounts) && bankAccounts.length <= 3) {
+          driverUpdate.bankAccounts = bankAccounts;
+        }
+      }
+      
+      driver = await Driver.findOne({ user: req.user._id });
+      if (!driver) {
+        driver = await Driver.create({
+          user: req.user._id,
+          ...driverUpdate,
+          licenseNumber: 'TEMP-LICENSE-123'
+        });
+      } else {
+        driver = await Driver.findOneAndUpdate(
+          { user: req.user._id },
+          driverUpdate,
+          { new: true }
+        );
+      }
     }
 
     // Backward compatibility: if old single fields exist and bankAccounts is empty, migrate to bankAccounts
@@ -126,12 +255,19 @@ const uploadDocument = async (req, res) => {
       documentUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     }
 
-    let driver = await Driver.findOne({ user: req.user._id });
-    if (!driver) {
-      driver = await Driver.create({
-        user: req.user._id,
-        licenseNumber: 'TEMP-LICENSE-123'
-      });
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+      if (!driver) {
+        driver = await Driver.create({
+          user: req.user._id,
+          licenseNumber: 'TEMP-LICENSE-123'
+        });
+      }
     }
 
     const newDocument = {
@@ -175,7 +311,15 @@ const editDocument = async (req, res) => {
       documentUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     }
 
-    const driver = await Driver.findOne({ user: req.user._id });
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+    }
+    
     if (!driver) {
       return res.status(404).json({ success: false, message: 'Driver not found' });
     }
@@ -211,7 +355,15 @@ const deleteDocument = async (req, res) => {
   try {
     const { docId } = req.params;
 
-    const driver = await Driver.findOne({ user: req.user._id });
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+    }
+    
     if (!driver) {
       return res.status(404).json({ success: false, message: 'Driver not found' });
     }
@@ -239,35 +391,43 @@ const deleteDocument = async (req, res) => {
 
 const getDriverProfile = async (req, res) => {
     try {
-      let driver = await Driver.findOne({ user: req.user._id });
+      let driver, user;
+      if (req.user.role === 'driver' && req.user.driverId) {
+        // New standalone Driver
+        driver = await Driver.findById(req.user._id);
+        user = driver;
+      } else {
+        // Old user-linked Driver
+        driver = await Driver.findOne({ user: req.user._id });
       
-      if (!driver) {
-        console.log('Driver not found, creating new driver for user:', req.user._id);
-        const uniqueTempLicense = `TEMP-LICENSE-${Date.now()}`;
-        driver = await Driver.create({
-          user: req.user._id,
-          licenseNumber: uniqueTempLicense,
-          vehicleType: 'Car',
-          vehicleNumber: 'TN 01 AB 1234',
-          address: '',
-          bankName: '',
-          accountHolderName: '',
-          accountNumber: '',
-          ifscCode: '',
-          branchName: '',
-        });
-        console.log('New driver created:', driver._id);
+        if (!driver) {
+          console.log('Driver not found, creating new driver for user:', req.user._id);
+          const uniqueTempLicense = `TEMP-LICENSE-${Date.now()}`;
+          driver = await Driver.create({
+            user: req.user._id,
+            licenseNumber: uniqueTempLicense,
+            vehicleType: 'Car',
+            vehicleNumber: 'TN 01 AB 1234',
+            address: '',
+            bankName: '',
+            accountHolderName: '',
+            accountNumber: '',
+            ifscCode: '',
+            branchName: '',
+          });
+          console.log('New driver created:', driver._id);
+        }
+        
+        if (driver && !driver.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: 'Driver not approved. Please wait for vendor/admin approval.'
+          });
+        }
+        
+        user = await User.findById(req.user._id);
       }
       
-      if (driver && !driver.isApproved) {
-        return res.status(403).json({
-          success: false,
-          message: 'Driver not approved. Please wait for vendor/admin approval.'
-        });
-      }
-      
-      const user = await User.findById(req.user._id);
-
       if (driver && (!driver.bankAccounts || driver.bankAccounts.length === 0)) {
         if (driver.bankName && driver.accountNumber) {
           driver.bankAccounts = [{
@@ -343,11 +503,23 @@ const getDriverProfile = async (req, res) => {
 const updateStatus = async (req, res) => {
   try {
     const { isOnline, status } = req.body;
-    const driver = await Driver.findOneAndUpdate(
-      { user: req.user._id },
-      { isOnline, status },
-      { new: true }
-    );
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findByIdAndUpdate(
+        req.user._id,
+        { isOnline, status },
+        { new: true }
+      );
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOneAndUpdate(
+        { user: req.user._id },
+        { isOnline, status },
+        { new: true }
+      );
+    }
+    
     res.status(200).json({ status: 'success', data: { driver } });
   } catch (error) {
     res.status(400).json({ status: 'error', message: error.message });
@@ -357,11 +529,22 @@ const updateStatus = async (req, res) => {
 const updateLocation = async (req, res) => {
   try {
     const { coordinates } = req.body; // [lng, lat]
-    const driver = await Driver.findOneAndUpdate(
-      { user: req.user._id },
-      { currentLocation: { coordinates } },
-      { new: true }
-    );
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findByIdAndUpdate(
+        req.user._id,
+        { currentLocation: { coordinates } },
+        { new: true }
+      );
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOneAndUpdate(
+        { user: req.user._id },
+        { currentLocation: { coordinates } },
+        { new: true }
+      );
+    }
     res.status(200).json({ status: 'success', data: { driver } });
   } catch (error) {
     res.status(400).json({ status: 'error', message: error.message });
@@ -370,7 +553,15 @@ const updateLocation = async (req, res) => {
 
 const getEarnings = async (req, res) => {
   try {
-    const driver = await Driver.findOne({ user: req.user._id });
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+    }
+    
     res.status(200).json({
       status: 'success',
       data: {
@@ -388,32 +579,51 @@ const registerDriver = async (req, res) => {
   try {
     const { licenseNumber, vehicleType, vehicleNumber, address, bankName, accountHolderName, accountNumber, ifscCode, branchName } = req.body;
     
-    let driver = await Driver.findOne({ user: req.user._id });
-    
-    if (driver) {
-      driver.licenseNumber = licenseNumber || driver.licenseNumber;
-      driver.vehicleType = vehicleType || driver.vehicleType;
-      driver.vehicleNumber = vehicleNumber || driver.vehicleNumber;
-      if (address !== undefined) driver.address = address;
-      if (bankName !== undefined) driver.bankName = bankName;
-      if (accountHolderName !== undefined) driver.accountHolderName = accountHolderName;
-      if (accountNumber !== undefined) driver.accountNumber = accountNumber;
-      if (ifscCode !== undefined) driver.ifscCode = ifscCode;
-      if (branchName !== undefined) driver.branchName = branchName;
-      await driver.save();
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+      if (driver) {
+        driver.licenseNumber = licenseNumber || driver.licenseNumber;
+        driver.vehicleType = vehicleType || driver.vehicleType;
+        driver.vehicleNumber = vehicleNumber || driver.vehicleNumber;
+        if (address !== undefined) driver.address = address;
+        if (bankName !== undefined) driver.bankName = bankName;
+        if (accountHolderName !== undefined) driver.accountHolderName = accountHolderName;
+        if (accountNumber !== undefined) driver.accountNumber = accountNumber;
+        if (ifscCode !== undefined) driver.ifscCode = ifscCode;
+        if (branchName !== undefined) driver.branchName = branchName;
+        await driver.save();
+      }
     } else {
-      driver = await Driver.create({
-        user: req.user._id,
-        licenseNumber: licenseNumber || 'TEMP-LICENSE-123',
-        vehicleType: vehicleType || 'Car',
-        vehicleNumber: vehicleNumber || 'TN 01 AB 1234',
-        address: address || '',
-        bankName: bankName || '',
-        accountHolderName: accountHolderName || '',
-        accountNumber: accountNumber || '',
-        ifscCode: ifscCode || '',
-        branchName: branchName || '',
-      });
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+      
+      if (driver) {
+        driver.licenseNumber = licenseNumber || driver.licenseNumber;
+        driver.vehicleType = vehicleType || driver.vehicleType;
+        driver.vehicleNumber = vehicleNumber || driver.vehicleNumber;
+        if (address !== undefined) driver.address = address;
+        if (bankName !== undefined) driver.bankName = bankName;
+        if (accountHolderName !== undefined) driver.accountHolderName = accountHolderName;
+        if (accountNumber !== undefined) driver.accountNumber = accountNumber;
+        if (ifscCode !== undefined) driver.ifscCode = ifscCode;
+        if (branchName !== undefined) driver.branchName = branchName;
+        await driver.save();
+      } else {
+        driver = await Driver.create({
+          user: req.user._id,
+          licenseNumber: licenseNumber || 'TEMP-LICENSE-123',
+          vehicleType: vehicleType || 'Car',
+          vehicleNumber: vehicleNumber || 'TN 01 AB 1234',
+          address: address || '',
+          bankName: bankName || '',
+          accountHolderName: accountHolderName || '',
+          accountNumber: accountNumber || '',
+          ifscCode: ifscCode || '',
+          branchName: branchName || '',
+        });
+      }
     }
 
     res.status(200).json({ status: 'success', data: { driver } });
@@ -425,7 +635,14 @@ const registerDriver = async (req, res) => {
 const getDriverRideHistory = async (req, res) => {
   // Trigger nodemon
   try {
-    const driver = await Driver.findOne({ user: req.user._id });
+    let driver;
+    if (req.user.role === 'driver' && req.user.driverId) {
+      // New standalone Driver
+      driver = await Driver.findById(req.user._id);
+    } else {
+      // Old user-linked Driver
+      driver = await Driver.findOne({ user: req.user._id });
+    }
     
     if (!driver) {
       return res.status(404).json({ success: false, message: 'Driver not found' });
@@ -443,8 +660,14 @@ const getDriverRideHistory = async (req, res) => {
 
 const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.user._id })
-      .sort('-createdAt');
+    let notifications;
+    if (req.user?.role === 'driver' && req.user?.driverId) {
+      notifications = await Notification.find({ driver: req.user._id })
+        .sort('-createdAt');
+    } else {
+      notifications = await Notification.find({ user: req.user._id })
+        .sort('-createdAt');
+    }
     const unreadCount = notifications.filter(n => !n.isRead).length;
     res.status(200).json({ success: true, data: { notifications, unreadCount } });
   } catch (error) {
@@ -488,4 +711,21 @@ const markAllNotificationsAsRead = async (req, res) => {
   }
 };
 
-module.exports = { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead, uploadDocument, editDocument, deleteDocument };
+module.exports = { 
+  updateDriverProfile, 
+  getDriverProfile, 
+  updateStatus, 
+  updateLocation, 
+  getEarnings, 
+  registerDriver, 
+  getDriverRideHistory, 
+  getNotifications, 
+  markNotificationAsRead, 
+  deleteNotification, 
+  markAllNotificationsAsRead, 
+  uploadDocument, 
+  editDocument, 
+  deleteDocument,
+  registerPendingDriver,
+  getDriverStatus
+};

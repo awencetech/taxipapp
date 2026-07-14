@@ -6,12 +6,16 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/driver_models.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
+import '../services/socket_service.dart';
 import '../core/constants/app_constants.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
   final GoogleAuthService _googleAuthService = GoogleAuthService();
+  final SocketService _socketService = SocketService();
 
   DriverModel? _driver;
   Map<String, dynamic>? _newDriverInfo;
@@ -24,6 +28,11 @@ class AuthViewModel extends ChangeNotifier {
   String? get error => _error;
   bool get isLoggedIn => _driver != null;
   List<DocumentModel> get documents => _driver?.documents ?? [];
+
+  void setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
 
   // SharedPreferences keys
   static const String _driverDataKey = 'driver_data';
@@ -521,39 +530,43 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyPhoneOTP(String phone, String otp) async {
+  Future<Map<String, dynamic>> signInWithFirebasePhone(String idToken, String role, {String? name, String? firebaseUid, String? mobile}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // First, try to login with a generated email
-      final email = "$phone@taxinanban.com";
-      const password = "test123456"; // Default password for test users
+      final result = await _authService.firebasePhoneSignIn(idToken, role, name: name);
+      if (result['isNewDriver'] == true) {
+        _newDriverInfo = {
+          ...result,
+          'firebaseUid': firebaseUid,
+        };
+        _isLoading = false;
+        notifyListeners();
+        return {'success': true, 'isNewDriver': true};
+      } else {
+        _driver = result['user'];
+        if (_driver != null) {
+          _socketService.connect(_driver!.id);
 
-      bool loginSuccess = await login(email, password);
-      if (loginSuccess) {
-        // If login successful, we're done!
-        return true;
+          // Save login session to SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', true);
+          await prefs.setString('authProvider', 'phone');
+          if (mobile != null) {
+            await prefs.setString('mobile', mobile);
+          }
+        }
+        _isLoading = false;
+        notifyListeners();
+        return {'success': true, 'isNewDriver': false};
       }
-
-      // If login failed (probably user doesn't exist), register them
-      debugPrint("Login failed, registering new driver");
-      final registerResult = await register(
-        "Driver $phone",
-        email,
-        password,
-        phone,
-        "Car",
-        "TN 01 AB 1234",
-      );
-
-      return registerResult;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'success': false};
     }
   }
 
@@ -769,12 +782,95 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> completeGoogleProfile(
+  Future<bool> registerPendingDriver(
     String name,
+    String lastName,
     String mobile,
     String vehicleType,
-    String vehicleNumber,
-  ) async {
+    String vehicleNumber, {
+    String? firebaseUid,
+    String? googleId,
+    String countryCode = '+91',
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.post(
+        AppConstants.driverRegisterPendingUrl,
+        data: {
+          'name': name,
+          'lastName': lastName,
+          'mobile': mobile,
+          'vehicleType': vehicleType,
+          'vehicleNumber': vehicleNumber,
+          if (firebaseUid != null) 'firebaseUid': firebaseUid,
+          if (googleId != null) 'googleId': googleId,
+          'countryCode': countryCode,
+        },
+      );
+
+      if (response.data['success'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_mobile', mobile);
+        if (firebaseUid != null) {
+          await prefs.setString('pending_firebase_uid', firebaseUid);
+        }
+        if (googleId != null) {
+          await prefs.setString('pending_google_id', googleId);
+        }
+        await prefs.setBool('isRegistrationPending', true);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to submit registration';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getDriverStatus({
+    String? mobile,
+    String? firebaseUid,
+    String? googleId,
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {};
+      if (mobile != null) queryParams['mobile'] = mobile;
+      if (firebaseUid != null) queryParams['firebaseUid'] = firebaseUid;
+      if (googleId != null) queryParams['googleId'] = googleId;
+
+      final response = await _apiService.get(
+        AppConstants.driverStatusUrl,
+        queryParameters: queryParams,
+      );
+
+      if (response.data['success'] == true) {
+        return response.data['data'];
+      }
+      return null;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    }
+  }
+
+  Future<bool> completeGoogleProfile(
+    String name,
+    String mobile, [
+    String vehicleType = 'Car',
+    String vehicleNumber = 'TEMP',
+    String countryCode = '+91',
+  ]) async {
     if (_newDriverInfo == null) return false;
 
     _isLoading = true;
@@ -786,7 +882,11 @@ class AuthViewModel extends ChangeNotifier {
         ..._newDriverInfo!,
         'name': name,
         'mobile': mobile,
+        'countryCode': countryCode,
         'role': 'driver',
+        'authProvider': 'phone',
+        'vehicleType': vehicleType,
+        'vehicleNumber': vehicleNumber,
       };
 
       final response = await _apiService.post(
@@ -813,37 +913,34 @@ class AuthViewModel extends ChangeNotifier {
         }
 
         await prefs.setString(AppConstants.tokenKey, token);
+        await prefs.setString('mobile', mobile);
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('authProvider', 'phone');
 
-        final driverResponse = await _apiService.post(
-          AppConstants.driverRegisterUrl,
-          data: {'vehicleType': vehicleType, 'vehicleNumber': vehicleNumber},
+        final userData = (actualData is Map)
+            ? (actualData['user'] ?? actualData)
+            : actualData;
+        _driver = DriverModel.fromJson(
+          userData is Map
+              ? Map<String, dynamic>.from(userData)
+              : <String, dynamic>{},
         );
+        _newDriverInfo = null;
 
-        if (driverResponse.statusCode == 200 ||
-            driverResponse.statusCode == 201) {
-          final userData = (actualData is Map)
-              ? (actualData['user'] ?? actualData)
-              : actualData;
-          _driver = DriverModel.fromJson(
-            userData is Map
-                ? Map<String, dynamic>.from(userData)
-                : <String, dynamic>{},
-          );
-          _newDriverInfo = null;
-
+        if (_driver?.id != null) {
           await prefs.setString(AppConstants.driverIdKey, _driver!.id);
-
-          // Save driver to prefs
-          if (_driver != null) {
-            await _saveDriverToPrefs(_driver!);
-          }
-
-          _isLoading = false;
-          notifyListeners();
-          return true;
+          await _saveDriverToPrefs(_driver!);
         }
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to complete profile';
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
-      return false;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;

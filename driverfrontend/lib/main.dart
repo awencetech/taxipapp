@@ -56,6 +56,8 @@ class AuthCheck extends StatefulWidget {
 }
 
 class _AuthCheckState extends State<AuthCheck> {
+  bool _initialLoadComplete = false;
+
   @override
   void initState() {
     super.initState();
@@ -65,14 +67,19 @@ class _AuthCheckState extends State<AuthCheck> {
   Future<void> _checkAuth() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     await authViewModel.checkAutoLogin();
+    if (mounted) {
+      setState(() {
+        _initialLoadComplete = true;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
-    debugPrint('AuthCheck Build: isLoggedIn=${authViewModel.isLoggedIn}, isLoading=${authViewModel.isLoading}');
+    debugPrint('AuthCheck Build: isLoggedIn=${authViewModel.isLoggedIn}, isLoading=${authViewModel.isLoading}, initialLoadComplete=$_initialLoadComplete');
 
-    if (authViewModel.isLoading) {
+    if (!_initialLoadComplete) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),

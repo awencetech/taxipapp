@@ -33,7 +33,9 @@ class ApiService {
           final path = options.path;
           final isPublicRoute = path.contains('/login') || 
                                path.contains('/signup') || 
-                               path.contains('/register');
+                               path.contains('/register') ||
+                               path.contains('/status');
+
           debugPrint('Is public route: $isPublicRoute');
 
           if (!isPublicRoute) {
@@ -103,6 +105,14 @@ class ApiService {
   Future<Response> delete(String path, {dynamic data}) async {
     try {
       return await _dio.delete(path, data: data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Response> firebasePhoneAuth(Map<String, dynamic> data) async {
+    try {
+      return await _dio.post(AppConstants.firebasePhoneAuthUrl, data: data);
     } on DioException catch (e) {
       throw _handleError(e);
     }

@@ -4,7 +4,14 @@ const notificationSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+  },
+  driver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver',
+  },
+  vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
   },
   title: {
     type: String,
@@ -16,7 +23,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['ride', 'payment', 'system', 'promo'],
+    enum: ['ride', 'payment', 'system', 'promo', 'approval'],
     default: 'system',
   },
   isRead: {

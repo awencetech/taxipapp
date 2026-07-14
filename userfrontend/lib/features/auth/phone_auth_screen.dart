@@ -304,18 +304,23 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       if (mounted) {
         if (_nameController.text.trim().isNotEmpty) {
           debugPrint('=== Signing in as returning user with name ===');
-          final success = await authProvider.signInWithFirebasePhone(
+          final result = await authProvider.signInWithFirebasePhone(
             idToken!,
             'user',
             name: _nameController.text.trim(),
           );
-          if (success && mounted) {
+          if (result['success'] == true && result['isNewUser'] == false && mounted) {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
               );
             }
+          } else if (result['success'] == true && result['isNewUser'] == true && mounted) {
+            setState(() {
+              _isNewUser = true;
+              _isLoading = false;
+            });
           } else if (mounted) {
             setState(() {
               _isLoading = false;
@@ -331,20 +336,32 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
           }
         } else {
           debugPrint('=== Signing in as new user ===');
-          final success =
+          final result =
               await authProvider.signInWithFirebasePhone(idToken!, 'user');
-          if (success && mounted) {
+          if (result['success'] == true && result['isNewUser'] == false && mounted) {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
               );
             }
-          } else if (mounted) {
+          } else if (result['success'] == true && result['isNewUser'] == true && mounted) {
             setState(() {
               _isNewUser = true;
               _isLoading = false;
             });
+          } else if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(authProvider.error ?? 'Sign in failed'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
           }
         }
       }
@@ -467,55 +484,27 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                                 }
                                 return;
                               }
-                              print("=== Number of initialized Firebase apps: ${Firebase.apps.length}");
-                              for (var app in Firebase.apps) {
-                                print("=== Firebase app: ${app.name}");
-                              }
                               final authProvider = context.read<AuthProvider>();
-                              final user = FirebaseAuth.instance.currentUser;
-                              if (user == null) {
+                              if (authProvider.newUserInfo == null) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('User not found, please try again'),
+                                      content: Text('Session expired, please try again'),
                                       backgroundColor: AppColors.error,
                                     ),
                                   );
                                 }
                                 return;
                               }
-                              final idToken = await user.getIdToken();
-                              if (idToken == null) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to retrieve ID token'),
-                                      backgroundColor: AppColors.error,
-                                    ),
-                                  );
-                                }
-                                return;
-                              }
-                              if (mounted) {
-                                setState(() {
-                                  _isLoading = true;
-                                });
-                              }
-                              final success =
-                                  await authProvider.signInWithFirebasePhone(
-                                idToken,
-                                'user',
-                                name: _nameController.text.trim(),
+                              final success = await authProvider.completeGoogleProfile(
+                                _nameController.text.trim(),
+                                authProvider.newUserInfo!['mobile'],
                               );
                               if (success && mounted) {
-                                if (mounted) {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) =>
-                                            const HomeScreen()),
-                                  );
-                                }
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                );
                               } else if (mounted) {
                                 setState(() {
                                   _isLoading = false;
@@ -523,8 +512,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(authProvider.error ??
-                                          'Sign in failed'),
+                                      content: Text(authProvider.error ?? 'Sign in failed'),
                                       backgroundColor: AppColors.error,
                                     ),
                                   );

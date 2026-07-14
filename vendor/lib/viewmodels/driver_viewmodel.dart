@@ -9,12 +9,14 @@ class DriverViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool _isFetching = false;
   List<Driver> _drivers = [];
+  List<Driver> _pendingDrivers = [];
   String? _errorMessage;
 
   DriverViewModel({required ApiService apiService}) : _apiService = apiService;
 
   bool get isLoading => _isLoading;
   List<Driver> get drivers => _drivers;
+  List<Driver> get pendingDrivers => _pendingDrivers;
   String? get errorMessage => _errorMessage;
 
   Future<void> fetchDrivers() async {
@@ -42,6 +44,32 @@ class DriverViewModel extends ChangeNotifier {
       _drivers = [];
     } finally {
       _isFetching = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchPendingDrivers() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.get(AppConstants.vendorPendingDriversUrl);
+      if (response.statusCode == 200) {
+        if (response.data['success'] == true && response.data['data'] is Map && response.data['data']['drivers'] is List) {
+          final List<dynamic> data = response.data['data']['drivers'];
+          _pendingDrivers = data.map((json) => Driver.fromJson(json)).toList();
+        } else {
+          _errorMessage = 'Invalid response format';
+          _pendingDrivers = [];
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching pending drivers: $e');
+      _errorMessage = e.toString();
+      _pendingDrivers = [];
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
@@ -94,9 +122,37 @@ class DriverViewModel extends ChangeNotifier {
 
     try {
       final response = await _apiService.put(
-        '${AppConstants.vendorDriversUrl}/$driverId/approve',
+        AppConstants.vendorApproveDriverUrl.replaceFirst(':id', driverId),
       );
       if (response.statusCode == 200) {
+        await fetchPendingDrivers();
+        await fetchDrivers();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _errorMessage = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> rejectDriver(String driverId, String rejectionReason) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.put(
+        AppConstants.vendorRejectDriverUrl.replaceFirst(':id', driverId),
+        data: {
+          'rejectionReason': rejectionReason,
+        },
+      );
+      if (response.statusCode == 200) {
+        await fetchPendingDrivers();
         await fetchDrivers();
         return true;
       }

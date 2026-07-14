@@ -1,4 +1,4 @@
-// Taxi Nanban Backend Server
+// Taxi Nanban Backend Server - Updated port to 5003
 const express = require('express');
 const http = require('http');
 const dotenv = require('dotenv');
@@ -134,7 +134,7 @@ app.get('/', (req, res) => {
 // Error handler middleware
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 server.listen(PORT, "0.0.0.0", () => {
   logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} (0.0.0.0)`);

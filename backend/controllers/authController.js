@@ -48,36 +48,68 @@ const register = async (req, res) => {
     email = email.trim().toLowerCase();
     mobile = mobile.trim();
 
-    const userExists = await User.findOne({ $or: [{ email }, { mobile }] });
-    if (userExists) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User already exists' 
+    if (role === 'driver') {
+      const driverExists = await Driver.findOne({ $or: [{ email }, { mobile }] });
+      if (driverExists) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Driver already exists' 
+        });
+      }
+      const driver = await Driver.create({
+        name,
+        email,
+        password,
+        mobile,
+        role: 'driver',
+        licenseNumber: `TEMP-${Date.now()}`,
+      });
+
+      const token = generateToken(driver._id);
+      return res.status(201).json({
+        success: true,
+        message: 'Driver registered successfully',
+        token,
+        user: {
+          id: driver._id,
+          name: driver.name,
+          email: driver.email,
+          mobile: driver.mobile,
+          role: driver.role,
+          driverId: driver.driverId,
+        },
+      });
+    } else {
+      const userExists = await User.findOne({ $or: [{ email }, { mobile }] });
+      if (userExists) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'User already exists' 
+        });
+      }
+
+      const user = await User.create({
+        name,
+        email,
+        password,
+        mobile,
+        role: role || 'user',
+      });
+
+      const token = generateToken(user._id);
+      return res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          role: user.role
+        },
       });
     }
-
-    const user = await User.create({
-      name,
-      email,
-      password,
-      mobile,
-      role: role || 'user',
-    });
-
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        role: user.role
-      },
-    });
   } catch (error) {
     console.error('Registration Error:', error);
     res.status(400).json({ 
@@ -96,7 +128,7 @@ const login = async (req, res) => {
       });
     }
     console.log('Login Request Body:', req.body);
-    let { email, password } = req.body;
+    let { email, password, role } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ 
@@ -106,7 +138,31 @@ const login = async (req, res) => {
     }
 
     email = email.trim().toLowerCase();
-    const user = await User.findOne({ email }).select('+password');
+    let user, driverId;
+
+    if (role === 'driver') {
+      user = await Driver.findOne({ email }).select('+password');
+      if (user) {
+        if (!user.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: 'Driver not approved. Please wait for vendor/admin approval.'
+          });
+        }
+        driverId = user.driverId;
+      }
+    } else {
+      user = await User.findOne({ email }).select('+password');
+      if (user && user.role === 'driver') {
+        const driver = await Driver.findOne({ user: user._id });
+        if (driver && !driver.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: 'Driver not approved. Please wait for vendor/admin approval.'
+          });
+        }
+      }
+    }
 
     if (!user) {
       return res.status(401).json({ 
@@ -123,27 +179,10 @@ const login = async (req, res) => {
       });
     }
 
-    if (user.role === 'driver') {
-      const driver = await Driver.findOne({ user: user._id });
-      if (driver && !driver.isApproved) {
-        return res.status(403).json({
-          success: false,
-          message: 'Driver not approved. Please wait for vendor/admin approval.'
-        });
-      }
-    }
-
     const token = generateToken(user._id);
-
-    let driverId = null;
-    if (user.role === 'driver') {
-      const driver = await Driver.findOne({ user: user._id });
-      driverId = driver?.driverId;
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: 'User logged in successfully',
+      message: `${role === 'driver' ? 'Driver' : 'User'} logged in successfully`,
       token,
       user: {
         id: user._id,
@@ -151,7 +190,7 @@ const login = async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        driverId: driverId
+        driverId: driverId,
       },
     });
   } catch (error) {
@@ -392,70 +431,174 @@ const googleLogin = async (req, res) => {
 
 const completeProfile = async (req, res) => {
   try {
-    const { name, email, googleId, mobile, photoUrl, role = 'user' } = req.body;
+    const { name, email, googleId, firebaseUid, mobile, photoUrl, role = 'user', vehicleType, vehicleNumber, companyName } = req.body;
 
-    if (!email || !googleId || !name || !mobile) {
+    if (!name || !mobile) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Please provide all required fields (name, email, googleId, mobile)' 
+        message: 'Please provide all required fields (name, mobile)' 
       });
     }
 
     let isNewUser = false;
-    let user = await User.findOne({ email: email.toLowerCase() });
-    
-    if (user) {
-      user.name = name;
-      user.mobile = mobile;
-      if (googleId) user.googleId = googleId;
-      if (photoUrl) user.profilePic = photoUrl;
-      user.role = role;
-      user.isVerified = true;
-      await user.save();
-    } else {
-      user = await User.create({
-        name,
-        email: email.toLowerCase(),
-        googleId,
-        mobile,
-        profilePic: photoUrl || 'default-profile.png',
-        role: role,
-        isVerified: true
-      });
-      isNewUser = true;
-    }
+    const cleanMobile = mobile.replace(/\D/g, '');
 
-    if (user.role === 'driver') {
-      const driver = await Driver.findOne({ user: user._id });
-      if (driver && !driver.isApproved) {
+    if (role === 'vendor') {
+      let query = { phone: cleanMobile };
+      if (firebaseUid) {
+        query = { $or: [{ phone: cleanMobile }, { firebaseUid }] };
+      }
+      let vendor = await Vendor.findOne(query);
+      if (!vendor) {
+        if (!email || !companyName) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Please provide email and company name for vendor' 
+          });
+        }
+        vendor = await Vendor.create({
+          name,
+          email: email.toLowerCase(),
+          phone: cleanMobile,
+          companyName,
+          profilePicture: photoUrl,
+          isVerified: true,
+          firebaseUid: firebaseUid || undefined,
+          googleId: googleId || undefined
+        });
+        isNewUser = true;
+      } else {
+        vendor.name = name;
+        if (email) vendor.email = email.toLowerCase();
+        if (companyName) vendor.companyName = companyName;
+        if (photoUrl) vendor.profilePicture = photoUrl;
+        if (firebaseUid) vendor.firebaseUid = firebaseUid;
+        if (googleId) vendor.googleId = googleId;
+        await vendor.save();
+      }
+
+      const token = jwt.sign({ id: vendor._id, role: 'vendor' }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRE
+      });
+
+      return res.status(isNewUser ? 201 : 200).json({
+        success: true,
+        message: 'Vendor profile completed successfully',
+        token,
+        user: {
+          id: vendor._id,
+          name: vendor.name,
+          email: vendor.email,
+          mobile: vendor.phone,
+          role: 'vendor',
+          companyName: vendor.companyName,
+          profilePicture: vendor.profilePicture
+        }
+      });
+    } else if (role === 'driver') {
+      let driver;
+      let query = { mobile: cleanMobile };
+      if (firebaseUid) {
+        query = { $or: [{ mobile: cleanMobile }, { firebaseUid }] };
+      }
+      driver = await Driver.findOne(query);
+
+      if (driver) {
+        driver.name = name;
+        if (email) driver.email = email.toLowerCase();
+        if (googleId) driver.googleId = googleId;
+        if (firebaseUid) driver.firebaseUid = firebaseUid;
+        if (photoUrl) driver.profilePic = photoUrl;
+        driver.isVerified = true;
+        if (vehicleType) driver.vehicleType = vehicleType;
+        if (vehicleNumber) driver.vehicleNumber = vehicleNumber;
+        await driver.save();
+      } else {
+        driver = await Driver.create({
+          name,
+          email: email ? email.toLowerCase() : undefined,
+          googleId: googleId || undefined,
+          firebaseUid: firebaseUid || undefined,
+          mobile: cleanMobile,
+          profilePic: photoUrl || 'default-profile.png',
+          role: 'driver',
+          isVerified: true,
+          vehicleType: vehicleType || 'Car',
+          vehicleNumber: vehicleNumber,
+          licenseNumber: `TEMP-${Date.now()}`,
+          isApproved: false
+        });
+        isNewUser = true;
+      }
+
+      if (!driver.isApproved) {
         return res.status(403).json({
           success: false,
-          message: 'Driver not approved. Please wait for vendor/admin approval.'
+          message: 'Driver not approved. Please wait for vendor/admin approval.',
+          status: 'pending'
         });
       }
-    }
 
-    const token = generateToken(user._id);
-    let driverId = null;
-    if (user.role === 'driver') {
-      const driver = await Driver.findOne({ user: user._id });
-      driverId = driver?.driverId;
-    }
+      const token = generateToken(driver._id);
+      return res.status(isNewUser ? 201 : 200).json({
+        success: true,
+        message: 'Profile completed successfully',
+        token,
+        user: {
+          id: driver._id,
+          name: driver.name,
+          email: driver.email,
+          mobile: driver.mobile,
+          role: driver.role,
+          profilePic: driver.profilePic,
+          driverId: driver.driverId
+        },
+      });
+    } else {
+      // Handle user
+      let query = { role: 'user', mobile: cleanMobile };
+      if (firebaseUid) {
+        query = { role: 'user', $or: [{ mobile: cleanMobile }, { firebaseUid }] };
+      }
+      let user = await User.findOne(query);
+      
+      if (user) {
+        user.name = name;
+        if (email) user.email = email.toLowerCase();
+        if (googleId) user.googleId = googleId;
+        if (firebaseUid) user.firebaseUid = firebaseUid;
+        if (photoUrl) user.profilePic = photoUrl;
+        user.isVerified = true;
+        await user.save();
+      } else {
+        user = await User.create({
+          name,
+          email: email ? email.toLowerCase() : undefined,
+          googleId: googleId || undefined,
+          firebaseUid: firebaseUid || undefined,
+          mobile: cleanMobile,
+          profilePic: photoUrl || 'default-profile.png',
+          role: role,
+          isVerified: true
+        });
+        isNewUser = true;
+      }
 
-    res.status(isNewUser ? 201 : 200).json({
-      success: true,
-      message: 'Profile completed successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        role: user.role,
-        profilePic: user.profilePic,
-        driverId: driverId
-      },
-    });
+      const token = generateToken(user._id);
+      return res.status(isNewUser ? 201 : 200).json({
+        success: true,
+        message: 'Profile completed successfully',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          role: user.role,
+          profilePic: user.profilePic
+        },
+      });
+    }
   } catch (error) {
     console.error('Complete Profile Error:', error);
     res.status(400).json({ success: false, message: error.message });
@@ -482,7 +625,10 @@ const changePassword = async (req, res) => {
     }
 
     // Get user with password (since select is false by default)
-    const user = await User.findById(req.user._id).select('+password');
+    let user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      user = await Driver.findById(req.user._id).select('+password');
+    }
     if (!user) {
       return res.status(404).json({ 
         success: false, 
@@ -553,6 +699,7 @@ const firebasePhoneAuth = async (req, res) => {
     if (role === 'user') {
       // Handle User
       let user = await User.findOne({ 
+        role: 'user',
         $or: [
           { firebaseUid }, 
           { mobile: cleanPhone }
@@ -560,19 +707,12 @@ const firebasePhoneAuth = async (req, res) => {
       });
 
       if (!user) {
-        // Create new user if not exists
-        if (!name) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'Name is required for new user registration' 
-          });
-        }
-        user = await User.create({
-          name,
+        // Return isNewUser: true so frontend can show registration
+        return res.status(200).json({
+          success: true,
+          isNewUser: true,
           mobile: cleanPhone,
-          firebaseUid,
-          role: 'user',
-          isVerified: true
+          message: 'New user, please complete registration'
         });
       } else {
         // Update firebaseUid if not present
@@ -585,6 +725,7 @@ const firebasePhoneAuth = async (req, res) => {
       const token = generateToken(user._id);
       return res.status(200).json({
         success: true,
+        isNewUser: false,
         message: 'User authenticated successfully',
         token,
         user: {
@@ -598,36 +739,30 @@ const firebasePhoneAuth = async (req, res) => {
       });
     } else if (role === 'driver') {
       // Handle Driver
-      let user = await User.findOne({ 
+      let driver = await Driver.findOne({ 
         $or: [
           { firebaseUid }, 
           { mobile: cleanPhone }
         ]
       });
 
-      if (!user) {
-        // Driver must have been registered previously (by vendor)
-        return res.status(404).json({
-          success: false,
-          message: 'Driver not found. Please contact your vendor to register.'
+      if (!driver) {
+        // Return isNewDriver: true so frontend can show driver registration
+        return res.status(200).json({
+          success: true,
+          isNewDriver: true,
+          mobile: cleanPhone,
+          message: 'New driver, please complete registration'
         });
-      }
-
-      // Update firebaseUid if not present
-      if (!user.firebaseUid) {
-        user.firebaseUid = firebaseUid;
-        await user.save();
+      } else {
+        // Update firebaseUid if not present
+        if (!driver.firebaseUid) {
+          driver.firebaseUid = firebaseUid;
+          await driver.save();
+        }
       }
 
       // Check driver status
-      const driver = await Driver.findOne({ user: user._id });
-      if (!driver) {
-        return res.status(404).json({
-          success: false,
-          message: 'Driver profile not found.'
-        });
-      }
-
       if (!driver.isApproved) {
         return res.status(403).json({
           success: false,
@@ -636,19 +771,20 @@ const firebasePhoneAuth = async (req, res) => {
         });
       }
 
-      const token = generateToken(user._id);
+      const token = generateToken(driver._id);
       return res.status(200).json({
         success: true,
+        isNewDriver: false,
         message: 'Driver authenticated successfully',
         token,
         user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          role: user.role,
+          id: driver._id,
+          name: driver.name,
+          email: driver.email,
+          mobile: driver.mobile,
+          role: driver.role,
           driverId: driver.driverId,
-          profilePic: user.profilePic
+          profilePic: driver.profilePic
         }
       });
     } else if (role === 'vendor') {
@@ -661,17 +797,19 @@ const firebasePhoneAuth = async (req, res) => {
       });
 
       if (!vendor) {
-        // Vendor must have been registered previously
-        return res.status(404).json({
-          success: false,
-          message: 'Vendor not found. Please contact admin to register.'
+        // Return isNewVendor: true so frontend can show vendor registration
+        return res.status(200).json({
+          success: true,
+          isNewVendor: true,
+          mobile: cleanPhone,
+          message: 'New vendor, please complete registration'
         });
-      }
-
-      // Update firebaseUid if not present
-      if (!vendor.firebaseUid) {
-        vendor.firebaseUid = firebaseUid;
-        await vendor.save();
+      } else {
+        // Update firebaseUid if not present
+        if (!vendor.firebaseUid) {
+          vendor.firebaseUid = firebaseUid;
+          await vendor.save();
+        }
       }
 
       if (!vendor.isApproved) {
@@ -689,6 +827,7 @@ const firebasePhoneAuth = async (req, res) => {
 
       return res.status(200).json({
         success: true,
+        isNewVendor: false,
         message: 'Vendor authenticated successfully',
         token,
         user: {

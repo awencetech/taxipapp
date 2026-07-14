@@ -1,18 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
-import '../models/user_model.dart';
+import '../models/driver_models.dart';
+import '../core/constants/app_constants.dart';
 import 'dart:async';
 
 class AuthService {
   final ApiService _apiService = ApiService();
-  final _userController = StreamController<UserModel?>.broadcast();
+  final _userController = StreamController<DriverModel?>.broadcast();
 
-  Stream<UserModel?> get userStream => _userController.stream;
+  Stream<DriverModel?> get userStream => _userController.stream;
 
-  Future<UserModel?> signUp(
+  Future<DriverModel?> signUp(
       String name, String email, String password, String mobile) async {
     try {
-      final response = await _apiService.register({
+      final response = await _apiService.post(AppConstants.registerUrl, data: {
         'name': name,
         'email': email,
         'password': password,
@@ -21,11 +22,11 @@ class AuthService {
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final userData = response.data['user'];
-        final user = UserModel.fromMap(userData);
+        final user = DriverModel.fromJson(userData);
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', response.data['token']);
-        await prefs.setString('user_id', user.id);
+        await prefs.setString(AppConstants.tokenKey, response.data['token']);
+        await prefs.setString(AppConstants.driverIdKey, user.id);
 
         _userController.add(user);
         return user;
@@ -38,20 +39,20 @@ class AuthService {
     }
   }
 
-  Future<UserModel?> signIn(String email, String password) async {
+  Future<DriverModel?> signIn(String email, String password) async {
     try {
-      final response = await _apiService.login({
+      final response = await _apiService.post(AppConstants.loginUrl, data: {
         'email': email,
         'password': password,
       });
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final userData = response.data['user'];
-        final user = UserModel.fromMap(userData);
+        final user = DriverModel.fromJson(userData);
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', response.data['token']);
-        await prefs.setString('user_id', user.id);
+        await prefs.setString(AppConstants.tokenKey, response.data['token']);
+        await prefs.setString(AppConstants.driverIdKey, user.id);
 
         _userController.add(user);
         return user;
@@ -67,7 +68,7 @@ class AuthService {
   Future<Map<String, dynamic>> googleSignIn(
       Map<String, dynamic> userData) async {
     try {
-      final response = await _apiService.googleLogin(userData);
+      final response = await _apiService.post(AppConstants.googleLoginUrl, data: userData);
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['isNewUser'] == true) {
@@ -80,11 +81,11 @@ class AuthService {
           };
         } else {
           final userMap = response.data['user'];
-          final user = UserModel.fromMap(userMap);
+          final user = DriverModel.fromJson(userMap);
 
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwt_token', response.data['token']);
-          await prefs.setString('user_id', user.id);
+          await prefs.setString(AppConstants.tokenKey, response.data['token']);
+          await prefs.setString(AppConstants.driverIdKey, user.id);
 
           _userController.add(user);
           return {
@@ -101,18 +102,18 @@ class AuthService {
     }
   }
 
-  Future<UserModel?> completeProfile(Map<String, dynamic> userData) async {
+  Future<DriverModel?> completeProfile(Map<String, dynamic> userData) async {
     try {
-      final response = await _apiService.completeProfile(userData);
+      final response = await _apiService.post(AppConstants.completeProfileUrl, data: userData);
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           response.data['success'] == true) {
         final userMap = response.data['user'];
-        final user = UserModel.fromMap(userMap);
+        final user = DriverModel.fromJson(userMap);
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', response.data['token']);
-        await prefs.setString('user_id', user.id);
+        await prefs.setString(AppConstants.tokenKey, response.data['token']);
+        await prefs.setString(AppConstants.driverIdKey, user.id);
 
         _userController.add(user);
         return user;
@@ -134,22 +135,22 @@ class AuthService {
       });
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        if (response.data['isNewUser'] == true) {
+        if (response.data['isNewDriver'] == true) {
           return {
-            'isNewUser': true,
+            'isNewDriver': true,
             'mobile': response.data['mobile'],
           };
         } else {
           final userData = response.data['user'];
-          final user = UserModel.fromMap(userData);
+          final user = DriverModel.fromJson(userData);
 
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwt_token', response.data['token']);
-          await prefs.setString('user_id', user.id);
+          await prefs.setString(AppConstants.tokenKey, response.data['token']);
+          await prefs.setString(AppConstants.driverIdKey, user.id);
 
           _userController.add(user);
           return {
-            'isNewUser': false,
+            'isNewDriver': false,
             'user': user,
           };
         }
@@ -162,52 +163,19 @@ class AuthService {
     }
   }
 
-  Future<void> forgotPassword(String email) async {
-    try {
-      final response = await _apiService.forgotPassword(email);
-      if (response.statusCode != 200 || response.data['success'] != true) {
-        throw Exception(response.data['message'] ?? 'Failed to send OTP');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> verifyOTP(String email, String otp) async {
-    try {
-      final response = await _apiService.verifyOTP(email, otp);
-      if (response.statusCode != 200 || response.data['success'] != true) {
-        throw Exception(response.data['message'] ?? 'Invalid OTP');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> resetPassword(String email, String otp, String password) async {
-    try {
-      final response = await _apiService.resetPassword(email, otp, password);
-      if (response.statusCode != 200 || response.data['success'] != true) {
-        throw Exception(response.data['message'] ?? 'Failed to reset password');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('user_id');
+    await prefs.remove(AppConstants.tokenKey);
+    await prefs.remove(AppConstants.driverIdKey);
     _userController.add(null);
   }
 
-  Future<UserModel?> getCurrentUser() async {
+  Future<DriverModel?> getCurrentUser() async {
     try {
-      final response = await _apiService.getProfile();
+      final response = await _apiService.get(AppConstants.getDriverProfileUrl);
       if (response.statusCode == 200 && response.data['success'] == true) {
         final userData = response.data['data']['user'];
-        final user = UserModel.fromMap(userData);
+        final user = DriverModel.fromJson(userData);
         _userController.add(user);
         return user;
       }
@@ -217,10 +185,10 @@ class AuthService {
     }
   }
 
-  Future<UserModel?> updateProfile(
+  Future<DriverModel?> updateProfile(
       String name, String email, String mobile) async {
     try {
-      final response = await _apiService.updateProfile({
+      final response = await _apiService.put(AppConstants.updateDriverProfileUrl, data: {
         'name': name,
         'email': email,
         'mobile': mobile,
@@ -228,7 +196,7 @@ class AuthService {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final userData = response.data['data']['user'];
-        final user = UserModel.fromMap(userData);
+        final user = DriverModel.fromJson(userData);
         _userController.add(user);
         return user;
       } else {

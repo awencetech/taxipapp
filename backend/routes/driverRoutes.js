@@ -1,9 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead, uploadDocument, editDocument, deleteDocument } = require('../controllers/driverController');
+const { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead, uploadDocument, editDocument, deleteDocument, registerPendingDriver, getDriverStatus } = require('../controllers/driverController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
+// Public routes
+router.post('/register-pending', registerPendingDriver);
+router.get('/status', getDriverStatus);
+
+// Protected routes
 router.use(protect);
 
 router.get('/profile', getDriverProfile);

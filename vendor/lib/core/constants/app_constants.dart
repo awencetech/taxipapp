@@ -1,8 +1,8 @@
 class AppConstants {
   static const String appName = 'Taxi Nanban Vendor';
 
-  static const String baseUrl = 'http://127.0.0.1:5000/api/v1';
-  static const String socketUrl = 'http://127.0.0.1:5000';
+  static const String baseUrl = 'http://127.0.0.1:5003/api/v1';
+  static const String socketUrl = 'http://127.0.0.1:5003';
 
   // Vendor APIs
   static const String vendorLoginUrl = '/vendor/login';
@@ -14,10 +14,13 @@ class AppConstants {
 
   // Driver APIs (Vendor)
   static const String vendorDriversUrl = '/vendor/drivers';
+  static const String vendorPendingDriversUrl = '/vendor/drivers/pending';
   static const String vendorDriverByIdUrl = '/vendor/drivers/:id';
   static const String vendorAddDriverUrl = '/vendor/drivers';
   static const String vendorUpdateDriverUrl = '/vendor/drivers/:id';
   static const String vendorDeleteDriverUrl = '/vendor/drivers/:id';
+  static const String vendorApproveDriverUrl = '/vendor/drivers/:id/approve';
+  static const String vendorRejectDriverUrl = '/vendor/drivers/:id/reject';
 
   // Vehicle APIs (Vendor)
   static const String vendorVehiclesUrl = '/vendor/vehicles';

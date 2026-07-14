@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'signup_screen.dart';
@@ -17,124 +19,339 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _obscurePassword = true;
   bool _isPhoneLogin = true;
-  bool _showOTPField = false;
-  String? _phoneError;
+  bool _isOtpSent = false;
+  bool _isNewDriver = false;
+  String? _verificationId;
+  int _resendTimer = 0;
+  bool _canResend = false;
 
   String? _validatePhoneNumber(String value) {
-    // Remove any non-digit characters
     final cleaned = value.replaceAll(RegExp(r'[^\d]'), '');
-
-    // Check if it's exactly 10 digits
     if (cleaned.length != 10) {
       return 'Phone number must be exactly 10 digits';
     }
-
     return null;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // Add listener to phone number field
-    _phoneController.addListener(() {
-      // Validate phone number
-      final error = _validatePhoneNumber(_phoneController.text);
-      setState(() {
-        _phoneError = error;
-      });
+  String _formatPhoneNumber(String input) {
+    final digits = input.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.length == 10) {
+      return '+91$digits';
+    }
+    return input;
+  }
 
-      // If phone number is 10 digits long and we're not already showing OTP, auto-show OTP screen
-      final phone = _phoneController.text.trim().replaceAll(
-        RegExp(r'[^\d]'),
-        '',
-      );
-      if (phone.length == 10 && !_showOTPField && _phoneError == null) {
-        // Auto-send OTP or just switch to OTP screen? Let's just switch to OTP screen
-        // Wait, the user said "if the number will be entered the otp screen will be shown"
-        // Let's show OTP screen when 10 digits are entered
+  void _startResendTimer() {
+    _resendTimer = 60;
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) {
         setState(() {
-          _showOTPField = true;
+          if (_resendTimer > 0) {
+            _resendTimer--;
+          }
+          _canResend = _resendTimer == 0;
         });
       }
+      return _resendTimer > 0 && mounted;
     });
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _phoneController.dispose();
-    _otpController.dispose();
-    super.dispose();
-  }
-
-  void _handleLogin() async {
+  Future<void> _verifyPhoneNumber() async {
+    debugPrint('=== _verifyPhoneNumber START ===');
+    FocusScope.of(context).unfocus();
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
 
-    if (_isPhoneLogin && !_showOTPField) {
-      // Step 1: Validate phone number
-      final error = _validatePhoneNumber(_phoneController.text);
-      if (error != null) {
-        setState(() {
-          _phoneError = error;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-        return;
-      }
-
-      // Step 1: Request OTP
-      final success = await authViewModel.sendOTP(
-        _phoneController.text.trim().replaceAll(RegExp(r'[^\d]'), ''),
-      );
-      if (success && mounted) {
-        setState(() {
-          _showOTPField = true;
-        });
+    final error = _validatePhoneNumber(_phoneController.text);
+    if (error != null) {
+      debugPrint('=== _verifyPhoneNumber: Validation failed: $error ===');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
       }
       return;
     }
 
-    // Step 2: Verify OTP or Email Login
-    bool success;
-    if (_isPhoneLogin) {
-      if (_otpController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Please enter OTP')));
-        return;
-      }
-      success = await authViewModel.verifyPhoneOTP(
-        _phoneController.text.trim(),
-        _otpController.text.trim(),
-      );
-    } else {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
+    final formattedPhone = _formatPhoneNumber(_phoneController.text);
+    debugPrint('=== Formatted Phone: $formattedPhone ===');
 
-      if (email.isEmpty || password.isEmpty) {
+    // Set loading state
+    authViewModel.setLoading(true);
+    debugPrint('=== Loading state set to true ===');
+
+    // Add a timeout for verifyPhoneNumber (30 seconds)
+    bool isTimedOut = false;
+    Timer? timeoutTimer;
+    timeoutTimer = Timer(const Duration(seconds: 30), () {
+      if (!isTimedOut && mounted) {
+        debugPrint('=== verifyPhoneNumber TIMEOUT ===');
+        isTimedOut = true;
+        authViewModel.setLoading(false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter email and password')),
+          const SnackBar(content: Text('OTP request timed out. Please try again.')),
         );
+      }
+    });
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: formattedPhone,
+        timeout: const Duration(seconds: 60), // Explicit timeout
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          debugPrint('=== verificationCompleted ===');
+          if (isTimedOut) {
+            debugPrint('=== verificationCompleted: Already timed out, skipping ===');
+            return;
+          }
+          isTimedOut = true;
+          timeoutTimer?.cancel();
+          await _signInWithCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint('=== verificationFailed ===');
+          debugPrint('Code: ${e.code}, Message: ${e.message}');
+          if (isTimedOut) {
+            debugPrint('=== verificationFailed: Already timed out, skipping ===');
+            return;
+          }
+          isTimedOut = true;
+          timeoutTimer?.cancel();
+          if (mounted) {
+            setState(() {
+              _isOtpSent = false;
+            });
+            authViewModel.setLoading(false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${e.code}: ${e.message}')),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          debugPrint('=== codeSent ===');
+          debugPrint('=== Verification ID: $verificationId, Resend Token: $resendToken ===');
+          if (isTimedOut) {
+            debugPrint('=== codeSent: Already timed out, skipping ===');
+            return;
+          }
+          isTimedOut = true;
+          timeoutTimer?.cancel();
+          if (mounted) {
+            debugPrint('=== codeSent: Mounted, updating state ===');
+            setState(() {
+              _verificationId = verificationId;
+              _isOtpSent = true;
+              _resendTimer = 60;
+              _canResend = false;
+            });
+            authViewModel.setLoading(false);
+            _startResendTimer();
+            debugPrint('=== codeSent: Loading stopped, resend timer started ===');
+          } else {
+            debugPrint('=== codeSent: Not mounted ===');
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          debugPrint('=== codeAutoRetrievalTimeout ===');
+          debugPrint('Verification ID: $verificationId');
+          if (isTimedOut) {
+            debugPrint('=== codeAutoRetrievalTimeout: Already timed out, skipping ===');
+            return;
+          }
+          if (mounted) {
+            setState(() {
+              _verificationId = verificationId;
+              _canResend = true;
+            });
+          }
+        },
+      );
+    } catch (e, stackTrace) {
+      debugPrint('=== Exception in verifyPhoneNumber ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (isTimedOut) {
+        debugPrint('=== Exception: Already timed out, skipping ===');
         return;
       }
+      isTimedOut = true;
+      timeoutTimer.cancel();
+      if (mounted) {
+        authViewModel.setLoading(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+  }
 
-      success = await authViewModel.login(email, password);
+  Future<void> _signInWithOtp() async {
+    FocusScope.of(context).unfocus();
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty || _verificationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the OTP')),
+      );
+      return;
     }
 
+    if (otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP must be exactly 6 digits')),
+      );
+      return;
+    }
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: otp,
+      );
+      await _signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('=== FirebaseAuthException in signInWithOtp ===');
+      debugPrint('Code: ${e.code}, Message: ${e.message}');
+      if (mounted) {
+        authViewModel.setLoading(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${e.code}: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      debugPrint('=== Exception in signInWithOtp ===');
+      if (mounted) {
+        authViewModel.setLoading(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    authViewModel.setLoading(true);
+    try {
+      debugPrint('=== Signing in with credential ===');
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      debugPrint('=== User Credential: $userCredential');
+
+      final user = userCredential.user;
+      if (user == null) {
+        throw Exception('Failed to sign in: User is null');
+      }
+
+      debugPrint('=== Getting ID Token ===');
+      final idToken = await user.getIdToken();
+      debugPrint('=== ID Token retrieved ===');
+      final firebaseUid = user.uid;
+      final cleanMobile = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+      if (mounted) {
+        if (_nameController.text.trim().isNotEmpty) {
+          debugPrint('=== Signing in as returning driver with name ===');
+          final result = await authViewModel.signInWithFirebasePhone(
+            idToken!,
+            'driver',
+            name: _nameController.text.trim(),
+            firebaseUid: firebaseUid,
+            mobile: cleanMobile,
+          );
+          if (result['success'] == true) {
+            if (result['isNewDriver'] == true && mounted) {
+              setState(() {
+                _isNewDriver = true;
+              });
+              authViewModel.setLoading(false);
+            } else if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+            }
+          } else if (mounted) {
+            authViewModel.setLoading(false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(authViewModel.error ?? 'Sign in failed')),
+            );
+          }
+        } else {
+          debugPrint('=== Signing in as new driver ===');
+          final result = await authViewModel.signInWithFirebasePhone(
+            idToken!,
+            'driver',
+            firebaseUid: firebaseUid,
+            mobile: cleanMobile,
+          );
+          if (result['success'] == true) {
+            if (result['isNewDriver'] == true && mounted) {
+              setState(() {
+                _isNewDriver = true;
+              });
+              authViewModel.setLoading(false);
+            } else if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+            }
+          } else if (mounted) {
+            authViewModel.setLoading(false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(authViewModel.error ?? 'Sign in failed')),
+            );
+          }
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('=== FirebaseAuthException ===');
+      debugPrint('Code: ${e.code}, Message: ${e.message}');
+      if (mounted) {
+        authViewModel.setLoading(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${e.code}: ${e.message}')),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('=== Exception in signInWithCredential ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        authViewModel.setLoading(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+  }
+
+  void _handleEmailLogin() async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    final success = await authViewModel.login(email, password);
+
     if (success && mounted) {
-      debugPrint('LoginScreen: Login successful, navigating to HomeScreen');
-      // Explicitly navigate to HomeScreen
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => HomeScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authViewModel.error ?? 'Action Failed')),
+        SnackBar(content: Text(authViewModel.error ?? 'Login failed')),
       );
     }
   }
@@ -144,16 +361,16 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await authViewModel.loginWithGoogle();
 
     if (result['success'] && mounted) {
-      if (result['isNewUser']) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const GoogleOnboardingScreen()),
+      if (result['isNewUser'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No driver account found with this Google account. Please register first.'),
+            backgroundColor: Colors.red,
+          ),
         );
       } else {
-        debugPrint(
-          'LoginScreen: Google login successful, navigating to HomeScreen',
-        );
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => HomeScreen()),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
           (route) => false,
         );
       }
@@ -165,15 +382,45 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _phoneController.dispose();
+    _otpController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      appBar: (_isNewDriver || _isOtpSent)
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                onPressed: () {
+                  setState(() {
+                    if (_isNewDriver) {
+                      _isNewDriver = false;
+                      _isOtpSent = true;
+                    } else {
+                      _isOtpSent = false;
+                      _otpController.clear();
+                      _verificationId = null;
+                    }
+                  });
+                },
+              ),
+            )
+          : null,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header with Gradient
             Container(
               width: double.infinity,
               height: 300,
@@ -188,62 +435,62 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.directions_car,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'TaxiNanban Driver',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  if (!_isNewDriver)
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          Text(
-                            'Start earning today',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 12,
-                            ),
+                          child: const Icon(
+                            Icons.directions_car,
+                            color: Colors.white,
+                            size: 24,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'TaxiNanban Driver',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Start earning today',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 40),
-                  const Text(
-                    'Welcome Back',
-                    style: TextStyle(
+                  Text(
+                    _isNewDriver ? 'Complete Profile' : 'Welcome Back',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Login to start accepting rides',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  Text(
+                    _isNewDriver ? 'Tell us your name' : 'Login to start accepting rides',
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ],
               ),
             ),
 
-            // Login/OTP Card
             Transform.translate(
               offset: const Offset(0, -40),
               child: Container(
@@ -260,9 +507,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                child: _showOTPField
-                    ? _buildOTPScreen(authViewModel)
-                    : _buildLoginScreen(authViewModel),
+                child: _isNewDriver
+                    ? _buildNewDriverScreen(authViewModel)
+                    : (_isOtpSent
+                        ? _buildOtpScreen(authViewModel)
+                        : _buildLoginScreen(authViewModel)),
               ),
             ),
           ],
@@ -291,7 +540,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Toggle Switch
         Container(
           height: 45,
           decoration: BoxDecoration(
@@ -315,7 +563,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Dynamic Fields
         if (_isPhoneLogin) ...[
           const Text(
             'Mobile Number',
@@ -342,9 +589,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: '9876543210',
-                    errorText: _phoneError,
                   ),
                 ),
               ),
@@ -378,8 +624,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 ),
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
           ),
@@ -387,12 +632,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 24),
 
-        // Action Button
         SizedBox(
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: authViewModel.isLoading ? null : _handleLogin,
+            onPressed: authViewModel.isLoading
+                ? null
+                : (_isPhoneLogin ? _verifyPhoneNumber : _handleEmailLogin),
             child: authViewModel.isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
                 : Row(
@@ -408,14 +654,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 24),
 
-        // Divider
         Row(
           children: [
             Expanded(child: Divider(color: Colors.grey[300])),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'OR CONTINUE WITH',
+                'or continue with',
                 style: TextStyle(
                   color: Colors.grey[400],
                   fontSize: 10,
@@ -429,7 +674,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 24),
 
-        // Google Sign-In Button
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -463,7 +707,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 32),
 
-        // Register Link
         Center(
           child: Column(
             children: [
@@ -502,7 +745,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildOTPScreen(AuthViewModel authViewModel) {
+  Widget _buildOtpScreen(AuthViewModel authViewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -513,7 +756,11 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               icon: const Icon(Icons.arrow_back_ios, size: 16),
-              onPressed: () => setState(() => _showOTPField = false),
+              onPressed: () => setState(() {
+                _isOtpSent = false;
+                _otpController.clear();
+                _verificationId = null;
+              }),
             ),
             const SizedBox(width: 8),
             const Text(
@@ -567,12 +814,32 @@ class _LoginScreenState extends State<LoginScreen> {
             fillColor: const Color(0xFFF5F5F5),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _resendTimer > 0
+                  ? 'Resend OTP in $_resendTimer seconds'
+                  : "Didn't receive OTP?",
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            if (_canResend)
+              TextButton(
+                onPressed: authViewModel.isLoading ? null : _verifyPhoneNumber,
+                child: const Text(
+                  'Resend',
+                  style: TextStyle(color: Color(0xFFFF6D00)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: authViewModel.isLoading ? null : _handleLogin,
+            onPressed: authViewModel.isLoading ? null : _signInWithOtp,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF6D00),
               shape: RoundedRectangleBorder(
@@ -591,7 +858,96 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildNewDriverScreen(AuthViewModel authViewModel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Enter your name',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Tell us your name to continue',
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 32),
+        TextField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            hintText: 'Your name',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Color(0xFFF5F5F5),
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: authViewModel.isLoading
+                ? null
+                : () async {
+                    if (_nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter your name')),
+                      );
+                      return;
+                    }
+                    if (authViewModel.newDriverInfo == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Session expired, please try again')),
+                      );
+                      return;
+                    }
+                    final success = await authViewModel.completeGoogleProfile(
+                      _nameController.text.trim(),
+                      authViewModel.newDriverInfo!['mobile'],
+                    );
+                    if (success && mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        (route) => false,
+                      );
+                    } else if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(authViewModel.error ?? 'Failed to complete profile'),
+                        ),
+                      );
+                    }
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6D00),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+            ),
+            child: authViewModel.isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+          ),
+        ),
       ],
     );
   }
@@ -626,39 +982,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  Widget _buildSocialButton(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
-
-// ── Google "G" Logo (painted, no external assets needed) ─────────────────────
 
 class _GoogleLogo extends StatelessWidget {
   @override

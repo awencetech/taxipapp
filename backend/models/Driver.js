@@ -1,15 +1,71 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const validator = require('validator');
 
 const driverSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: false,
+    trim: true,
+  },
+  lastName: {
+    type: String,
+    required: false,
+    trim: true,
+  },
+  email: {
+    type: String,
+    required: false,
+    sparse: true, // Allows multiple nulls for email
+    lowercase: true,
+    trim: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Skip validation if empty
+        return validator.isEmail(v);
+      },
+      message: 'Please provide a valid email'
+    },
+  },
+  mobile: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true,
+    trim: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Skip validation if empty
+        return /^\d{10}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid 10-digit mobile number!`
+    }
+  },
+  password: {
+    type: String,
+    required: false,
+    minlength: 6,
+    select: false,
+  },
+  role: {
+    type: String,
+    enum: ['driver'],
+    default: 'driver',
+  },
+  profilePic: {
+    type: String,
+    default: 'default-profile.png',
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  googleId: String,
+  firebaseUid: String,
+  fcmToken: String,
   driverId: {
     type: String,
     unique: true,
-    required: true,
-  },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
   },
   vendor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -33,7 +89,7 @@ const driverSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  status: {
+  rideStatus: {
     type: String,
     enum: ['available', 'busy', 'offline'],
     default: 'offline',
@@ -71,8 +127,9 @@ const driverSchema = new mongoose.Schema({
   },
   licenseNumber: {
     type: String,
-    required: [true, 'Please provide license number'],
+    required: false,
     unique: true,
+    sparse: true,
   },
   documents: [
     {
@@ -103,9 +160,42 @@ const driverSchema = new mongoose.Schema({
       },
     },
   ],
+  documentsVerified: {
+    type: Boolean,
+    default: false,
+  },
+  // Approval workflow fields
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+  accountStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
   isApproved: {
     type: Boolean,
     default: false,
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+  },
+  approvedAt: {
+    type: Date,
+    default: null,
+  },
+  rejectionReason: {
+    type: String,
+    default: null,
   },
   totalEarnings: {
     type: Number,
@@ -170,12 +260,15 @@ const driverSchema = new mongoose.Schema({
       },
     },
   ],
-}, { timestamps: true });
+}, { timestamps: true, strictPopulate: false });
 
 driverSchema.index({ currentLocation: '2dsphere' });
+driverSchema.index({ firebaseUid: 1 }, { sparse: true, unique: true });
+driverSchema.index({ googleId: 1 }, { sparse: true, unique: true });
+driverSchema.index({ email: 1 }, { sparse: true, unique: true });
 
-// Auto-generate driverId before saving
-driverSchema.pre('save', async function (next) {
+// Auto-generate driverId before validation
+driverSchema.pre('validate', async function (next) {
   if (this.isNew) {
     const lastDriver = await mongoose.model('Driver').findOne().sort({ driverId: -1 }).exec();
     let nextId = 1;
@@ -187,5 +280,17 @@ driverSchema.pre('save', async function (next) {
   }
   next();
 });
+
+// Hash password before saving
+driverSchema.pre('save', async function (next) {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  next();
+});
+
+driverSchema.methods.comparePassword = async function (candidatePassword, driverPassword) {
+  return await bcrypt.compare(candidatePassword, driverPassword);
+};
 
 module.exports = mongoose.model('Driver', driverSchema);

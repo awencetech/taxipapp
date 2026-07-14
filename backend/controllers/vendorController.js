@@ -2,6 +2,7 @@ const Vendor = require('../models/Vendor');
 const Driver = require('../models/Driver');
 const Vehicle = require('../models/Vehicle');
 const Ride = require('../models/Ride');
+const Notification = require('../models/Notification');
 const jwt = require('jsonwebtoken');
 const { getCache, setCache, deleteCache } = require('../utils/cache');
 const sendEmail = require('../utils/emailService');
@@ -295,6 +296,22 @@ const loginVendor = async (req, res) => {
   }
 };
 
+const getPendingDrivers = async (req, res) => {
+  try {
+    const pendingDrivers = await Driver.find({ status: 'pending' });
+    res.status(200).json({
+      success: true,
+      data: { drivers: pendingDrivers },
+    });
+  } catch (error) {
+    console.error('Get Pending Drivers Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const getDashboard = async (req, res) => {
   try {
     const today = new Date();
@@ -304,7 +321,7 @@ const getDashboard = async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const totalDrivers = await Driver.countDocuments();
-    const onlineDrivers = await Driver.countDocuments({ status: 'online' });
+    const onlineDrivers = await Driver.countDocuments({ rideStatus: 'online' });
     const totalVehicles = await Vehicle.countDocuments();
     const onlineVehicles = totalVehicles;
 
@@ -334,6 +351,13 @@ const getDashboard = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
+    const pendingDrivers = await Driver.countDocuments({ status: 'pending' });
+    const approvedDrivers = await Driver.countDocuments({ status: 'approved' });
+    const rejectedDrivers = await Driver.countDocuments({ status: 'rejected' });
+    const todayRegistrations = await Driver.countDocuments({
+      createdAt: { $gte: today, $lt: tomorrow },
+    });
+
     res.status(200).json({
       totalRidesToday,
       totalEarnings,
@@ -342,6 +366,10 @@ const getDashboard = async (req, res) => {
       completedRides,
       cancelledRides,
       recentTrips,
+      pendingDrivers,
+      approvedDrivers,
+      rejectedDrivers,
+      todayRegistrations,
     });
   } catch (error) {
     console.error('Dashboard Error:', error);
@@ -359,10 +387,13 @@ const getDrivers = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const drivers = await Driver.find({ vendor: req.user?._id }).populate('user', 'name email mobile profilePic');
+    let query = { vendor: req.user?._id };
+    
+    // Also get drivers without vendor (unassigned, pending approval)
+    const allDrivers = await Driver.find();
     
     // Process each driver with today's data
-    const processedDrivers = await Promise.all(drivers.map(async (driver) => {
+    const processedDrivers = await Promise.all(allDrivers.map(async (driver) => {
       const driverObj = driver.toObject();
       
       // Get today's trips and earnings
@@ -375,8 +406,26 @@ const getDrivers = async (req, res) => {
       const todayTrips = todayRides.length;
       const todayEarnings = todayRides.reduce((sum, ride) => sum + (ride.fare || 0), 0);
       
+      // Handle both old and new drivers
+      let name, email, mobile, profilePic;
+      if (driverObj.user) {
+        name = driverObj.user.name;
+        email = driverObj.user.email;
+        mobile = driverObj.user.mobile;
+        profilePic = driverObj.user.profilePic;
+      } else {
+        name = driverObj.name;
+        email = driverObj.email;
+        mobile = driverObj.mobile;
+        profilePic = driverObj.profilePic;
+      }
+      
       return {
         ...driverObj,
+        name,
+        email,
+        mobile,
+        profilePic,
         todayTrips,
         todayEarnings
       };
@@ -472,12 +521,53 @@ const deleteDriver = async (req, res) => {
 
 const approveDriver = async (req, res) => {
   try {
-    const driver = await Driver.findByIdAndUpdate(
+    let driver = await Driver.findByIdAndUpdate(
       req.params.id,
-      { isApproved: true },
+      { 
+        isApproved: true, 
+        vendor: req.user?._id, 
+        status: 'approved', 
+        accountStatus: 'approved',
+        approvedBy: req.user?._id,
+        approvedAt: new Date(),
+        rejectionReason: null,
+      },
       { new: true }
-    ).populate('user', 'name email mobile profilePic');
-    res.status(200).json({ success: true, data: { driver } });
+    );
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found',
+      });
+    }
+
+    // Send notification to driver
+    await Notification.create({
+      driver: driver._id,
+      title: 'Account Approved',
+      message: 'Congratulations! Your driver account has been approved. You can now start accepting rides.',
+      type: 'approval',
+      data: { approvedBy: req.user?._id },
+    });
+
+    // Process driver for consistent response
+    const driverObj = driver.toObject();
+    let name, email, mobile, profilePic;
+    if (driverObj.user) {
+      name = driverObj.user.name;
+      email = driverObj.user.email;
+      mobile = driverObj.user.mobile;
+      profilePic = driverObj.user.profilePic;
+    } else {
+      name = driverObj.name;
+      email = driverObj.email;
+      mobile = driverObj.mobile;
+      profilePic = driverObj.profilePic;
+    }
+    
+    const processedDriver = { ...driverObj, name, email, mobile, profilePic };
+    res.status(200).json({ success: true, data: { driver: processedDriver } });
   } catch (error) {
     console.error('Approve Driver Error:', error);
     res.status(400).json({
@@ -487,16 +577,62 @@ const approveDriver = async (req, res) => {
   }
 };
 
-const declineDriver = async (req, res) => {
+const rejectDriver = async (req, res) => {
   try {
-    const driver = await Driver.findByIdAndUpdate(
+    const { rejectionReason } = req.body;
+    if (!rejectionReason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required',
+      });
+    }
+
+    let driver = await Driver.findByIdAndUpdate(
       req.params.id,
-      { isApproved: false },
+      { 
+        isApproved: false, 
+        status: 'rejected', 
+        accountStatus: 'rejected',
+        rejectionReason: rejectionReason,
+      },
       { new: true }
-    ).populate('user', 'name email mobile profilePic');
-    res.status(200).json({ success: true, data: { driver } });
+    );
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found',
+      });
+    }
+
+    // Send notification to driver
+    await Notification.create({
+      driver: driver._id,
+      title: 'Account Rejected',
+      message: `Your driver account has been rejected. Reason: ${rejectionReason}`,
+      type: 'approval',
+      data: { rejectionReason: rejectionReason },
+    });
+
+    // Process driver for consistent response
+    const driverObj = driver.toObject();
+    let name, email, mobile, profilePic;
+    if (driverObj.user) {
+      name = driverObj.user.name;
+      email = driverObj.user.email;
+      mobile = driverObj.user.mobile;
+      profilePic = driverObj.user.profilePic;
+    } else {
+      name = driverObj.name;
+      email = driverObj.email;
+      mobile = driverObj.mobile;
+      profilePic = driverObj.profilePic;
+    }
+    
+    const processedDriver = { ...driverObj, name, email, mobile, profilePic };
+    res.status(200).json({ success: true, data: { driver: processedDriver } });
   } catch (error) {
-    console.error('Decline Driver Error:', error);
+    console.error('Reject Driver Error:', error);
     res.status(400).json({
       success: false,
       message: error.message,
@@ -985,8 +1121,7 @@ const getAllVendors = async (req, res) => {
 
 const getDriverById = async (req, res) => {
   try {
-    const driver = await Driver.findById(req.params.id)
-      .populate('user', 'name email mobile profilePic');
+    const driver = await Driver.findById(req.params.id);
 
     if (!driver) {
       return res.status(404).json({
@@ -994,6 +1129,22 @@ const getDriverById = async (req, res) => {
         message: 'Driver not found',
       });
     }
+
+    // Process driver for consistent response
+    const driverObj = driver.toObject();
+    let name, email, mobile, profilePic;
+    if (driverObj.user) {
+      name = driverObj.user.name;
+      email = driverObj.user.email;
+      mobile = driverObj.user.mobile;
+      profilePic = driverObj.user.profilePic;
+    } else {
+      name = driverObj.name;
+      email = driverObj.email;
+      mobile = driverObj.mobile;
+      profilePic = driverObj.profilePic;
+    }
+    const processedDriver = { ...driverObj, name, email, mobile, profilePic };
 
     // Get active ride for this driver
     const activeRide = await Ride.findOne({
@@ -1004,7 +1155,7 @@ const getDriverById = async (req, res) => {
     }).populate('user', 'name mobile');
 
     res.status(200).json({
-      driver,
+      driver: processedDriver,
       activeRide,
     });
   } catch (error) {
@@ -1076,6 +1227,18 @@ const declineVendor = async (req, res) => {
   }
 };
 
+const getVendorNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({ vendor: req.user._id })
+      .sort('-createdAt');
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    res.status(200).json({ success: true, data: { notifications, unreadCount } });
+  } catch (error) {
+    console.error('Get Vendor Notifications Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   registerVendor,
   loginVendor,
@@ -1090,7 +1253,7 @@ module.exports = {
   addDriver,
   deleteDriver,
   approveDriver,
-  declineDriver,
+  rejectDriver,
   getVehicles,
   addVehicle,
   deleteVehicle,
@@ -1099,4 +1262,6 @@ module.exports = {
   getAllVendors,
   approveVendor,
   declineVendor,
+  getPendingDrivers,
+  getVendorNotifications,
 };

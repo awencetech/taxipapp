@@ -2,8 +2,8 @@ class AppConstants {
   static const String appName = 'Taxi Nanban Driver';
 
   // Local network backend URL
-  static const String baseUrl = 'http://192.168.31.100:5000/api/v1';
-  static const String socketUrl = 'http://192.168.31.100:5000';
+  static const String baseUrl = 'http://192.168.31.100:5003/api/v1';
+  static const String socketUrl = 'http://192.168.31.100:5003';
 
   // Authentication APIs
   static const String loginUrl = '/auth/login';
@@ -11,11 +11,13 @@ class AppConstants {
   static const String googleLoginUrl = '/auth/google-login';
   static const String completeProfileUrl = '/auth/complete-profile';
   static const String changePasswordUrl = '/auth/change-password';
+  static const String firebasePhoneAuthUrl = '/auth/firebase-phone';
 
   // Driver APIs
   static const String driverSignupUrl = '/auth/register';
   static const String driverLoginUrl = '/auth/login';
   static const String driverRegisterUrl = '/drivers/register';
+  static const String driverRegisterPendingUrl = '/driver/register-pending';
   static const String driverStatusUrl = '/driver/status';
   static const String updateLocationUrl = '/drivers/location';
   static const String driverLocationUrl = '/drivers/location';

@@ -15,7 +15,7 @@ const {
   addDriver,
   deleteDriver,
   approveDriver,
-  declineDriver,
+  rejectDriver,
   getVehicles,
   addVehicle,
   deleteVehicle,
@@ -24,6 +24,8 @@ const {
   getAllVendors,
   approveVendor,
   declineVendor,
+  getPendingDrivers,
+  getVendorNotifications,
 } = require('../controllers/vendorController');
 
 router.post('/register', registerVendor);
@@ -35,16 +37,18 @@ router.post('/forgot-password/verify-otp', verifyForgotPasswordOTP);
 router.post('/forgot-password/reset', resetPassword);
 router.get('/dashboard', protect, getDashboard);
 router.get('/drivers', protect, getDrivers);
+router.get('/drivers/pending', protect, getPendingDrivers);
 router.get('/drivers/:id', protect, getDriverById);
 router.post('/drivers', protect, addDriver);
 router.delete('/drivers/:id', protect, deleteDriver);
 router.put('/drivers/:id/approve', protect, approveDriver);
-router.put('/drivers/:id/decline', protect, declineDriver);
+router.put('/drivers/:id/reject', protect, rejectDriver);
 router.get('/vehicles', protect, getVehicles);
 router.post('/vehicles', protect, addVehicle);
 router.delete('/vehicles/:id', protect, deleteVehicle);
 router.get('/trips', protect, getTrips);
 router.get('/earnings', protect, getEarnings);
+router.get('/notifications', protect, getVendorNotifications);
 
 // Admin routes for vendor management
 router.get('/all', getAllVendors);

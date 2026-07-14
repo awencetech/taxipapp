@@ -145,24 +145,32 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> signInWithFirebasePhone(String idToken, String role, {String? name}) async {
+  Future<Map<String, dynamic>> signInWithFirebasePhone(String idToken, String role, {String? name}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _user = await _authService.firebasePhoneSignIn(idToken, role, name: name);
-      if (_user != null) {
-        _socketService.connect(_user!.id);
+      final result = await _authService.firebasePhoneSignIn(idToken, role, name: name);
+      if (result['isNewUser'] == true) {
+        _newUserInfo = result;
+        _isLoading = false;
+        notifyListeners();
+        return {'success': true, 'isNewUser': true};
+      } else {
+        _user = result['user'];
+        if (_user != null) {
+          _socketService.connect(_user!.id);
+        }
+        _isLoading = false;
+        notifyListeners();
+        return {'success': true, 'isNewUser': false};
       }
-      _isLoading = false;
-      notifyListeners();
-      return _user != null;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'success': false};
     }
   }
 

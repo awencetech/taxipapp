@@ -11,7 +11,6 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: function() { return !this.googleId && !this.firebaseUid; }, // Required only if not social/phone login
-    unique: true,
     sparse: true, // Allows multiple nulls for email
     lowercase: true,
     trim: true,
@@ -26,7 +25,6 @@ const userSchema = new mongoose.Schema({
   mobile: {
     type: String,
     required: function() { return !this.googleId; }, // Required only if not social login
-    unique: true,
     sparse: true, // Allows multiple nulls if field is missing
     trim: true,
     validate: {
@@ -122,7 +120,9 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-userSchema.index({ mobile: 1 }, { unique: true, sparse: true });
+// Compound indexes to ensure uniqueness within the same role
+userSchema.index({ role: 1, mobile: 1 }, { unique: true, sparse: true, partialFilterExpression: { mobile: { $exists: true } } });
+userSchema.index({ role: 1, email: 1 }, { unique: true, sparse: true, partialFilterExpression: { email: { $exists: true } } });
 
 userSchema.methods.comparePassword = async function (candidatePassword, userPassword) {
   return await bcrypt.compare(candidatePassword, userPassword);

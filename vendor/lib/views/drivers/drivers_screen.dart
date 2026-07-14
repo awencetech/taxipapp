@@ -34,17 +34,22 @@ class _DriversScreenState extends State<DriversScreen> {
     if (_selectedStatus != 'All') {
       filtered = filtered.where((driver) {
         final approved = driver.isApproved == true;
+        final isRejected = driver.accountStatus?.toLowerCase() == 'rejected' ||
+            driver.status.toLowerCase() == 'rejected' ||
+            driver.status.toLowerCase() == 'declined';
+
         if (_selectedStatus == 'Active') {
           return approved &&
               (driver.status.toLowerCase() == 'online' ||
                   driver.status.toLowerCase() == 'active');
         } else if (_selectedStatus == 'Pending Approval') {
-          return !approved;
+          return !approved && !isRejected;
         } else if (_selectedStatus == 'Deactivated') {
-          return approved &&
-              (driver.status.toLowerCase() == 'offline' ||
-                  driver.status.toLowerCase() == 'inactive' ||
-                  driver.status.toLowerCase() == 'deactivated');
+          return isRejected ||
+              (approved &&
+                  (driver.status.toLowerCase() == 'offline' ||
+                      driver.status.toLowerCase() == 'inactive' ||
+                      driver.status.toLowerCase() == 'deactivated'));
         }
         return true;
       }).toList();
@@ -110,7 +115,11 @@ class _DriversScreenState extends State<DriversScreen> {
         )
         .length;
     final pendingDrivers = driverVM.drivers
-        .where((d) => d.isApproved != true)
+        .where((d) =>
+            d.isApproved != true &&
+            d.accountStatus?.toLowerCase() != 'rejected' &&
+            d.status.toLowerCase() != 'rejected' &&
+            d.status.toLowerCase() != 'declined')
         .length;
 
     return Scaffold(
@@ -1187,8 +1196,11 @@ class _DriversScreenState extends State<DriversScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1208,36 +1220,68 @@ class _DriversScreenState extends State<DriversScreen> {
                   ),
                 ),
               ),
-              if (!approved)
-                ElevatedButton(
-                  onPressed: () async {
-                    final success = await context
-                        .read<DriverViewModel>()
-                        .approveDriver(driver.id);
-                    if (success && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Driver approved successfully!'),
+              if (!approved && driver.accountStatus?.toLowerCase() != 'rejected' && driver.status.toLowerCase() != 'rejected')
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        final success = await context
+                            .read<DriverViewModel>()
+                            .rejectDriver(driver.id, 'Declined by vendor');
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Driver declined successfully!'),
+                            ),
+                          );
+                        }
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Decline',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final success = await context
+                            .read<DriverViewModel>()
+                            .approveDriver(driver.id);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Driver approved successfully!'),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        elevation: 0,
+                        minimumSize: Size.zero,
+                      ),
+                      child: const Text(
+                        'Approve',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Approve',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                  ],
                 ),
             ],
           ),

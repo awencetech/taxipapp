@@ -67,6 +67,14 @@ class Driver {
   final String? vehicleBrand;
   final int todayTrips;
   final num todayEarnings;
+  final String? accountStatus;
+  final String? approvedBy;
+  final DateTime? approvedAt;
+  final String? rejectionReason;
+  final bool? documentsVerified;
+  final String? firstName;
+  final String? lastName;
+  final String? approvalStatus;
 
   Driver({
     required this.id,
@@ -96,17 +104,32 @@ class Driver {
     this.vehicleBrand,
     this.todayTrips = 0,
     this.todayEarnings = 0,
+    this.accountStatus,
+    this.approvedBy,
+    this.approvedAt,
+    this.rejectionReason,
+    this.documentsVerified,
+    this.firstName,
+    this.lastName,
+    this.approvalStatus,
   });
 
   factory Driver.fromJson(Map<String, dynamic> json) {
-    final user = json['user'] as Map<String, dynamic>?;
+    // Safely get user - check if it's a Map first
+    final user = (json['user'] is Map<String, dynamic>) ? json['user'] as Map<String, dynamic> : null;
+    
+    // Debug prints
+    print('Parsing Driver: id=${json['_id']}, name=${json['name']}, accountStatus=${json['accountStatus']}');
+    
     return Driver(
       id: (json['_id'] ?? json['id']).toString(),
       driverId: json['driverId']?.toString(),
-      name: user?['name']?.toString() ?? 'Unknown',
-      email: user?['email']?.toString() ?? 'unknown@example.com',
-      phone: user?['mobile']?.toString() ?? '0000000000',
-      profilePicture: user?['profilePic']?.toString(),
+      name: json['name']?.toString() ?? user?['name']?.toString() ?? 'Unknown',
+      firstName: json['firstName']?.toString(),
+      lastName: json['lastName']?.toString(),
+      email: json['email']?.toString() ?? user?['email']?.toString() ?? 'unknown@example.com',
+      phone: json['mobile']?.toString() ?? user?['mobile']?.toString() ?? '0000000000',
+      profilePicture: json['profilePic']?.toString() ?? user?['profilePic']?.toString(),
       licenseNumber: json['licenseNumber']?.toString(),
       status: json['status']?.toString() ?? 'offline',
       rating: (json['ratings'] as num?)?.toDouble() ?? 0.0,
@@ -132,6 +155,14 @@ class Driver {
       vehicleBrand: json['vehicleBrand']?.toString(),
       todayTrips: (json['todayTrips'] as num?)?.toInt() ?? 0,
       todayEarnings: json['todayEarnings'] as num? ?? 0,
+      accountStatus: json['accountStatus']?.toString() ?? json['status']?.toString() ?? 'pending',
+      approvedBy: json['approvedBy']?.toString(),
+      approvedAt: json['approvedAt'] != null
+          ? DateTime.tryParse(json['approvedAt'].toString())
+          : null,
+      rejectionReason: json['rejectionReason']?.toString(),
+      documentsVerified: json['documentsVerified'] as bool? ?? false,
+      approvalStatus: json['approvalStatus']?.toString(),
     );
   }
 }
@@ -437,6 +468,10 @@ class DashboardStats {
   final int completedRides;
   final int cancelledRides;
   final List<Trip> recentTrips;
+  final int pendingDrivers;
+  final int approvedDrivers;
+  final int rejectedDrivers;
+  final int todayRegistrations;
 
   DashboardStats({
     required this.totalRidesToday,
@@ -446,6 +481,10 @@ class DashboardStats {
     required this.completedRides,
     required this.cancelledRides,
     required this.recentTrips,
+    required this.pendingDrivers,
+    required this.approvedDrivers,
+    required this.rejectedDrivers,
+    required this.todayRegistrations,
   });
 
   factory DashboardStats.fromJson(Map<String, dynamic> json) {
@@ -461,6 +500,10 @@ class DashboardStats {
               ?.map((x) => Trip.fromJson(x))
               .toList() ??
           [],
+      pendingDrivers: json['pendingDrivers'] ?? 0,
+      approvedDrivers: json['approvedDrivers'] ?? 0,
+      rejectedDrivers: json['rejectedDrivers'] ?? 0,
+      todayRegistrations: json['todayRegistrations'] ?? 0,
     );
   }
 }
