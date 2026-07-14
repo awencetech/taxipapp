@@ -51,7 +51,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
       } else if (_status == 'rejected') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => RejectedScreen(rejectionReason: _rejectionReason)),
+          MaterialPageRoute(
+            builder: (_) => RejectedScreen(rejectionReason: _rejectionReason),
+          ),
         );
       }
     }
@@ -80,6 +82,20 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Back Arrow
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios,
+                    color: Color(0xFF212529),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
               // Clock/Icon
               Container(
                 width: 120,
@@ -107,7 +123,10 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
               const SizedBox(height: 16),
               // Status Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF9800).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -183,6 +202,20 @@ class RejectedScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Back Arrow
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios,
+                    color: Color(0xFF212529),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
               // Rejected Icon
               Container(
                 width: 120,
@@ -210,7 +243,10 @@ class RejectedScreen extends StatelessWidget {
               const SizedBox(height: 16),
               // Status Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF44336).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
