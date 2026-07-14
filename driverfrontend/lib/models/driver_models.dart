@@ -64,6 +64,10 @@ class DriverModel {
   final int acceptanceRate;
   final int onTimePercentage;
   final DateTime? memberSince;
+  // New: Approval status fields
+  final String? status;
+  final String? approvalStatus;
+  final String? rejectionReason;
 
   DriverModel({
     required this.id,
@@ -89,6 +93,9 @@ class DriverModel {
     this.acceptanceRate = 100,
     this.onTimePercentage = 96,
     this.memberSince,
+    this.status,
+    this.approvalStatus,
+    this.rejectionReason,
   });
 
   factory DriverModel.fromJson(Map<String, dynamic> json) {
@@ -166,7 +173,13 @@ class DriverModel {
         completedTrips: (json['completedTrips'] as num?)?.toInt() ?? 0,
         acceptanceRate: (json['acceptanceRate'] as num?)?.toInt() ?? 100,
         onTimePercentage: (json['onTimePercentage'] as num?)?.toInt() ?? 96,
-        memberSince: json['memberSince'] != null ? DateTime.tryParse(json['memberSince'].toString()) : null,
+        memberSince: json['memberSince'] != null
+            ? DateTime.tryParse(json['memberSince'].toString())
+            : null,
+        // New approval fields
+        status: json['status'] as String?,
+        approvalStatus: json['approvalStatus'] as String?,
+        rejectionReason: json['rejectionReason'] as String?,
       );
 
       debugPrint('DriverModel.fromJson: Successfully created DriverModel!');
@@ -215,6 +228,9 @@ class DriverModel {
       'branchName': branchName,
       'bankAccounts': bankAccounts.map((e) => e.toJson()).toList(),
       'documents': documents.map((e) => e.toJson()).toList(),
+      'status': status,
+      'approvalStatus': approvalStatus,
+      'rejectionReason': rejectionReason,
     };
   }
 }

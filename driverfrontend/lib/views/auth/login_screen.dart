@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'signup_screen.dart';
-import 'google_onboarding_screen.dart';
 import '../home/home_screen.dart';
+import 'pending_approval_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -69,9 +69,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (error != null) {
       debugPrint('=== _verifyPhoneNumber: Validation failed: $error ===');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
       return;
     }
@@ -92,7 +92,9 @@ class _LoginScreenState extends State<LoginScreen> {
         isTimedOut = true;
         authViewModel.setLoading(false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP request timed out. Please try again.')),
+          const SnackBar(
+            content: Text('OTP request timed out. Please try again.'),
+          ),
         );
       }
     });
@@ -104,7 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
         verificationCompleted: (PhoneAuthCredential credential) async {
           debugPrint('=== verificationCompleted ===');
           if (isTimedOut) {
-            debugPrint('=== verificationCompleted: Already timed out, skipping ===');
+            debugPrint(
+              '=== verificationCompleted: Already timed out, skipping ===',
+            );
             return;
           }
           isTimedOut = true;
@@ -115,7 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
           debugPrint('=== verificationFailed ===');
           debugPrint('Code: ${e.code}, Message: ${e.message}');
           if (isTimedOut) {
-            debugPrint('=== verificationFailed: Already timed out, skipping ===');
+            debugPrint(
+              '=== verificationFailed: Already timed out, skipping ===',
+            );
             return;
           }
           isTimedOut = true;
@@ -125,14 +131,16 @@ class _LoginScreenState extends State<LoginScreen> {
               _isOtpSent = false;
             });
             authViewModel.setLoading(false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${e.code}: ${e.message}')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('${e.code}: ${e.message}')));
           }
         },
         codeSent: (String verificationId, int? resendToken) {
           debugPrint('=== codeSent ===');
-          debugPrint('=== Verification ID: $verificationId, Resend Token: $resendToken ===');
+          debugPrint(
+            '=== Verification ID: $verificationId, Resend Token: $resendToken ===',
+          );
           if (isTimedOut) {
             debugPrint('=== codeSent: Already timed out, skipping ===');
             return;
@@ -149,7 +157,9 @@ class _LoginScreenState extends State<LoginScreen> {
             });
             authViewModel.setLoading(false);
             _startResendTimer();
-            debugPrint('=== codeSent: Loading stopped, resend timer started ===');
+            debugPrint(
+              '=== codeSent: Loading stopped, resend timer started ===',
+            );
           } else {
             debugPrint('=== codeSent: Not mounted ===');
           }
@@ -158,7 +168,9 @@ class _LoginScreenState extends State<LoginScreen> {
           debugPrint('=== codeAutoRetrievalTimeout ===');
           debugPrint('Verification ID: $verificationId');
           if (isTimedOut) {
-            debugPrint('=== codeAutoRetrievalTimeout: Already timed out, skipping ===');
+            debugPrint(
+              '=== codeAutoRetrievalTimeout: Already timed out, skipping ===',
+            );
             return;
           }
           if (mounted) {
@@ -181,9 +193,9 @@ class _LoginScreenState extends State<LoginScreen> {
       timeoutTimer.cancel();
       if (mounted) {
         authViewModel.setLoading(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -194,9 +206,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final otp = _otpController.text.trim();
     if (otp.isEmpty || _verificationId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the OTP')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter the OTP')));
       return;
     }
 
@@ -218,17 +230,17 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Code: ${e.code}, Message: ${e.message}');
       if (mounted) {
         authViewModel.setLoading(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e.code}: ${e.message}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${e.code}: ${e.message}')));
       }
     } catch (e) {
       debugPrint('=== Exception in signInWithOtp ===');
       if (mounted) {
         authViewModel.setLoading(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -238,8 +250,10 @@ class _LoginScreenState extends State<LoginScreen> {
     authViewModel.setLoading(true);
     try {
       debugPrint('=== Signing in with credential ===');
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      debugPrint('=== User Credential: $userCredential');
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      debugPrint('=== User Credential: $userCredential ===');
 
       final user = userCredential.user;
       if (user == null) {
@@ -250,7 +264,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final idToken = await user.getIdToken();
       debugPrint('=== ID Token retrieved ===');
       final firebaseUid = user.uid;
-      final cleanMobile = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleanMobile = _phoneController.text.replaceAll(
+        RegExp(r'[^0-9]'),
+        '',
+      );
 
       if (mounted) {
         if (_nameController.text.trim().isNotEmpty) {
@@ -269,9 +286,8 @@ class _LoginScreenState extends State<LoginScreen> {
               });
               authViewModel.setLoading(false);
             } else if (mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const HomeScreen()),
-                (route) => false,
               );
             }
           } else if (mounted) {
@@ -295,9 +311,8 @@ class _LoginScreenState extends State<LoginScreen> {
               });
               authViewModel.setLoading(false);
             } else if (mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
+              Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const HomeScreen()),
-                (route) => false,
               );
             }
           } else if (mounted) {
@@ -313,9 +328,9 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Code: ${e.code}, Message: ${e.message}');
       if (mounted) {
         authViewModel.setLoading(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e.code}: ${e.message}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${e.code}: ${e.message}')));
       }
     } catch (e, stackTrace) {
       debugPrint('=== Exception in signInWithCredential ===');
@@ -323,9 +338,9 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         authViewModel.setLoading(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -345,10 +360,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authViewModel.login(email, password);
 
     if (success && mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authViewModel.error ?? 'Login failed')),
@@ -358,27 +372,116 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleGoogleLogin() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    // Show full-screen loading overlay
+    _showFullScreenLoading(true);
+
     final result = await authViewModel.loginWithGoogle();
 
-    if (result['success'] && mounted) {
-      if (result['isNewUser'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No driver account found with this Google account. Please register first.'),
-            backgroundColor: Colors.red,
+    // Hide loading overlay
+    if (mounted) {
+      _showFullScreenLoading(false);
+    }
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      if (result['status'] == 'APPROVED') {
+        // Navigate to Home Screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else if (result['status'] == 'PENDING') {
+        // Navigate to Pending Approval Screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+        );
+      } else if (result['status'] == 'REJECTED') {
+        // Navigate to Rejected Screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                RejectedScreen(rejectionReason: result['rejectionReason']),
           ),
         );
-      } else {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+      } else if (result['status'] == 'NOT_FOUND' ||
+          result['isNewUser'] == true) {
+        // Show NOT FOUND bottom sheet
+        _showDriverNotFoundBottomSheet();
       }
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authViewModel.error ?? 'Google Login Failed')),
-      );
+    } else {
+      // Show error dialog
+      _showConnectionErrorDialog();
     }
+  }
+
+  // Show/hide full-screen loading overlay
+  void _showFullScreenLoading(bool show) {
+    if (show) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const _FullScreenLoadingOverlay(),
+      );
+    } else {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  // Show NOT FOUND bottom sheet
+  void _showDriverNotFoundBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => _DriverNotFoundBottomSheet(
+        onRegister: () {
+          Navigator.of(context).pop();
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const SignupScreen()));
+        },
+        onUseAnotherAccount: () async {
+          final authViewModel = Provider.of<AuthViewModel>(
+            context,
+            listen: false,
+          );
+          await authViewModel.logout();
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        onClose: () => Navigator.of(context).pop(),
+      ),
+    );
+  }
+
+  // Show connection error dialog
+  void _showConnectionErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Connection Problem'),
+        content: const Text(
+          'We couldn\'t verify your account right now. Please try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handleGoogleLogin();
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -484,7 +587,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _isNewDriver ? 'Tell us your name' : 'Login to start accepting rides',
+                    _isNewDriver
+                        ? 'Tell us your name'
+                        : 'Login to start accepting rides',
                     style: const TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ],
@@ -510,8 +615,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: _isNewDriver
                     ? _buildNewDriverScreen(authViewModel)
                     : (_isOtpSent
-                        ? _buildOtpScreen(authViewModel)
-                        : _buildLoginScreen(authViewModel)),
+                          ? _buildOtpScreen(authViewModel)
+                          : _buildLoginScreen(authViewModel)),
               ),
             ),
           ],
@@ -589,9 +694,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    hintText: '9876543210',
-                  ),
+                  decoration: const InputDecoration(hintText: '9876543210'),
                 ),
               ),
             ],
@@ -624,7 +727,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
           ),
@@ -890,7 +994,7 @@ class _LoginScreenState extends State<LoginScreen> {
               borderSide: BorderSide.none,
             ),
             filled: true,
-            fillColor: Color(0xFFF5F5F5),
+            fillColor: const Color(0xFFF5F5F5),
           ),
         ),
         const SizedBox(height: 24),
@@ -909,7 +1013,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     }
                     if (authViewModel.newDriverInfo == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Session expired, please try again')),
+                        const SnackBar(
+                          content: Text('Session expired, please try again'),
+                        ),
                       );
                       return;
                     }
@@ -918,14 +1024,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       authViewModel.newDriverInfo!['mobile'],
                     );
                     if (success && mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
+                      Navigator.of(context).pushReplacement(
                         MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        (route) => false,
                       );
                     } else if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(authViewModel.error ?? 'Failed to complete profile'),
+                          content: Text(
+                            authViewModel.error ?? 'Failed to complete profile',
+                          ),
                         ),
                       );
                     }
@@ -978,6 +1085,148 @@ class _LoginScreenState extends State<LoginScreen> {
               color: isActive ? Colors.black : Colors.grey[600],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Full-screen loading overlay
+class _FullScreenLoadingOverlay extends StatelessWidget {
+  const _FullScreenLoadingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.5),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 24),
+            Text(
+              'Signing you in… Please wait.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Driver not found bottom sheet
+class _DriverNotFoundBottomSheet extends StatelessWidget {
+  final VoidCallback onRegister;
+  final VoidCallback onUseAnotherAccount;
+  final VoidCallback onClose;
+
+  const _DriverNotFoundBottomSheet({
+    required this.onRegister,
+    required this.onUseAnotherAccount,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Warning icon
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.warning_rounded,
+                size: 40,
+                color: Color(0xFFFF9800),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Driver Account Not Found',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'This Google account is not registered as a TaxiNanban Driver. Please register first or use another approved Google account.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 40),
+            // Primary button
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: onRegister,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6D00),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                ),
+                child: const Text(
+                  'Register as Driver',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Secondary button
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: TextButton(
+                onPressed: onUseAnotherAccount,
+                child: const Text(
+                  'Use Another Google Account',
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Close button
+            TextButton(
+              onPressed: onClose,
+              child: Text(
+                'Close',
+                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+              ),
+            ),
+          ],
         ),
       ),
     );

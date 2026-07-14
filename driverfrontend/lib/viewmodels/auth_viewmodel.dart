@@ -293,7 +293,9 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('fetchDriverProfile: Error: $e');
       debugPrint('fetchDriverProfile: Stack trace: $stackTrace');
       final errorMsg = e.toString().toLowerCase();
-      if (errorMsg.contains('403') || errorMsg.contains('not approved') || errorMsg.contains('approved')) {
+      if (errorMsg.contains('403') ||
+          errorMsg.contains('not approved') ||
+          errorMsg.contains('approved')) {
         _error = 'Driver not approved. Please wait for vendor/admin approval.';
         await logout();
       }
@@ -530,18 +532,25 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> signInWithFirebasePhone(String idToken, String role, {String? name, String? firebaseUid, String? mobile}) async {
+  Future<Map<String, dynamic>> signInWithFirebasePhone(
+    String idToken,
+    String role, {
+    String? name,
+    String? firebaseUid,
+    String? mobile,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final result = await _authService.firebasePhoneSignIn(idToken, role, name: name);
+      final result = await _authService.firebasePhoneSignIn(
+        idToken,
+        role,
+        name: name,
+      );
       if (result['isNewDriver'] == true) {
-        _newDriverInfo = {
-          ...result,
-          'firebaseUid': firebaseUid,
-        };
+        _newDriverInfo = {...result, 'firebaseUid': firebaseUid};
         _isLoading = false;
         notifyListeners();
         return {'success': true, 'isNewDriver': true};
@@ -747,33 +756,60 @@ class AuthViewModel extends ChangeNotifier {
         data: driverData,
       );
 
+      // Handle new user case first
       if (response.data['isNewUser'] == true) {
         _newDriverInfo = response.data;
         _isLoading = false;
         notifyListeners();
-        return {'success': true, 'isNewUser': true};
+        return {'success': true, 'status': 'NOT_FOUND', 'isNewUser': true};
+      }
+
+      final data = response.data;
+      final actualData = (data['data'] != null) ? data['data'] : data;
+      final driver = DriverModel.fromJson(actualData['user'] ?? actualData);
+
+      // Determine driver status
+      String status;
+      String? rejectionReason;
+
+      if (driver.status == 'approved' || driver.approvalStatus == 'approved') {
+        status = 'APPROVED';
+      } else if (driver.status == 'rejected' ||
+          driver.approvalStatus == 'rejected') {
+        status = 'REJECTED';
+        rejectionReason = driver.rejectionReason;
+      } else if (driver.status == 'pending' ||
+          driver.approvalStatus == 'pending') {
+        status = 'PENDING';
       } else {
-        final data = response.data;
-        final actualData = (data['data'] != null) ? data['data'] : data;
-        _driver = DriverModel.fromJson(actualData['user'] ?? actualData);
+        status = 'PENDING'; // Default to pending if status is unknown
+      }
+
+      if (status == 'APPROVED') {
+        // Save driver and token only if approved
+        _driver = driver;
 
         final prefs = await SharedPreferences.getInstance();
         final token = actualData['token'] ?? data['token'];
-
         if (token != null) {
           await prefs.setString(AppConstants.tokenKey, token);
-          await prefs.setString(AppConstants.driverIdKey, _driver!.id);
-
-          _isLoading = false;
-          notifyListeners();
-          return {'success': true, 'isNewUser': false};
-        } else {
-          _error = 'Token not found in response';
-          _isLoading = false;
-          notifyListeners();
-          return {'success': false};
+          await prefs.setString(AppConstants.driverIdKey, driver.id);
+          await _saveDriverToPrefs(driver);
         }
+      } else {
+        // Don't save full driver object if not approved, just keep for status check
+        _driver = null;
       }
+
+      _isLoading = false;
+      notifyListeners();
+
+      return {
+        'success': true,
+        'status': status,
+        'rejectionReason': rejectionReason,
+        'isNewUser': false,
+      };
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
