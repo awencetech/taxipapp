@@ -227,12 +227,10 @@ class RejectedScreen extends StatelessWidget {
                     await prefs.clear();
 
                     // Navigate to LoginScreen
-                    if (mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
-                      );
-                    }
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
                   },
                 ),
               ),
