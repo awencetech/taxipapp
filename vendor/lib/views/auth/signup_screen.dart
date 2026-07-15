@@ -249,7 +249,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             }
                             return;
                           }
-                          final success = await authViewModel.register(
+                          final status = await authViewModel.register(
                             _nameController.text,
                             _emailController.text,
                             _phoneController.text.trim().replaceAll(
@@ -259,12 +259,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             _passwordController.text,
                             _companyNameController.text,
                           );
-                          if (!success && authViewModel.errorMessage != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(authViewModel.errorMessage!),
-                              ),
-                            );
+                          if (status == null && authViewModel.errorMessage != null) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(authViewModel.errorMessage!),
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(

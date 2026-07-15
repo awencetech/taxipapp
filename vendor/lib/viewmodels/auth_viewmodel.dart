@@ -481,17 +481,18 @@ class AuthViewModel extends ChangeNotifier {
     return {'success': false};
   }
 
-  Future<bool> completeGoogleSignUp({
+  Future<AuthStatus?> completeGoogleSignUp({
     required String phone,
     required String password,
     required String companyName,
   }) async {
     if (_pendingGoogleSignUpData == null) {
-      return false;
+      return null;
     }
 
     _isLoading = true;
     _errorMessage = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -507,26 +508,60 @@ class AuthViewModel extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
+        final vendorData = data['vendor'];
+        
+        // Check approval status
+        final approvalStatus = vendorData['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+          _isLoading = false;
+          notifyListeners();
+          return AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+          _isLoading = false;
+          notifyListeners();
+          return AuthStatus.declined;
+        }
+
+        // If approved, log them in
         final token = data['token'];
-        final vendorId = data['vendor']['_id'];
+        final vendorId = vendorData['_id'];
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConstants.tokenKey, token);
         await prefs.setString(AppConstants.vendorIdKey, vendorId);
 
-        _vendor = Vendor.fromJson(data['vendor']);
+        _vendor = Vendor.fromJson(vendorData);
         _isLoggedIn = true;
         _pendingGoogleSignUpData = null;
+        _authStatus = AuthStatus.success;
         _isLoading = false;
         notifyListeners();
-        return true;
+        return AuthStatus.success;
       }
-      return false;
-    } catch (e) {
-      _errorMessage = e.toString();
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 && e.data != null) {
+        final approvalStatus = e.data!['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+        }
+        _isLoading = false;
+        notifyListeners();
+        return _authStatus;
+      }
+      _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
-      return false;
+      return null;
+    } catch (e) {
+      _errorMessage = 'Something went wrong. Please try again.';
+      _isLoading = false;
+      notifyListeners();
+      return null;
     }
   }
 

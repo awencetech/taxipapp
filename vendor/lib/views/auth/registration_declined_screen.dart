@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vendor/core/theme/app_colors.dart';
-import 'package:vendor/views/auth/login_screen.dart';
+import '../../core/theme/app_theme.dart';
+import 'login_screen.dart';
 
 class RegistrationDeclinedScreen extends StatelessWidget {
   const RegistrationDeclinedScreen({super.key});
@@ -8,6 +8,7 @@ class RegistrationDeclinedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -22,11 +23,7 @@ class RegistrationDeclinedScreen extends StatelessWidget {
                   color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.cancel,
-                  size: 60,
-                  color: Colors.red,
-                ),
+                child: const Icon(Icons.cancel, size: 60, color: Colors.red),
               ),
               const SizedBox(height: 32),
               // Title
@@ -58,19 +55,23 @@ class RegistrationDeclinedScreen extends StatelessWidget {
                     // TODO: Implement contact main vendor
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Contact Main Vendor feature coming soon'),
+                        content: Text(
+                          'Contact Main Vendor feature coming soon',
+                        ),
                       ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: const Text(
                     'Contact Main Vendor',
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -82,23 +83,23 @@ class RegistrationDeclinedScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
                       (route) => false,
                     );
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    side: const BorderSide(color: AppColors.primary),
+                    side: const BorderSide(color: AppTheme.primaryColor),
+                    foregroundColor: AppTheme.primaryColor,
                   ),
                   child: const Text(
                     'Back to Login',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.primary,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

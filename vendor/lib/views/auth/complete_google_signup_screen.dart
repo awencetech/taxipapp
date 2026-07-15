@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
+import 'waiting_for_approval_screen.dart';
+import 'registration_declined_screen.dart';
 
 class CompleteGoogleSignupScreen extends StatefulWidget {
   const CompleteGoogleSignupScreen({super.key});
@@ -65,10 +67,7 @@ class _CompleteGoogleSignupScreenState
               const SizedBox(height: 8),
               Text(
                 'Just a few more details to get you started!',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
@@ -170,9 +169,11 @@ class _CompleteGoogleSignupScreenState
                         _obscurePassword = !_obscurePassword;
                       });
                     },
-                    icon: Icon(_obscurePassword
-                        ? Icons.visibility
-                        : Icons.visibility_off),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
                   ),
                   filled: true,
                   fillColor: const Color(0xFFF3F4F6),
@@ -196,28 +197,43 @@ class _CompleteGoogleSignupScreenState
                       height: 56,
                       child: ElevatedButton(
                         onPressed: () async {
-                          final success =
-                              await authViewModel.completeGoogleSignUp(
-                            phone: _phoneController.text,
-                            password: _passwordController.text,
-                            companyName: _companyNameController.text,
-                          );
-                          if (success) {
-                            if (mounted) {
+                          final status = await authViewModel
+                              .completeGoogleSignUp(
+                                phone: _phoneController.text,
+                                password: _passwordController.text,
+                                companyName: _companyNameController.text,
+                              );
+                          if (mounted) {
+                            if (status == AuthStatus.success) {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => const DashboardScreen(),
                                 ),
                               );
+                            } else if (status == AuthStatus.pending) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const WaitingForApprovalScreen(),
+                                ),
+                              );
+                            } else if (status == AuthStatus.declined) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const RegistrationDeclinedScreen(),
+                                ),
+                              );
+                            } else if (authViewModel.errorMessage != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(authViewModel.errorMessage!),
+                                ),
+                              );
                             }
-                          } else if (authViewModel.errorMessage != null &&
-                              mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(authViewModel.errorMessage!),
-                              ),
-                            );
                           }
                         },
                         style: ElevatedButton.styleFrom(
