@@ -20,7 +20,7 @@ class AppTheme {
       surface: Colors.white,
       onSurface: textColor,
       error: errorColor,
-    ),
+    ).copyWith(outline: Colors.transparent, outlineVariant: Colors.transparent),
     focusColor: Colors.transparent,
     highlightColor: Colors.transparent,
     hoverColor: Colors.transparent,
@@ -66,11 +66,11 @@ class AppTheme {
       fillColor: const Color(0xFFF5F5F5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -100,7 +100,7 @@ class AppTheme {
       surface: const Color(0xFF121212),
       onSurface: Colors.white,
       error: errorColor,
-    ),
+    ).copyWith(outline: Colors.transparent, outlineVariant: Colors.transparent),
     focusColor: Colors.transparent,
     highlightColor: Colors.transparent,
     hoverColor: Colors.transparent,
@@ -131,11 +131,11 @@ class AppTheme {
       fillColor: const Color(0xFF2D2D2D),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF4B5563), width: 1),
+        borderSide: const BorderSide(color: Color(0xFF4B5563), width: 1.2),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF4B5563), width: 1),
+        borderSide: const BorderSide(color: Color(0xFF4B5563), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
