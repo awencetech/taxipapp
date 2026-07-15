@@ -697,28 +697,26 @@ class _VendorsScreenState extends State<VendorsScreen> {
                             ),
                             const SizedBox(width: 12),
                             // Actions
-                            if (vendor.approvalStatus == 'pending') ...[
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                ),
-                                onPressed: () => _approveVendor(vendor.id),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
                               ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(
-                                  Icons.cancel,
-                                  color: Colors.redAccent,
-                                ),
-                                onPressed: () => _declineVendor(vendor.id),
+                              onPressed: () => _approveVendor(vendor.id),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(
+                                Icons.cancel,
+                                color: Colors.redAccent,
                               ),
-                              const SizedBox(width: 4),
-                            ],
+                              onPressed: () => _declineVendor(vendor.id),
+                            ),
+                            const SizedBox(width: 4),
                             // Delete button
                             IconButton(
                               padding: EdgeInsets.zero,
