@@ -21,6 +21,10 @@ class AppTheme {
       onSurface: textColor,
       error: errorColor,
     ),
+    focusColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    splashColor: Colors.transparent,
     scaffoldBackgroundColor: backgroundColor,
     textTheme: GoogleFonts.poppinsTextTheme(
       TextTheme(
@@ -97,6 +101,10 @@ class AppTheme {
       onSurface: Colors.white,
       error: errorColor,
     ),
+    focusColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    splashColor: Colors.transparent,
     scaffoldBackgroundColor: const Color(0xFF1E1E1E),
     textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
     appBarTheme: const AppBarTheme(
