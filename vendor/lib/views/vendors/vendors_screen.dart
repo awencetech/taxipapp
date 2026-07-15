@@ -608,85 +608,22 @@ class _VendorsScreenState extends State<VendorsScreen> {
                         ],
                       ),
                       padding: const EdgeInsets.all(16),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Avatar
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: statusColor,
-                              ),
-                              child: Icon(
-                                Icons.person,
-                                size: 28,
-                                color: vendor.approvalStatus == 'approved'
-                                    ? Colors.green[700]
-                                    : vendor.approvalStatus == 'declined'
-                                    ? Colors.red[700]
-                                    : Colors.orange[700],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Vendor Details
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(minWidth: 150, maxWidth: 220),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    vendor.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1F2937),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    vendor.email,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    vendor.companyName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Status
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                statusText,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              // Avatar
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: statusColor,
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 28,
                                   color: vendor.approvalStatus == 'approved'
                                       ? Colors.green[700]
                                       : vendor.approvalStatus == 'declined'
@@ -694,40 +631,99 @@ class _VendorsScreenState extends State<VendorsScreen> {
                                       : Colors.orange[700],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Actions
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
+                              const SizedBox(width: 16),
+                              // Vendor Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      vendor.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      vendor.email,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      vendor.companyName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              onPressed: () => _approveVendor(vendor.id),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(
-                                Icons.cancel,
-                                color: Colors.redAccent,
+                              const SizedBox(width: 12),
+                              // Status
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: vendor.approvalStatus == 'approved'
+                                        ? Colors.green[700]
+                                        : vendor.approvalStatus == 'declined'
+                                        ? Colors.red[700]
+                                        : Colors.orange[700],
+                                  ),
+                                ),
                               ),
-                              onPressed: () => _declineVendor(vendor.id),
-                            ),
-                            const SizedBox(width: 4),
-                            // Delete button
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: _isDeleting
-                                  ? null
-                                  : () => _deleteVendor(vendor),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Actions
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => _approveVendor(vendor.id),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.cancel,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () => _declineVendor(vendor.id),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: _isDeleting
+                                    ? null
+                                    : () => _deleteVendor(vendor),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     );
                   },
