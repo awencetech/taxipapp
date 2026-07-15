@@ -1228,6 +1228,58 @@ const declineVendor = async (req, res) => {
   }
 };
 
+const deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the vendor first
+    const vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Find all drivers assigned to this vendor
+    const assignedDrivers = await Driver.find({ vendor: id });
+    const numAssignedDrivers = assignedDrivers.length;
+
+    // If there are assigned drivers, unassign them
+    if (numAssignedDrivers > 0) {
+      await Driver.updateMany(
+        { vendor: id },
+        { 
+          $set: { 
+            vendor: null, 
+            vendorStatus: 'Unassigned' 
+          } 
+        }
+      );
+    }
+
+    // TODO: Handle fleet relationships (if any) once fleet model is defined
+
+    // Delete the vendor
+    await Vendor.findByIdAndDelete(id);
+
+    // Log the deletion
+    console.log(`Vendor deleted: ID=${vendor._id}, Name=${vendor.name}, Deleted by=${req.user?._id || 'unknown'}, Time=${new Date().toISOString()}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor deleted successfully',
+      numDriversUnassigned: numAssignedDrivers,
+    });
+  } catch (error) {
+    console.error('Delete Vendor Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const getVendorNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({ vendor: req.user._id })
@@ -1375,6 +1427,7 @@ module.exports = {
   getAllVendors,
   approveVendor,
   declineVendor,
+  deleteVendor,
   getPendingDrivers,
   getVendorNotifications,
 };

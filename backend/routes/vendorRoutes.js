@@ -27,6 +27,7 @@ const {
   getAllVendors,
   approveVendor,
   declineVendor,
+  deleteVendor,
   getPendingDrivers,
   getVendorNotifications,
 } = require('../controllers/vendorController');
@@ -60,5 +61,6 @@ router.get('/notifications', protect, getVendorNotifications);
 router.get('/all', getAllVendors);
 router.put('/:id/approve', approveVendor);
 router.put('/:id/decline', declineVendor);
+router.delete('/:id', deleteVendor);
 
 module.exports = router;

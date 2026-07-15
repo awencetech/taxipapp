@@ -15,6 +15,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
   List<Vendor> _vendors = [];
   bool _isLoading = true;
   bool _showAddVendor = false;
+  bool _isDeleting = false;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -40,9 +41,9 @@ class _VendorsScreenState extends State<VendorsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load vendors: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load vendors: $e')));
       }
     } finally {
       setState(() {
@@ -65,9 +66,9 @@ class _VendorsScreenState extends State<VendorsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to approve vendor: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to approve vendor: $e')));
       }
     }
   }
@@ -78,17 +79,89 @@ class _VendorsScreenState extends State<VendorsScreen> {
       final response = await apiService.put('/vendor/$vendorId/decline');
       if (response.data['success'] == true) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vendor declined.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Vendor declined.')));
         }
         await _fetchVendors();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to decline vendor: $e')),
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to decline vendor: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteVendor(Vendor vendor) async {
+    // First, we need to know if this vendor has assigned drivers
+    // For now, we'll show the first confirmation dialog
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Delete Vendor?'),
+        content: const Text(
+          'Are you sure you want to permanently delete this vendor? This action cannot be undone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // Show second confirmation if needed (we'll assume we might have assigned drivers, but for now just proceed)
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response = await apiService.delete('/vendor/${vendor.id}');
+
+      if (response.data['success'] == true) {
+        if (mounted) {
+          // Remove the vendor from the list immediately without full refresh
+          setState(() {
+            _vendors.removeWhere((v) => v.id == vendor.id);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Vendor deleted successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('Unable to Delete Vendor'),
+            content: const Text(
+              'Something went wrong while deleting the vendor. Please try again.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
       }
     }
   }
@@ -123,9 +196,9 @@ class _VendorsScreenState extends State<VendorsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add vendor: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to add vendor: $e')));
       }
     }
   }
@@ -478,16 +551,27 @@ class _VendorsScreenState extends State<VendorsScreen> {
                           // Actions
                           if (!vendor.isApproved) ...[
                             IconButton(
-                              icon: const Icon(Icons.check_circle,
-                                  color: Colors.green),
+                              icon: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                              ),
                               onPressed: () => _approveVendor(vendor.id),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.cancel,
-                                  color: Colors.redAccent),
+                              icon: const Icon(
+                                Icons.cancel,
+                                color: Colors.redAccent,
+                              ),
                               onPressed: () => _declineVendor(vendor.id),
                             ),
                           ],
+                          // Delete button
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: _isDeleting
+                                ? null
+                                : () => _deleteVendor(vendor),
+                          ),
                         ],
                       ),
                     );
