@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
-import 'signup_screen.dart';
+
 import 'complete_google_signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -747,40 +747,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                         ],
                       ),
-
-                    const SizedBox(height: 32),
-
-                    // Sign up Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Don\'t have an account?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SignupScreen(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            '  Create Account',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
