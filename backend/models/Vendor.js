@@ -55,9 +55,33 @@ const vendorSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  role: {
+    type: String,
+    enum: ['main_vendor', 'sub_vendor'],
+    default: 'sub_vendor',
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'declined'],
+    default: 'pending',
+  },
   isApproved: {
     type: Boolean,
     default: false,
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+  },
+  approvedAt: {
+    type: Date,
+  },
+  declinedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+  },
+  declinedAt: {
+    type: Date,
   },
   fcmToken: String,
 }, { timestamps: true });

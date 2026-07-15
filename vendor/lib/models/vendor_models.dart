@@ -6,6 +6,8 @@ class Vendor {
   final String? profilePicture;
   final String companyName;
   final bool isApproved;
+  final String role;
+  final String approvalStatus;
   final int totalDrivers;
   final int totalVehicles;
   final DateTime createdAt;
@@ -18,6 +20,8 @@ class Vendor {
     this.profilePicture,
     required this.companyName,
     required this.isApproved,
+    required this.role,
+    required this.approvalStatus,
     required this.totalDrivers,
     required this.totalVehicles,
     required this.createdAt,
@@ -32,6 +36,8 @@ class Vendor {
       profilePicture: json['profilePicture'],
       companyName: json['companyName'],
       isApproved: json['isApproved'] ?? false,
+      role: json['role'] ?? 'sub_vendor',
+      approvalStatus: json['approvalStatus'] ?? 'pending',
       totalDrivers: json['totalDrivers'] ?? 0,
       totalVehicles: json['totalVehicles'] ?? 0,
       createdAt: DateTime.parse(json['createdAt']),

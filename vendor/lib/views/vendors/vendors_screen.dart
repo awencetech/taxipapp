@@ -16,12 +16,15 @@ class _VendorsScreenState extends State<VendorsScreen> {
   bool _isLoading = true;
   bool _showAddVendor = false;
   bool _isDeleting = false;
+  String _searchQuery = '';
+  String _selectedFilter = 'all'; // all, pending, approved, declined
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _companyNameController = TextEditingController();
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -32,7 +35,17 @@ class _VendorsScreenState extends State<VendorsScreen> {
   Future<void> _fetchVendors() async {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
-      final response = await apiService.get('/vendor/all');
+      final Map<String, dynamic> queryParams = {};
+      if (_searchQuery.isNotEmpty) {
+        queryParams['search'] = _searchQuery;
+      }
+      if (_selectedFilter != 'all') {
+        queryParams['status'] = _selectedFilter;
+      }
+      final response = await apiService.get(
+        '/vendor/all',
+        queryParameters: queryParams,
+      );
       if (response.data['success'] == true) {
         final List<dynamic> vendorsData = response.data['vendors'];
         setState(() {
@@ -218,6 +231,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _companyNameController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -437,13 +451,125 @@ class _VendorsScreenState extends State<VendorsScreen> {
                 const SizedBox(height: 24),
               ],
 
+              // Search and Filters
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search vendors...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: const Color(0xFFF3F4F6),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.trim();
+                        });
+                        _fetchVendors();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('All'),
+                      selected: _selectedFilter == 'all',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedFilter = 'all';
+                        });
+                        _fetchVendors();
+                      },
+                      selectedColor: AppTheme.primaryColor,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: _selectedFilter == 'all'
+                            ? Colors.white
+                            : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Pending'),
+                      selected: _selectedFilter == 'pending',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedFilter = 'pending';
+                        });
+                        _fetchVendors();
+                      },
+                      selectedColor: Colors.orange,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: _selectedFilter == 'pending'
+                            ? Colors.white
+                            : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Approved'),
+                      selected: _selectedFilter == 'approved',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedFilter = 'approved';
+                        });
+                        _fetchVendors();
+                      },
+                      selectedColor: Colors.green,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: _selectedFilter == 'approved'
+                            ? Colors.white
+                            : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Declined'),
+                      selected: _selectedFilter == 'declined',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedFilter = 'declined';
+                        });
+                        _fetchVendors();
+                      },
+                      selectedColor: Colors.red,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: _selectedFilter == 'declined'
+                            ? Colors.white
+                            : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Vendors List
               if (_isLoading) ...[
                 const Center(child: CircularProgressIndicator()),
               ] else ...[
-                const Text(
-                  'All Vendors',
-                  style: TextStyle(
+                Text(
+                  '${_vendors.length} Vendors',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1F2937),
@@ -456,6 +582,18 @@ class _VendorsScreenState extends State<VendorsScreen> {
                   itemCount: _vendors.length,
                   itemBuilder: (context, index) {
                     final vendor = _vendors[index];
+                    Color statusColor;
+                    String statusText;
+                    if (vendor.approvalStatus == 'approved') {
+                      statusColor = Colors.green[100]!;
+                      statusText = 'Approved';
+                    } else if (vendor.approvalStatus == 'declined') {
+                      statusColor = Colors.red[100]!;
+                      statusText = 'Declined';
+                    } else {
+                      statusColor = Colors.orange[100]!;
+                      statusText = 'Pending';
+                    }
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
@@ -478,15 +616,15 @@ class _VendorsScreenState extends State<VendorsScreen> {
                             height: 50,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: vendor.isApproved
-                                  ? Colors.green[100]
-                                  : Colors.orange[100],
+                              color: statusColor,
                             ),
                             child: Icon(
                               Icons.person,
                               size: 28,
-                              color: vendor.isApproved
+                              color: vendor.approvalStatus == 'approved'
                                   ? Colors.green[700]
+                                  : vendor.approvalStatus == 'declined'
+                                  ? Colors.red[700]
                                   : Colors.orange[700],
                             ),
                           ),
@@ -531,25 +669,25 @@ class _VendorsScreenState extends State<VendorsScreen> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: vendor.isApproved
-                                  ? Colors.green[100]
-                                  : Colors.orange[100],
+                              color: statusColor,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              vendor.isApproved ? 'Approved' : 'Pending',
+                              statusText,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: vendor.isApproved
+                                color: vendor.approvalStatus == 'approved'
                                     ? Colors.green[700]
+                                    : vendor.approvalStatus == 'declined'
+                                    ? Colors.red[700]
                                     : Colors.orange[700],
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
                           // Actions
-                          if (!vendor.isApproved) ...[
+                          if (vendor.approvalStatus == 'pending') ...[
                             IconButton(
                               icon: const Icon(
                                 Icons.check_circle,

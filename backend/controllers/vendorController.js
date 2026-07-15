@@ -174,14 +174,16 @@ const registerVendor = async (req, res) => {
       password,
       companyName,
       googleId: googleId || undefined,
-      isApproved: true,
+      role: 'sub_vendor',
+      approvalStatus: 'pending',
+      isApproved: false,
     });
 
     const token = generateToken(vendor._id);
 
     res.status(201).json({
       success: true,
-      message: 'Vendor registered successfully',
+      message: 'Vendor registered successfully, waiting for approval',
       token,
       vendor: {
         _id: vendor._id,
@@ -189,6 +191,9 @@ const registerVendor = async (req, res) => {
         email: vendor.email,
         phone: vendor.phone,
         companyName: vendor.companyName,
+        role: vendor.role,
+        approvalStatus: vendor.approvalStatus,
+        isApproved: vendor.isApproved,
         totalDrivers: 0,
         totalVehicles: 0,
         createdAt: vendor.createdAt,
@@ -232,21 +237,23 @@ const loginVendor = async (req, res) => {
       });
     }
 
-    // Auto-approve if Google login
-    if (googleId && !vendor.isApproved) {
-      vendor.isApproved = true;
-      if (!vendor.googleId) {
-        vendor.googleId = googleId;
+    // Main vendor can always log in
+    if (vendor.role !== 'main_vendor') {
+      // Check if vendor is approved
+      if (vendor.approvalStatus === 'declined') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your registration has been declined. Please contact support.',
+          approvalStatus: 'declined',
+        });
       }
-      await vendor.save();
-    }
-
-    // Check if vendor is approved
-    if (!vendor.isApproved) {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account is not approved yet. Please wait for admin approval.',
-      });
+      if (vendor.approvalStatus === 'pending' || !vendor.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is pending approval. Please wait for the main vendor to approve.',
+          approvalStatus: 'pending',
+        });
+      }
     }
 
     // Verify credentials
@@ -266,6 +273,11 @@ const loginVendor = async (req, res) => {
           message: 'Invalid Google credentials',
         });
       }
+      // Set googleId if not set
+      if (!vendor.googleId) {
+        vendor.googleId = googleId;
+        await vendor.save();
+      }
     }
 
     const totalDrivers = await Driver.countDocuments();
@@ -283,6 +295,9 @@ const loginVendor = async (req, res) => {
         email: vendor.email,
         phone: vendor.phone,
         companyName: vendor.companyName,
+        role: vendor.role,
+        approvalStatus: vendor.approvalStatus,
+        isApproved: vendor.isApproved,
         totalDrivers,
         totalVehicles,
         createdAt: vendor.createdAt,
@@ -1106,7 +1121,27 @@ const resetPassword = async (req, res) => {
 
 const getAllVendors = async (req, res) => {
   try {
-    const vendors = await Vendor.find().sort({ createdAt: -1 });
+    const { search, status } = req.query;
+    
+    let query = {};
+    
+    // Status filter
+    if (status && status !== 'all') {
+      query.approvalStatus = status;
+    }
+    
+    // Search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      query.$or = [
+        { name: { $regex: searchLower, $options: 'i' } },
+        { email: { $regex: searchLower, $options: 'i' } },
+        { companyName: { $regex: searchLower, $options: 'i' } },
+        { phone: { $regex: searchLower, $options: 'i' } },
+      ];
+    }
+    
+    const vendors = await Vendor.find(query).sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       vendors,
@@ -1173,7 +1208,12 @@ const approveVendor = async (req, res) => {
     const { id } = req.params;
     const vendor = await Vendor.findByIdAndUpdate(
       id,
-      { isApproved: true },
+      { 
+        isApproved: true, 
+        approvalStatus: 'approved',
+        approvedBy: req.user?._id,
+        approvedAt: new Date(),
+      },
       { new: true }
     );
 
@@ -1203,7 +1243,12 @@ const declineVendor = async (req, res) => {
     const { id } = req.params;
     const vendor = await Vendor.findByIdAndUpdate(
       id,
-      { isApproved: false },
+      { 
+        isApproved: false, 
+        approvalStatus: 'declined',
+        declinedBy: req.user?._id,
+        declinedAt: new Date(),
+      },
       { new: true }
     );
 
