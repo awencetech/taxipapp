@@ -1,8 +1,8 @@
 class AppConstants {
   static const String appName = 'Taxi Nanban Vendor';
 
-  static const String baseUrl = 'http://127.0.0.1:5003/api/v1';
-  static const String socketUrl = 'http://127.0.0.1:5003';
+  static const String baseUrl = 'http://10.0.2.2:5003/api/v1';
+  static const String socketUrl = 'http://10.0.2.2:5003';
 
   // Vendor APIs
   static const String vendorLoginUrl = '/vendor/login';

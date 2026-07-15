@@ -414,7 +414,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                               _currentPhone!,
                                               _otpController.text,
                                             );
-                                        if (!success &&
+                                        if (success && mounted) {
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const DashboardScreen(),
+                                            ),
+                                          );
+                                        } else if (!success &&
                                             authViewModel.errorMessage !=
                                                 null) {
                                           if (mounted) {
@@ -594,7 +602,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                               password:
                                                   _passwordController.text,
                                             );
-                                        if (!success &&
+                                        if (success && mounted) {
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const DashboardScreen(),
+                                            ),
+                                          );
+                                        } else if (!success &&
                                             authViewModel.errorMessage !=
                                                 null) {
                                           if (mounted) {
