@@ -6,6 +6,8 @@ import '../dashboard/dashboard_screen.dart';
 
 import 'complete_google_signup_screen.dart';
 import 'forgot_password_screen.dart';
+import 'waiting_for_approval_screen.dart';
+import 'registration_declined_screen.dart';
 
 enum LoginState { phone, otp, email }
 
@@ -42,12 +44,27 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
 
-    if (authViewModel.isLoggedIn) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        );
+    // Handle auth status changes
+    if (authViewModel.authStatus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (authViewModel.authStatus == AuthStatus.success) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          );
+        } else if (authViewModel.authStatus == AuthStatus.pending) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WaitingForApprovalScreen()),
+          );
+        } else if (authViewModel.authStatus == AuthStatus.declined) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RegistrationDeclinedScreen(),
+            ),
+          );
+        }
       });
     }
 
@@ -409,33 +426,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                     height: 56,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        final success = await authViewModel
+                                        final status = await authViewModel
                                             .verifyOTP(
                                               _currentPhone!,
                                               _otpController.text,
                                             );
-                                        if (success && mounted) {
-                                          Navigator.pushReplacement(
+                                        if (authViewModel.errorMessage !=
+                                                null &&
+                                            mounted) {
+                                          ScaffoldMessenger.of(
                                             context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  const DashboardScreen(),
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                authViewModel.errorMessage!,
+                                              ),
                                             ),
                                           );
-                                        } else if (!success &&
-                                            authViewModel.errorMessage !=
-                                                null) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  authViewModel.errorMessage!,
-                                                ),
-                                              ),
-                                            );
-                                          }
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
@@ -596,34 +603,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                     height: 56,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        final success = await authViewModel
+                                        final status = await authViewModel
                                             .login(
                                               email: _emailController.text,
                                               password:
                                                   _passwordController.text,
                                             );
-                                        if (success && mounted) {
-                                          Navigator.pushReplacement(
+                                        if (authViewModel.errorMessage !=
+                                                null &&
+                                            mounted) {
+                                          ScaffoldMessenger.of(
                                             context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  const DashboardScreen(),
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                authViewModel.errorMessage!,
+                                              ),
                                             ),
                                           );
-                                        } else if (!success &&
-                                            authViewModel.errorMessage !=
-                                                null) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  authViewModel.errorMessage!,
-                                                ),
-                                              ),
-                                            );
-                                          }
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
@@ -685,6 +682,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 56,
                                   child: OutlinedButton.icon(
                                     onPressed: () async {
+                                      // TODO: Update signInWithGoogle to handle approvalStatus
                                       final result = await authViewModel
                                           .signInWithGoogle();
                                       if (result['success'] == true) {
@@ -699,7 +697,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                             );
                                           }
                                         } else {
-                                          if (mounted) {
+                                          // Check auth status after google login
+                                          if (authViewModel.authStatus ==
+                                                  AuthStatus.success &&
+                                              mounted) {
                                             Navigator.pushReplacement(
                                               context,
                                               MaterialPageRoute(

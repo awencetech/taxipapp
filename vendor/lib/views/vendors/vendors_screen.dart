@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../models/vendor_models.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
 class VendorsScreen extends StatefulWidget {
   const VendorsScreen({super.key});
@@ -29,6 +30,22 @@ class _VendorsScreenState extends State<VendorsScreen> {
   @override
   void initState() {
     super.initState();
+    _checkVendorRole();
+  }
+
+  Future<void> _checkVendorRole() async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.vendor?.role != 'main_vendor') {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Only the main vendor can access this page'),
+          ),
+        );
+      }
+      return;
+    }
     _fetchVendors();
   }
 
@@ -716,7 +733,10 @@ class _VendorsScreenState extends State<VendorsScreen> {
                                 onPressed: () => _declineVendor(vendor.id),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
                                 onPressed: _isDeleting
                                     ? null
                                     : () => _deleteVendor(vendor),

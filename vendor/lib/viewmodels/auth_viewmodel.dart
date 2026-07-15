@@ -5,6 +5,8 @@ import '../services/api_service.dart';
 import '../core/constants/app_constants.dart';
 import '../models/vendor_models.dart';
 
+enum AuthStatus { success, pending, declined }
+
 class AuthViewModel extends ChangeNotifier {
   final ApiService _apiService;
 
@@ -13,12 +15,14 @@ class AuthViewModel extends ChangeNotifier {
   Vendor? _vendor;
   String? _errorMessage;
   Map<String, dynamic>? _pendingGoogleSignUpData;
+  AuthStatus? _authStatus;
 
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
   Vendor? get vendor => _vendor;
   String? get errorMessage => _errorMessage;
   Map<String, dynamic>? get pendingGoogleSignUpData => _pendingGoogleSignUpData;
+  AuthStatus? get authStatus => _authStatus;
 
   AuthViewModel({required ApiService apiService}) : _apiService = apiService {
     _restoreLoginState();
@@ -40,13 +44,14 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login({
+  Future<AuthStatus?> login({
     String? email,
     String? phone,
     required String password,
   }) async {
     _isLoading = true;
     _errorMessage = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -71,16 +76,33 @@ class AuthViewModel extends ChangeNotifier {
 
         _vendor = Vendor.fromJson(data['vendor']);
         _isLoggedIn = true;
+        _authStatus = AuthStatus.success;
         _isLoading = false;
         notifyListeners();
-        return true;
+        return AuthStatus.success;
       }
-      return false;
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 && e.data != null) {
+        final approvalStatus = e.data!['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+        }
+        _isLoading = false;
+        notifyListeners();
+        return _authStatus;
+      }
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return null;
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 
@@ -109,9 +131,10 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyOTP(String phone, String otp) async {
+  Future<AuthStatus?> verifyOTP(String phone, String otp) async {
     _isLoading = true;
     _errorMessage = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -131,20 +154,37 @@ class AuthViewModel extends ChangeNotifier {
 
         _vendor = Vendor.fromJson(data['vendor']);
         _isLoggedIn = true;
+        _authStatus = AuthStatus.success;
         _isLoading = false;
         notifyListeners();
-        return true;
+        return AuthStatus.success;
       }
-      return false;
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 && e.data != null) {
+        final approvalStatus = e.data!['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+        }
+        _isLoading = false;
+        notifyListeners();
+        return _authStatus;
+      }
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return null;
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 
-  Future<bool> register(
+  Future<AuthStatus?> register(
     String name,
     String email,
     String phone,
@@ -153,6 +193,7 @@ class AuthViewModel extends ChangeNotifier {
   ) async {
     _isLoading = true;
     _errorMessage = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -169,25 +210,34 @@ class AuthViewModel extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
-        final token = data['token'];
-        final vendorId = data['vendor']['_id'];
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
-        await prefs.setString(AppConstants.vendorIdKey, vendorId);
-
         _vendor = Vendor.fromJson(data['vendor']);
-        _isLoggedIn = true;
+        _authStatus = AuthStatus.pending;
         _isLoading = false;
         notifyListeners();
-        return true;
+        return AuthStatus.pending;
       }
-      return false;
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 && e.data != null) {
+        final approvalStatus = e.data!['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+        }
+        _isLoading = false;
+        notifyListeners();
+        return _authStatus;
+      }
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return null;
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

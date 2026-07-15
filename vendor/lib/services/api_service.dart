@@ -3,6 +3,18 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final Map<String, dynamic>? data;
+
+  ApiException({
+    required this.message,
+    this.statusCode,
+    this.data,
+  });
+}
+
 class ApiService {
   late final Dio _dio;
 
@@ -75,8 +87,16 @@ class ApiService {
     }
   }
 
-  Exception _handleError(DioException error) {
+  ApiException _handleError(DioException error) {
     String message;
+    int? statusCode;
+    Map<String, dynamic>? data;
+
+    statusCode = error.response?.statusCode;
+    if (error.response?.data is Map<String, dynamic>) {
+      data = error.response?.data as Map<String, dynamic>;
+    }
+
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
         message = 'Connection timeout. Please check your internet connection.';
@@ -88,17 +108,15 @@ class ApiService {
         message = 'Receive timeout. Please try again.';
         break;
       case DioExceptionType.badResponse:
-        if (error.response?.statusCode == 401) {
+        if (statusCode == 401) {
           message = 'Unauthorized. Please login again.';
-        } else if (error.response?.statusCode == 404) {
+        } else if (statusCode == 404) {
           message = 'API endpoint not found. Please check backend.';
-        } else if (error.response?.statusCode == 500) {
+        } else if (statusCode == 500) {
           message = 'Server error. Please try again later.';
         } else {
-          // Check if data is a map first
-          if (error.response?.data is Map<String, dynamic>) {
-            final data = error.response?.data as Map<String, dynamic>;
-            message = data['message'] ?? 'Something went wrong.';
+          if (data != null && data.containsKey('message')) {
+            message = data['message'];
           } else if (error.response?.data is String) {
             message = error.response?.data as String;
           } else {
@@ -117,6 +135,10 @@ class ApiService {
         message = 'Something went wrong. Please try again.';
         break;
     }
-    return Exception(message);
+    return ApiException(
+      message: message,
+      statusCode: statusCode,
+      data: data,
+    );
   }
 }

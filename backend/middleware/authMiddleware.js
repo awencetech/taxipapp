@@ -47,6 +47,39 @@ const protect = async (req, res, next) => {
         });
       }
       
+      // Check if user is a vendor and validate their approval status
+      if (user.constructor.modelName === 'Vendor') {
+        // Re-fetch vendor to get the latest approval status (in case it changed)
+        const latestVendor = await Vendor.findById(decoded.id);
+        if (!latestVendor) {
+          return res.status(401).json({
+            success: false,
+            message: 'The user/driver/vendor belonging to this token no longer exists.',
+          });
+        }
+        
+        // Main vendor is always allowed
+        if (latestVendor.role !== 'main_vendor') {
+          if (latestVendor.approvalStatus === 'pending') {
+            return res.status(403).json({
+              success: false,
+              message: 'Pending Approval',
+              approvalStatus: 'pending',
+            });
+          }
+          if (latestVendor.approvalStatus === 'declined') {
+            return res.status(403).json({
+              success: false,
+              message: 'Registration Declined',
+              approvalStatus: 'declined',
+            });
+          }
+        }
+        
+        // Update req.user with latest vendor data
+        user = latestVendor;
+      }
+      
       req.user = user; // Set req.user to either User, Driver, or Vendor
       console.log('=== Auth Middleware: Success, calling next() ===');
       next();

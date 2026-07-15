@@ -111,6 +111,25 @@ const verifyVendorOTP = async (req, res) => {
       });
     }
 
+    // Main vendor can always log in
+    if (vendor.role !== 'main_vendor') {
+      // Check if vendor is approved
+      if (vendor.approvalStatus === 'declined') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your registration has been declined. Please contact support.',
+          approvalStatus: 'declined',
+        });
+      }
+      if (vendor.approvalStatus === 'pending' || !vendor.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is pending approval. Please wait for the main vendor to approve.',
+          approvalStatus: 'pending',
+        });
+      }
+    }
+
     // Clear OTP from storage
     try {
       await deleteCache(otpKey);
@@ -131,6 +150,9 @@ const verifyVendorOTP = async (req, res) => {
         email: vendor.email,
         phone: vendor.phone,
         companyName: vendor.companyName,
+        role: vendor.role,
+        approvalStatus: vendor.approvalStatus,
+        isApproved: vendor.isApproved,
         totalDrivers,
         totalVehicles,
         createdAt: vendor.createdAt,
@@ -179,12 +201,9 @@ const registerVendor = async (req, res) => {
       isApproved: false,
     });
 
-    const token = generateToken(vendor._id);
-
     res.status(201).json({
       success: true,
       message: 'Vendor registered successfully, waiting for approval',
-      token,
       vendor: {
         _id: vendor._id,
         name: vendor.name,
