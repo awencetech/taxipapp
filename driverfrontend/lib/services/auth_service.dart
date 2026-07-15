@@ -15,6 +15,8 @@ class AuthService {
     String email,
     String password,
     String mobile,
+    String? vehicleType,
+    String? vehicleNumber,
   ) async {
     try {
       final response = await _apiService.post(
@@ -24,19 +26,39 @@ class AuthService {
           'email': email,
           'password': password,
           'mobile': mobile,
+          'role': 'driver',
         },
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final userData = response.data['user'];
-        final user = DriverModel.fromJson(userData);
-
+        // Now register driver details (vehicle type, number)
+        final token = response.data['token'];
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, response.data['token']);
-        await prefs.setString(AppConstants.driverIdKey, user.id);
+        await prefs.setString(AppConstants.tokenKey, token);
 
-        _userController.add(user);
-        return user;
+        // Set the token for API service
+        // Note: This assumes ApiService uses the token from SharedPreferences
+        final driverResponse = await _apiService.post(
+          AppConstants.driverRegisterUrl,
+          data: {
+            if (vehicleType != null) 'vehicleType': vehicleType,
+            if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
+          },
+        );
+
+        if (driverResponse.statusCode == 200 ||
+            driverResponse.statusCode == 201) {
+          final userData = response.data['user'];
+          final user = DriverModel.fromJson(userData);
+          await prefs.setString(AppConstants.driverIdKey, user.id);
+          _userController.add(user);
+          return user;
+        } else {
+          throw Exception(
+            driverResponse.data['message'] ??
+                'Failed to register driver details',
+          );
+        }
       } else {
         final message = response.data['message'] ?? 'Signup failed';
         throw Exception(message);

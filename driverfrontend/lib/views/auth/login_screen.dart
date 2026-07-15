@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'signup_screen.dart';
 import '../home/home_screen.dart';
@@ -285,9 +286,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 _isNewDriver = true;
               });
               authViewModel.setLoading(false);
-            } else if (mounted) {
-              Navigator.of(context).pushReplacement(
+            } else if (result['status'] == 'APPROVED' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+            } else if (result['status'] == 'PENDING' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => const PendingApprovalScreen(),
+                ),
+                (route) => false,
+              );
+            } else if (result['status'] == 'REJECTED' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => RejectedScreen(
+                    rejectionReason: result['rejectionReason'],
+                  ),
+                ),
+                (route) => false,
               );
             }
           } else if (mounted) {
@@ -310,9 +328,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 _isNewDriver = true;
               });
               authViewModel.setLoading(false);
-            } else if (mounted) {
-              Navigator.of(context).pushReplacement(
+            } else if (result['status'] == 'APPROVED' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+            } else if (result['status'] == 'PENDING' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => const PendingApprovalScreen(),
+                ),
+                (route) => false,
+              );
+            } else if (result['status'] == 'REJECTED' && mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => RejectedScreen(
+                    rejectionReason: result['rejectionReason'],
+                  ),
+                ),
+                (route) => false,
               );
             }
           } else if (mounted) {
@@ -357,15 +392,37 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final success = await authViewModel.login(email, password);
+    final result = await authViewModel.login(email, password);
 
-    if (success && mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    if (result['success'] && mounted) {
+      if (result['status'] == 'APPROVED') {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      } else if (result['status'] == 'PENDING') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_mobile', _phoneController.text.trim());
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+          (route) => false,
+        );
+      } else if (result['status'] == 'REJECTED') {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) =>
+                RejectedScreen(rejectionReason: result['rejectionReason']),
+          ),
+          (route) => false,
+        );
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authViewModel.error ?? 'Login failed')),
+        SnackBar(
+          content: Text(
+            result['message'] ?? authViewModel.error ?? 'Login failed',
+          ),
+        ),
       );
     }
   }
@@ -384,32 +441,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
-    if (result['success']) {
-      if (result['status'] == 'APPROVED') {
-        // Navigate to Home Screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else if (result['status'] == 'PENDING') {
-        // Navigate to Pending Approval Screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
-        );
-      } else if (result['status'] == 'REJECTED') {
-        // Navigate to Rejected Screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) =>
-                RejectedScreen(rejectionReason: result['rejectionReason']),
-          ),
-        );
-      } else if (result['status'] == 'NOT_FOUND' ||
-          result['isNewUser'] == true) {
-        // Show NOT FOUND bottom sheet
-        _showDriverNotFoundBottomSheet();
+    if (result['cancelled'] == true) {
+      // User cancelled Google Sign-In, do nothing
+      return;
+    }
+
+    if (result['status'] == 'APPROVED') {
+      // Navigate to Home Screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    } else if (result['status'] == 'PENDING') {
+      // Navigate to Pending Approval Screen, save googleId to prefs
+      final googleData = result['googleData'];
+      final prefs = await SharedPreferences.getInstance();
+      if (googleData?['googleId'] != null) {
+        await prefs.setString('pending_google_id', googleData['googleId']);
       }
-    } else {
-      // Show error dialog
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+        (route) => false,
+      );
+    } else if (result['status'] == 'REJECTED') {
+      // Navigate to Rejected Screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) =>
+              RejectedScreen(rejectionReason: result['rejectionReason']),
+        ),
+        (route) => false,
+      );
+    } else if (result['status'] == 'NOT_FOUND') {
+      // Show NOT FOUND bottom sheet
+      _showDriverNotFoundBottomSheet();
+    } else if (result['error'] != null) {
+      // Only show Connection Problem for actual network/500 errors
       _showConnectionErrorDialog();
     }
   }

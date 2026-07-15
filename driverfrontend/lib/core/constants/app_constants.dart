@@ -17,8 +17,9 @@ class AppConstants {
   static const String driverSignupUrl = '/auth/register';
   static const String driverLoginUrl = '/auth/login';
   static const String driverRegisterUrl = '/drivers/register';
-  static const String driverRegisterPendingUrl = '/driver/register-pending';
-  static const String driverStatusUrl = '/driver/status';
+  static const String driverRegisterPendingUrl = '/drivers/register-pending';
+  static const String driverStatusUrl = '/drivers/status';
+  static const String driverGoogleLoginUrl = '/drivers/google-login';
   static const String updateLocationUrl = '/drivers/location';
   static const String driverLocationUrl = '/drivers/location';
   static const String driverEarningsUrl = '/drivers/earnings';

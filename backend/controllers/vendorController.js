@@ -2,6 +2,7 @@ const Vendor = require('../models/Vendor');
 const Driver = require('../models/Driver');
 const Vehicle = require('../models/Vehicle');
 const Ride = require('../models/Ride');
+const User = require('../models/User');
 const Notification = require('../models/Notification');
 const jwt = require('jsonwebtoken');
 const { getCache, setCache, deleteCache } = require('../utils/cache');
@@ -1239,6 +1240,115 @@ const getVendorNotifications = async (req, res) => {
   }
 };
 
+const suspendDriver = async (req, res) => {
+  try {
+    let driver = await Driver.findByIdAndUpdate(
+      req.params.id,
+      { 
+        accountStatus: 'suspended', 
+        status: 'suspended',
+        isOnline: false,
+        isBusy: false
+      },
+      { new: true }
+    );
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found',
+      });
+    }
+
+    // Send notification
+    await Notification.create({
+      driver: driver._id,
+      title: 'Account Suspended',
+      message: 'Your driver account has been suspended by the vendor.',
+      type: 'status',
+    });
+
+    res.status(200).json({ success: true, data: { driver } });
+  } catch (error) {
+    console.error('Suspend Driver Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const activateDriver = async (req, res) => {
+  try {
+    let driver = await Driver.findByIdAndUpdate(
+      req.params.id,
+      { 
+        accountStatus: 'approved', 
+        status: 'approved',
+        isApproved: true
+      },
+      { new: true }
+    );
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found',
+      });
+    }
+
+    // Send notification
+    await Notification.create({
+      driver: driver._id,
+      title: 'Account Activated',
+      message: 'Your driver account has been activated. You can now start accepting rides.',
+      type: 'status',
+    });
+
+    res.status(200).json({ success: true, data: { driver } });
+  } catch (error) {
+    console.error('Activate Driver Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const updateDriver = async (req, res) => {
+  try {
+    const driverId = req.params.id;
+    const updateData = req.body;
+
+    // Remove sensitive fields
+    delete updateData._id;
+    delete updateData.__v;
+
+    let driver = await Driver.findById(driverId);
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found',
+      });
+    }
+
+    // If driver has linked user, update user fields
+    if (driver.user) {
+      const userUpdate = {};
+      if (updateData.name) userUpdate.name = updateData.name;
+      if (updateData.email) userUpdate.email = updateData.email;
+      if (updateData.mobile) userUpdate.mobile = updateData.mobile;
+      if (updateData.profilePic) userUpdate.profilePic = updateData.profilePic;
+      
+      if (Object.keys(userUpdate).length > 0) {
+        await User.findByIdAndUpdate(driver.user, userUpdate);
+      }
+    }
+
+    // Update driver fields
+    driver = await Driver.findByIdAndUpdate(driverId, updateData, { new: true });
+    
+    res.status(200).json({ success: true, data: { driver } });
+  } catch (error) {
+    console.error('Update Driver Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   registerVendor,
   loginVendor,
@@ -1254,6 +1364,9 @@ module.exports = {
   deleteDriver,
   approveDriver,
   rejectDriver,
+  suspendDriver,
+  activateDriver,
+  updateDriver,
   getVehicles,
   addVehicle,
   deleteVehicle,

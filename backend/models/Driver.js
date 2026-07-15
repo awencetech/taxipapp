@@ -114,6 +114,10 @@ const driverSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  lastSeen: {
+    type: Date,
+    default: null,
+  },
   currentLocation: {
     type: {
       type: String,

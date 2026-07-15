@@ -16,6 +16,11 @@ class SocketService {
   Stream<Map<String, dynamic>> get driverLocationStream =>
       _driverLocationController.stream;
 
+  final _driverStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get driverStatusStream =>
+      _driverStatusController.stream;
+
   void connect(String vendorId) {
     socket = io.io(
       AppConstants.socketUrl,
@@ -55,6 +60,13 @@ class SocketService {
       _driverLocationController.add(data);
     });
 
+    socket.on('driverStatusChanged', (data) {
+      if (kDebugMode) {
+        debugPrint('Received driverStatusChanged: $data');
+      }
+      _driverStatusController.add(data);
+    });
+
     socket.onDisconnect((_) {
       if (kDebugMode) {
         debugPrint('Disconnected from Socket.io');
@@ -73,5 +85,6 @@ class SocketService {
   void dispose() {
     _tripUpdateController.close();
     _driverLocationController.close();
+    _driverStatusController.close();
   }
 }

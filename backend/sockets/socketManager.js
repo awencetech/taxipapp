@@ -40,6 +40,35 @@ const formatRideResponse = (ride) => {
   return rideObj;
 };
 
+// Helper to broadcast driver status change to vendor
+const broadcastDriverStatus = async (io, driver) => {
+  try {
+    // If driver has a vendor, broadcast to that vendor's room
+    if (driver.vendor) {
+      const vendorId = driver.vendor.toString();
+      const statusData = {
+        driverId: driver._id.toString(),
+        isOnline: driver.isOnline,
+        status: driver.status,
+        isBusy: driver.isBusy,
+        lastSeen: driver.lastSeen
+      };
+      console.log(`Broadcasting driver status to vendor ${vendorId}:`, statusData);
+      io.to(`vendor-${vendorId}`).emit('driverStatusChanged', statusData);
+    }
+    // Also broadcast to all (for cases where vendor isn't in a specific room yet)
+    io.emit('driverStatusChanged', {
+      driverId: driver._id.toString(),
+      isOnline: driver.isOnline,
+      status: driver.status,
+      isBusy: driver.isBusy,
+      lastSeen: driver.lastSeen
+    });
+  } catch (err) {
+    console.error('Error broadcasting driver status:', err);
+  }
+};
+
 const initSocket = (server) => {
   const io = new Server(server, {
     cors: {
@@ -60,7 +89,7 @@ const initSocket = (server) => {
       try {
         const driver = await Driver.findOneAndUpdate(
           { user: userId },
-          { socketId: socket.id, isOnline: true, status: 'available' },
+          { socketId: socket.id },
           { new: true }
         );
         if (driver) {
@@ -68,6 +97,60 @@ const initSocket = (server) => {
         }
       } catch (err) {
         console.error('Error associating driver socket:', err);
+      }
+    });
+
+    // Vendor joins their specific room for driver updates
+    socket.on('joinVendor', async (vendorId) => {
+      const vendorRoom = `vendor-${vendorId}`;
+      socket.join(vendorRoom);
+      console.log(`Vendor ${vendorId} joined room ${vendorRoom}`);
+    });
+
+    // Driver goes online
+    socket.on('goOnline', async (data) => {
+      const { driverId } = data; // driverId here is the user._id (from driver app)
+      try {
+        const driver = await Driver.findOneAndUpdate(
+          { user: driverId },
+          {
+            isOnline: true,
+            status: 'available',
+            lastSeen: new Date(),
+            socketId: socket.id
+          },
+          { new: true }
+        );
+
+        if (driver) {
+          console.log(`Driver ${driverId} (${driver._id}) is now online`);
+          await broadcastDriverStatus(io, driver);
+        }
+      } catch (err) {
+        console.error('Error setting driver online:', err);
+      }
+    });
+
+    // Driver goes offline
+    socket.on('goOffline', async (data) => {
+      const { driverId } = data; // driverId here is user._id
+      try {
+        const driver = await Driver.findOneAndUpdate(
+          { user: driverId },
+          {
+            isOnline: false,
+            status: 'offline',
+            lastSeen: new Date()
+          },
+          { new: true }
+        );
+
+        if (driver) {
+          console.log(`Driver ${driverId} (${driver._id}) is now offline`);
+          await broadcastDriverStatus(io, driver);
+        }
+      } catch (err) {
+        console.error('Error setting driver offline:', err);
       }
     });
 
@@ -80,7 +163,8 @@ const initSocket = (server) => {
           { 
             currentLocation: { coordinates: [lng, lat] },
             currentLatitude: lat,
-            currentLongitude: lng
+            currentLongitude: lng,
+            lastSeen: new Date()
           },
           { new: true }
         );
@@ -306,13 +390,20 @@ const initSocket = (server) => {
       try {
         const driver = await Driver.findOneAndUpdate(
           { socketId: socket.id },
-          { socketId: null }
+          {
+            socketId: null,
+            isOnline: false,
+            status: 'offline',
+            lastSeen: new Date()
+          },
+          { new: true }
         );
         if (driver) {
-          console.log(`Cleared socket association for driver user ${driver.user}`);
+          console.log(`Driver ${driver._id} disconnected, marked as offline`);
+          await broadcastDriverStatus(io, driver);
         }
       } catch (err) {
-        console.error('Error clearing socket association:', err);
+        console.error('Error handling driver disconnect:', err);
       }
     });
   });

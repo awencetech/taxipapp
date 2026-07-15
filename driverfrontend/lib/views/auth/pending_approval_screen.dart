@@ -15,8 +15,8 @@ class PendingApprovalScreen extends StatefulWidget {
 
 class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
   bool _isRefreshing = false;
-  String? _status;
-  String? _rejectionReason;
+  bool _hasError = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -26,36 +26,70 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
 
   Future<void> _checkStatus() async {
     if (!mounted) return;
+    setState(() {
+      _hasError = false;
+      _errorMessage = null;
+    });
+
     final authViewModel = context.read<AuthViewModel>();
     final prefs = await SharedPreferences.getInstance();
     final mobile = prefs.getString('pending_mobile');
     final firebaseUid = prefs.getString('pending_firebase_uid');
     final googleId = prefs.getString('pending_google_id');
 
-    final statusData = await authViewModel.getDriverStatus(
-      mobile: mobile,
-      firebaseUid: firebaseUid,
-      googleId: googleId,
-    );
+    debugPrint('Checking status with: mobile=$mobile, firebaseUid=$firebaseUid, googleId=$googleId');
+    debugPrint('Current Driver ID: ${authViewModel.driver?.id}');
 
-    if (statusData != null && mounted) {
-      setState(() {
-        _status = statusData['status'];
-        _rejectionReason = statusData['rejectionReason'];
-      });
+    try {
+      final statusData = await authViewModel.getDriverStatus(
+        mobile: mobile,
+        firebaseUid: firebaseUid,
+        googleId: googleId,
+      );
 
-      if (_status == 'approved') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else if (_status == 'rejected') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RejectedScreen(rejectionReason: _rejectionReason),
-          ),
-        );
+      debugPrint('statusData = $statusData');
+
+      if (statusData != null && mounted) {
+        final approvalStatus = statusData['approvalStatus'];
+        final rejectionReason = statusData['rejectionReason'];
+        final driver = statusData['driver'];
+
+        debugPrint('Approval Status from Backend: $approvalStatus');
+        debugPrint('Backend Response: $statusData');
+
+        if (approvalStatus == 'APPROVED') {
+          debugPrint('Navigating to: HomeScreen');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            );
+          }
+        } else if (approvalStatus == 'REJECTED') {
+          debugPrint('Navigating to: RejectedScreen');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => RejectedScreen(rejectionReason: rejectionReason),
+              ),
+              (route) => false,
+            );
+          }
+        }
+        // If PENDING, do nothing (stay on this screen)
+      } else if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Unable to check approval status. Please try again.';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking status: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Error checking status: $e';
+        });
       }
     }
   }
@@ -81,7 +115,6 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Back Arrow
               Align(
@@ -106,61 +139,41 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 16),
+              const Spacer(),
               // Clock/Icon
               Container(
-                width: 120,
-                height: 120,
+                width: 140,
+                height: 140,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withOpacity(0.1),
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.access_time_rounded,
-                  size: 60,
+                  size: 70,
                   color: Color(0xFFFF9800),
                 ),
               ),
               const SizedBox(height: 32),
               // Title
               const Text(
-                'Waiting for Approval',
+                'Approval Pending',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF212529),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Status Badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'PENDING',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFFF9800),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Message
+              const SizedBox(height: 20),
+              // Subtitle
               const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Your registration has been submitted successfully. Your account is currently under review. This usually takes less than 24 hours.',
+                  'Your driver account is currently under review. You can start accepting rides after vendor approval.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Color(0xFF6C757D),
-                    height: 1.5,
+                    height: 1.6,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -190,6 +203,17 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
                         ),
                 ),
               ),
+              const SizedBox(height: 24),
+              // Bottom text
+              const Text(
+                'We\'ll notify you once your account is approved.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6C757D),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const Spacer(),
             ],
           ),
         ),
@@ -240,7 +264,7 @@ class RejectedScreen extends StatelessWidget {
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF44336).withOpacity(0.1),
+                  color: const Color(0xFFF44336).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -267,7 +291,7 @@ class RejectedScreen extends StatelessWidget {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF44336).withOpacity(0.1),
+                  color: const Color(0xFFF44336).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -280,62 +304,81 @@ class RejectedScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              // Reason Label
-              const Text(
-                'Reason',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF6C757D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Reason Text
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              // Message
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
-                  rejectionReason ?? 'No reason provided',
-                  style: const TextStyle(
+                  'Your driver registration was not approved. Please contact the vendor for more information.',
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF212529),
+                    color: Color(0xFF6C757D),
+                    height: 1.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
               ),
               const SizedBox(height: 48),
-              // Edit & Resubmit Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const GoogleOnboardingScreen(),
+              // Contact Support & Logout Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 56,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          // TODO: Implement contact support functionality
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFFF6D00)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: const Text(
+                          'Contact Support',
+                          style: TextStyle(
+                            color: Color(0xFFFF6D00),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6D00),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
                     ),
                   ),
-                  child: const Text(
-                    'Edit Details & Resubmit',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox(
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.clear();
+                          if (context.mounted) {
+                            Provider.of<AuthViewModel>(context, listen: false).logout();
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              (route) => false,
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6D00),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),

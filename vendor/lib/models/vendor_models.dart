@@ -50,7 +50,10 @@ class Driver {
   final String status;
   final double rating;
   final int totalRides;
+  final int completedTrips;
+  final int cancelledTrips;
   final DateTime createdAt;
+  final DateTime? lastLogin;
   final double? currentLatitude;
   final double? currentLongitude;
   final String? vehicleType;
@@ -64,6 +67,7 @@ class Driver {
   final bool? isApproved;
   final String? currentRide;
   final double? totalEarnings;
+  final double? walletBalance;
   final String? vehicleBrand;
   final int todayTrips;
   final num todayEarnings;
@@ -75,6 +79,9 @@ class Driver {
   final String? firstName;
   final String? lastName;
   final String? approvalStatus;
+  final String? city;
+  final String? aadhaarNumber; // Masked
+  final List<dynamic>? documents;
 
   Driver({
     required this.id,
@@ -87,7 +94,10 @@ class Driver {
     required this.status,
     required this.rating,
     required this.totalRides,
+    this.completedTrips = 0,
+    this.cancelledTrips = 0,
     required this.createdAt,
+    this.lastLogin,
     this.currentLatitude,
     this.currentLongitude,
     this.vehicleType,
@@ -101,6 +111,7 @@ class Driver {
     this.isApproved = false,
     this.currentRide,
     this.totalEarnings,
+    this.walletBalance,
     this.vehicleBrand,
     this.todayTrips = 0,
     this.todayEarnings = 0,
@@ -112,50 +123,84 @@ class Driver {
     this.firstName,
     this.lastName,
     this.approvalStatus,
+    this.city,
+    this.aadhaarNumber,
+    this.documents,
   });
 
   factory Driver.fromJson(Map<String, dynamic> json) {
     // Safely get user - check if it's a Map first
     final user = (json['user'] is Map<String, dynamic>) ? json['user'] as Map<String, dynamic> : null;
     
-    // Debug prints
-    print('Parsing Driver: id=${json['_id']}, name=${json['name']}, accountStatus=${json['accountStatus']}');
+    // Helper function to safely get string
+    String safeString(dynamic value) {
+      if (value == null) return '';
+      return value.toString();
+    }
+    
+    // Helper function to safely get int
+    int safeInt(dynamic value, [int defaultValue = 0]) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        return int.tryParse(value) ?? defaultValue;
+      }
+      return defaultValue;
+    }
+    
+    // Helper function to safely get double
+    double safeDouble(dynamic value, [double defaultValue = 0.0]) {
+      if (value == null) return defaultValue;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        return double.tryParse(value) ?? defaultValue;
+      }
+      return defaultValue;
+    }
     
     return Driver(
-      id: (json['_id'] ?? json['id']).toString(),
+      id: safeString(json['_id'] ?? json['id']),
       driverId: json['driverId']?.toString(),
-      name: json['name']?.toString() ?? user?['name']?.toString() ?? 'Unknown',
+      name: safeString(json['name'] ?? user?['name']).isEmpty ? 'Unknown' : safeString(json['name'] ?? user?['name']),
       firstName: json['firstName']?.toString(),
       lastName: json['lastName']?.toString(),
-      email: json['email']?.toString() ?? user?['email']?.toString() ?? 'unknown@example.com',
-      phone: json['mobile']?.toString() ?? user?['mobile']?.toString() ?? '0000000000',
-      profilePicture: json['profilePic']?.toString() ?? user?['profilePic']?.toString(),
+      email: safeString(json['email'] ?? user?['email']).isEmpty ? 'unknown@example.com' : safeString(json['email'] ?? user?['email']),
+      phone: safeString(json['mobile'] ?? user?['mobile']).isEmpty ? '0000000000' : safeString(json['mobile'] ?? user?['mobile']),
+      profilePicture: safeString(json['profilePic'] ?? user?['profilePic']).isEmpty ? null : safeString(json['profilePic'] ?? user?['profilePic']),
       licenseNumber: json['licenseNumber']?.toString(),
-      status: json['status']?.toString() ?? 'offline',
-      rating: (json['ratings'] as num?)?.toDouble() ?? 0.0,
-      totalRides: (json['numReviews'] as num?)?.toInt() ?? 0,
+      status: safeString(json['status']).isEmpty ? 'offline' : safeString(json['status']),
+      rating: safeDouble(json['ratings']),
+      totalRides: safeInt(json['numReviews']),
+      completedTrips: safeInt(json['completedTrips']),
+      cancelledTrips: safeInt(json['cancelledTrips']),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
-      currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
+      lastLogin: json['lastLogin'] != null
+          ? DateTime.tryParse(json['lastLogin'].toString())
+          : null,
+      currentLatitude: safeDouble(json['currentLatitude'], 0.0),
+      currentLongitude: safeDouble(json['currentLongitude'], 0.0),
       vehicleType: json['vehicleType']?.toString(),
       vehicleNumber: json['vehicleNumber']?.toString(),
       vehicleModel: json['vehicleModel']?.toString(),
       lastUpdated: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
-      speed: (json['speed'] as num?)?.toDouble(),
+      speed: safeDouble(json['speed']),
       currentAddress: json['currentAddress']?.toString(),
       isOnline: json['isOnline'] as bool? ?? false,
       isBusy: json['isBusy'] as bool? ?? false,
       isApproved: json['isApproved'] as bool? ?? false,
       currentRide: json['currentRide']?.toString(),
-      totalEarnings: (json['totalEarnings'] as num?)?.toDouble(),
+      totalEarnings: safeDouble(json['totalEarnings']),
+      walletBalance: safeDouble(json['walletBalance']),
       vehicleBrand: json['vehicleBrand']?.toString(),
-      todayTrips: (json['todayTrips'] as num?)?.toInt() ?? 0,
-      todayEarnings: json['todayEarnings'] as num? ?? 0,
-      accountStatus: json['accountStatus']?.toString() ?? json['status']?.toString() ?? 'pending',
+      todayTrips: safeInt(json['todayTrips']),
+      todayEarnings: safeDouble(json['todayEarnings']),
+      accountStatus: safeString(json['accountStatus'] ?? json['status']).isEmpty ? 'pending' : safeString(json['accountStatus'] ?? json['status']),
       approvedBy: json['approvedBy']?.toString(),
       approvedAt: json['approvedAt'] != null
           ? DateTime.tryParse(json['approvedAt'].toString())
@@ -163,6 +208,100 @@ class Driver {
       rejectionReason: json['rejectionReason']?.toString(),
       documentsVerified: json['documentsVerified'] as bool? ?? false,
       approvalStatus: json['approvalStatus']?.toString(),
+      city: json['city']?.toString(),
+      aadhaarNumber: json['aadhaarNumber']?.toString(),
+      documents: json['documents'] as List<dynamic>?,
+    );
+  }
+
+  // Copy with method for updating individual fields
+  Driver copyWith({
+    String? id,
+    String? driverId,
+    String? name,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? phone,
+    String? profilePicture,
+    String? licenseNumber,
+    String? status,
+    double? rating,
+    int? totalRides,
+    int? completedTrips,
+    int? cancelledTrips,
+    DateTime? createdAt,
+    DateTime? lastLogin,
+    double? currentLatitude,
+    double? currentLongitude,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? vehicleModel,
+    DateTime? lastUpdated,
+    double? speed,
+    String? currentAddress,
+    bool? isOnline,
+    bool? isBusy,
+    bool? isApproved,
+    String? approvalStatus,
+    String? accountStatus,
+    String? currentRide,
+    double? totalEarnings,
+    double? walletBalance,
+    String? vehicleBrand,
+    int? todayTrips,
+    num? todayEarnings,
+    String? approvedBy,
+    DateTime? approvedAt,
+    String? rejectionReason,
+    bool? documentsVerified,
+    String? city,
+    String? aadhaarNumber,
+    List<dynamic>? documents,
+  }) {
+    return Driver(
+      id: id ?? this.id,
+      driverId: driverId ?? this.driverId,
+      name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      profilePicture: profilePicture ?? this.profilePicture,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      totalRides: totalRides ?? this.totalRides,
+      completedTrips: completedTrips ?? this.completedTrips,
+      cancelledTrips: cancelledTrips ?? this.cancelledTrips,
+      createdAt: createdAt ?? this.createdAt,
+      lastLogin: lastLogin ?? this.lastLogin,
+      currentLatitude: currentLatitude ?? this.currentLatitude,
+      currentLongitude: currentLongitude ?? this.currentLongitude,
+      vehicleType: vehicleType ?? this.vehicleType,
+      vehicleNumber: vehicleNumber ?? this.vehicleNumber,
+      vehicleModel: vehicleModel ?? this.vehicleModel,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      speed: speed ?? this.speed,
+      currentAddress: currentAddress ?? this.currentAddress,
+      isOnline: isOnline ?? this.isOnline,
+      isBusy: isBusy ?? this.isBusy,
+      isApproved: isApproved ?? this.isApproved,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      accountStatus: accountStatus ?? this.accountStatus,
+      currentRide: currentRide ?? this.currentRide,
+      totalEarnings: totalEarnings ?? this.totalEarnings,
+      walletBalance: walletBalance ?? this.walletBalance,
+      vehicleBrand: vehicleBrand ?? this.vehicleBrand,
+      todayTrips: todayTrips ?? this.todayTrips,
+      todayEarnings: todayEarnings ?? this.todayEarnings,
+      approvedBy: approvedBy ?? this.approvedBy,
+      approvedAt: approvedAt ?? this.approvedAt,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      documentsVerified: documentsVerified ?? this.documentsVerified,
+      city: city ?? this.city,
+      aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
+      documents: documents ?? this.documents,
     );
   }
 }
@@ -472,6 +611,10 @@ class DashboardStats {
   final int approvedDrivers;
   final int rejectedDrivers;
   final int todayRegistrations;
+  final int totalDrivers;
+  final int offlineDrivers;
+  final int busyDrivers;
+  final int suspendedDrivers;
 
   DashboardStats({
     required this.totalRidesToday,
@@ -485,6 +628,10 @@ class DashboardStats {
     required this.approvedDrivers,
     required this.rejectedDrivers,
     required this.todayRegistrations,
+    this.totalDrivers = 0,
+    this.offlineDrivers = 0,
+    this.busyDrivers = 0,
+    this.suspendedDrivers = 0,
   });
 
   factory DashboardStats.fromJson(Map<String, dynamic> json) {
@@ -495,15 +642,15 @@ class DashboardStats {
       onlineVehicles: json['onlineVehicles'] ?? 0,
       completedRides: json['completedRides'] ?? 0,
       cancelledRides: json['cancelledRides'] ?? 0,
-      recentTrips:
-          (json['recentTrips'] as List?)
-              ?.map((x) => Trip.fromJson(x))
-              .toList() ??
-          [],
+      recentTrips: (json['recentTrips'] as List?)?.map((x) => Trip.fromJson(x)).toList() ?? [],
       pendingDrivers: json['pendingDrivers'] ?? 0,
       approvedDrivers: json['approvedDrivers'] ?? 0,
       rejectedDrivers: json['rejectedDrivers'] ?? 0,
       todayRegistrations: json['todayRegistrations'] ?? 0,
+      totalDrivers: json['totalDrivers'] ?? 0,
+      offlineDrivers: json['offlineDrivers'] ?? 0,
+      busyDrivers: json['busyDrivers'] ?? 0,
+      suspendedDrivers: json['suspendedDrivers'] ?? 0,
     );
   }
 }

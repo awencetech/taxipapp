@@ -81,6 +81,15 @@ class RideViewModel extends ChangeNotifier {
           'status': _isOnline ? 'available' : 'offline',
         },
       );
+
+      // Emit socket event for status change
+      if (_driverId != null) {
+        if (_isOnline) {
+          _socketService.emit('goOnline', {'driverId': _driverId});
+        } else {
+          _socketService.emit('goOffline', {'driverId': _driverId});
+        }
+      }
     } catch (e) {
       debugPrint('Error updating driver status: $e');
     }

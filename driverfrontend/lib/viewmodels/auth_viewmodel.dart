@@ -292,13 +292,6 @@ class AuthViewModel extends ChangeNotifier {
       debugPrint('fetchDriverProfile: ERROR CAUGHT!');
       debugPrint('fetchDriverProfile: Error: $e');
       debugPrint('fetchDriverProfile: Stack trace: $stackTrace');
-      final errorMsg = e.toString().toLowerCase();
-      if (errorMsg.contains('403') ||
-          errorMsg.contains('not approved') ||
-          errorMsg.contains('approved')) {
-        _error = 'Driver not approved. Please wait for vendor/admin approval.';
-        await logout();
-      }
     } finally {
       debugPrint(
         'fetchDriverProfile: Finally block, setting _isLoading to false',
@@ -555,21 +548,60 @@ class AuthViewModel extends ChangeNotifier {
         notifyListeners();
         return {'success': true, 'isNewDriver': true};
       } else {
-        _driver = result['user'];
-        if (_driver != null) {
-          _socketService.connect(_driver!.id);
+        // Now get driver status
+        final prefs = await SharedPreferences.getInstance();
+        if (mobile != null) {
+          await prefs.setString('pending_mobile', mobile);
+        }
+        if (firebaseUid != null) {
+          await prefs.setString('pending_firebase_uid', firebaseUid);
+        }
 
-          // Save login session to SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('authProvider', 'phone');
-          if (mobile != null) {
-            await prefs.setString('mobile', mobile);
+        final statusData = await getDriverStatus(
+          mobile: mobile,
+          firebaseUid: firebaseUid,
+        );
+
+        if (statusData != null) {
+          final approvalStatus = statusData['approvalStatus'];
+          if (approvalStatus == 'APPROVED') {
+            _driver = statusData['driver'];
+            if (_driver != null) {
+              _socketService.connect(_driver!.id);
+
+              // Save login session to SharedPreferences
+              await prefs.setBool('isLoggedIn', true);
+              await prefs.setString('authProvider', 'phone');
+              if (mobile != null) {
+                await prefs.setString('mobile', mobile);
+              }
+            }
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewDriver': false,
+              'status': 'APPROVED',
+            };
+          } else if (approvalStatus == 'PENDING') {
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'isNewDriver': false, 'status': 'PENDING'};
+          } else if (approvalStatus == 'REJECTED') {
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewDriver': false,
+              'status': 'REJECTED',
+              'rejectionReason': statusData['rejectionReason'],
+            };
           }
         }
+
         _isLoading = false;
         notifyListeners();
-        return {'success': true, 'isNewDriver': false};
+        return {'success': false, 'message': 'Failed to check driver status'};
       }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -579,7 +611,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     debugPrint('=== AuthViewModel: Starting login ===');
     debugPrint('Clearing old auth data first...');
     final prefs = await SharedPreferences.getInstance();
@@ -615,7 +647,7 @@ class AuthViewModel extends ChangeNotifier {
           debugPrint('AuthViewModel: Login failed with message: $_error');
           _isLoading = false;
           notifyListeners();
-          return false;
+          return {'success': false, 'message': _error};
         }
 
         // Check if data is nested under 'data' key
@@ -631,36 +663,48 @@ class AuthViewModel extends ChangeNotifier {
           debugPrint('AuthViewModel: Token found, saving to prefs: $token');
           await prefs.setString(AppConstants.tokenKey, token);
 
-          // Now fetch the full driver profile from /drivers/profile
-          await fetchDriverProfile();
-
-          _isLoading = false;
-          debugPrint(
-            'AuthViewModel: Login successful, isLoggedIn=${_driver != null}',
-          );
-          notifyListeners();
-          return true;
+          // Now get driver status
+          final statusData = await getDriverStatus();
+          if (statusData != null) {
+            final approvalStatus = statusData['approvalStatus'];
+            if (approvalStatus == 'APPROVED') {
+              await fetchDriverProfile();
+              _isLoading = false;
+              debugPrint(
+                'AuthViewModel: Login successful, driver approved, isLoggedIn=${_driver != null}',
+              );
+              notifyListeners();
+              return {'success': true, 'status': 'APPROVED'};
+            } else if (approvalStatus == 'PENDING') {
+              _isLoading = false;
+              notifyListeners();
+              return {'success': true, 'status': 'PENDING'};
+            } else if (approvalStatus == 'REJECTED') {
+              _isLoading = false;
+              notifyListeners();
+              return {
+                'success': true,
+                'status': 'REJECTED',
+                'rejectionReason': statusData['rejectionReason'],
+              };
+            }
+          }
         } else {
           _error = 'Token not found in response';
           debugPrint('AuthViewModel: $_error');
-          _isLoading = false;
-          notifyListeners();
-          return false;
         }
       }
-      debugPrint(
-        'AuthViewModel: Login failed with status ${response.statusCode}',
-      );
-      _error = 'Login failed with status ${response.statusCode}';
+      _error = _error ?? 'Login failed with status ${response.statusCode}';
+      debugPrint('AuthViewModel: $_error');
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'success': false, 'message': _error};
     } catch (e) {
       debugPrint('AuthViewModel: Login error caught: $e');
       _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'success': false, 'message': _error};
     }
   }
 
@@ -670,64 +714,95 @@ class AuthViewModel extends ChangeNotifier {
     String password,
     String mobile,
     String vehicleType,
-    String vehicleNumber,
-  ) async {
+    String vehicleNumber, {
+    String? googleUid,
+    String? photoURL,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.post(
-        AppConstants.driverSignupUrl,
-        data: {
-          'name': name,
-          'email': email,
-          'password': password,
-          'mobile': mobile,
-          'role': 'driver',
-        },
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data;
-        final actualData = (data is Map && data['data'] != null)
-            ? data['data']
-            : data;
-        final token = (actualData is Map)
-            ? (actualData['token'] ?? data['token'])
-            : null;
-
-        if (token == null) {
-          _error = 'Token not found in response';
-          _isLoading = false;
-          notifyListeners();
-          return {'success': false, 'message': _error};
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
-
-        final driverResponse = await _apiService.post(
-          AppConstants.driverRegisterUrl,
-          data: {'vehicleType': vehicleType, 'vehicleNumber': vehicleNumber},
+      // Use register-pending if googleUid is provided (Google sign up)
+      if (googleUid != null) {
+        final response = await _apiService.post(
+          AppConstants.driverRegisterPendingUrl,
+          data: {
+            'name': name,
+            'email': email,
+            'mobile': mobile,
+            'vehicleType': vehicleType,
+            'vehicleNumber': vehicleNumber,
+            'googleUid': googleUid,
+            'photoURL': photoURL,
+            'loginMethod': 'GOOGLE',
+          },
         );
 
-        if (driverResponse.statusCode == 200 ||
-            driverResponse.statusCode == 201) {
+        if (response.statusCode == 200 || response.statusCode == 201) {
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'message': 'Registration submitted'};
         } else {
-          _error = 'Failed to submit driver details';
+          _error = response.data['message'] ?? 'Signup failed';
           _isLoading = false;
           notifyListeners();
           return {'success': false, 'message': _error};
         }
       } else {
-        _error = response.data['message'] ?? 'Signup failed';
-        _isLoading = false;
-        notifyListeners();
-        return {'success': false, 'message': _error};
+        // Normal email/password sign up
+        final response = await _apiService.post(
+          AppConstants.driverSignupUrl,
+          data: {
+            'name': name,
+            'email': email,
+            'password': password,
+            'mobile': mobile,
+            'role': 'driver',
+          },
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final data = response.data;
+          final actualData = (data is Map && data['data'] != null)
+              ? data['data']
+              : data;
+          final token = (actualData is Map)
+              ? (actualData['token'] ?? data['token'])
+              : null;
+
+          if (token == null) {
+            _error = 'Token not found in response';
+            _isLoading = false;
+            notifyListeners();
+            return {'success': false, 'message': _error};
+          }
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(AppConstants.tokenKey, token);
+
+          final driverResponse = await _apiService.post(
+            AppConstants.driverRegisterUrl,
+            data: {'vehicleType': vehicleType, 'vehicleNumber': vehicleNumber},
+          );
+
+          if (driverResponse.statusCode == 200 ||
+              driverResponse.statusCode == 201) {
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'message': 'Registration submitted'};
+          } else {
+            _error = 'Failed to submit driver details';
+            _isLoading = false;
+            notifyListeners();
+            return {'success': false, 'message': _error};
+          }
+        } else {
+          _error = response.data['message'] ?? 'Signup failed';
+          _isLoading = false;
+          notifyListeners();
+          return {'success': false, 'message': _error};
+        }
       }
     } catch (e) {
       _error = e.toString();
@@ -738,6 +813,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> loginWithGoogle() async {
+    debugPrint('Google Sign-In Started');
     _isLoading = true;
     _error = null;
     _newDriverInfo = null;
@@ -746,83 +822,84 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final googleData = await _googleAuthService.signIn();
       if (googleData == null) {
+        debugPrint('Google Sign-In Cancelled');
         _isLoading = false;
         notifyListeners();
-        return {'success': false};
+        return {'success': false, 'cancelled': true};
       }
 
-      final driverData = {
-        'googleToken': googleData['idToken'] ?? googleData['accessToken'],
-        'email': googleData['email'],
-        'name': googleData['name'],
-        'googleId': googleData['googleId'],
-        'photoUrl': googleData['photoUrl'],
-      };
+      debugPrint('Google Email: ${googleData['email']}');
+      debugPrint('Google UID: ${googleData['googleId']}');
+      debugPrint('Google Token Received');
 
+      // Send to new driver google-login endpoint
+      debugPrint('Calling Backend...');
       final response = await _apiService.post(
-        AppConstants.googleLoginUrl,
-        data: driverData,
+        AppConstants.driverGoogleLoginUrl,
+        data: {
+          'email': googleData['email'],
+          'googleUid': googleData['googleId'],
+          'name': googleData['name'],
+          'photo': googleData['photoUrl'],
+          'idToken': googleData['idToken'],
+          'accessToken': googleData['accessToken'],
+        },
       );
 
-      // Handle new user case first
-      if (response.data['isNewUser'] == true) {
-        _newDriverInfo = response.data;
-        _isLoading = false;
-        notifyListeners();
-        return {'success': true, 'status': 'NOT_FOUND', 'isNewUser': true};
-      }
+      debugPrint('Backend Status Code: ${response.statusCode}');
+      debugPrint('Backend Response: ${response.data}');
 
-      final data = response.data;
-      final actualData = (data['data'] != null) ? data['data'] : data;
-      final driver = DriverModel.fromJson(actualData['user'] ?? actualData);
+      final responseData = response.data;
 
-      // Determine driver status
-      String status;
-      String? rejectionReason;
-
-      if (driver.status == 'approved' || driver.approvalStatus == 'approved') {
-        status = 'APPROVED';
-      } else if (driver.status == 'rejected' ||
-          driver.approvalStatus == 'rejected') {
-        status = 'REJECTED';
-        rejectionReason = driver.rejectionReason;
-      } else if (driver.status == 'pending' ||
-          driver.approvalStatus == 'pending') {
-        status = 'PENDING';
+      String? status;
+      if (responseData['success'] == true) {
+        status = responseData['approvalStatus'];
       } else {
-        status = 'PENDING'; // Default to pending if status is unknown
+        status = responseData['status'];
       }
+
+      debugPrint('Approval Status: $status');
 
       if (status == 'APPROVED') {
-        // Save driver and token only if approved
-        _driver = driver;
+        // Approved - save driver and token
+        final driverJson = responseData['driver'];
+        _driver = DriverModel.fromJson(Map<String, dynamic>.from(driverJson));
 
         final prefs = await SharedPreferences.getInstance();
-        final token = actualData['token'] ?? data['token'];
+        final token = responseData['token'];
         if (token != null) {
           await prefs.setString(AppConstants.tokenKey, token);
-          await prefs.setString(AppConstants.driverIdKey, driver.id);
-          await _saveDriverToPrefs(driver);
+          await prefs.setString(AppConstants.driverIdKey, _driver!.id);
+          await _saveDriverToPrefs(_driver!);
         }
+
+        _isLoading = false;
+        notifyListeners();
+        debugPrint('Navigating To: HomeScreen');
+        return {'success': true, 'status': 'APPROVED'};
       } else {
-        // Don't save full driver object if not approved, just keep for status check
-        _driver = null;
+        // Handle pending, rejected, not found
+        final rejectionReason = responseData['rejectionReason'];
+
+        _isLoading = false;
+        notifyListeners();
+
+        debugPrint('Navigating To: $status');
+
+        return {
+          'success': false,
+          'status': status,
+          'rejectionReason': rejectionReason,
+          'googleData': googleData,
+        };
       }
-
-      _isLoading = false;
-      notifyListeners();
-
-      return {
-        'success': true,
-        'status': status,
-        'rejectionReason': rejectionReason,
-        'isNewUser': false,
-      };
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Google Login Error: $e');
+      debugPrint('Stack Trace: $stackTrace');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      return {'success': false};
+      return {'success': false, 'error': e.toString()};
     }
   }
 
@@ -893,16 +970,38 @@ class AuthViewModel extends ChangeNotifier {
       if (firebaseUid != null) queryParams['firebaseUid'] = firebaseUid;
       if (googleId != null) queryParams['googleId'] = googleId;
 
+      debugPrint('getDriverStatus: Calling backend with params: $queryParams');
+
       final response = await _apiService.get(
         AppConstants.driverStatusUrl,
         queryParameters: queryParams,
       );
 
+      debugPrint('getDriverStatus: Backend response: ${response.data}');
+
       if (response.data['success'] == true) {
-        return response.data['data'];
+        final data = response.data['data'];
+        final driverData = data['driver'];
+        final approvalStatus = data['approvalStatus'];
+        final rejectionReason = data['rejectionReason'];
+
+        if (driverData != null) {
+          debugPrint('getDriverStatus: Parsing driver from backend');
+          _driver = DriverModel.fromJson(Map<String, dynamic>.from(driverData));
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(AppConstants.driverIdKey, _driver!.id);
+          await _saveDriverToPrefs(_driver!);
+        }
+
+        return {
+          'driver': driverData,
+          'approvalStatus': approvalStatus,
+          'rejectionReason': rejectionReason,
+        };
       }
       return null;
     } catch (e) {
+      debugPrint('getDriverStatus: Error: $e');
       _error = e.toString();
       return null;
     }

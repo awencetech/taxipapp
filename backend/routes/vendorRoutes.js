@@ -16,6 +16,9 @@ const {
   deleteDriver,
   approveDriver,
   rejectDriver,
+  suspendDriver,
+  activateDriver,
+  updateDriver,
   getVehicles,
   addVehicle,
   deleteVehicle,
@@ -43,6 +46,9 @@ router.post('/drivers', protect, addDriver);
 router.delete('/drivers/:id', protect, deleteDriver);
 router.put('/drivers/:id/approve', protect, approveDriver);
 router.put('/drivers/:id/reject', protect, rejectDriver);
+router.put('/drivers/:id/suspend', protect, suspendDriver);
+router.put('/drivers/:id/activate', protect, activateDriver);
+router.put('/drivers/:id', protect, updateDriver);
 router.get('/vehicles', protect, getVehicles);
 router.post('/vehicles', protect, addVehicle);
 router.delete('/vehicles/:id', protect, deleteVehicle);

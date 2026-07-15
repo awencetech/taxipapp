@@ -11,15 +11,80 @@ const generateToken = (id) => {
   });
 };
 
+// Google Login for Drivers
+const googleLogin = async (req, res) => {
+  try {
+    const { email, googleUid, name, photo, idToken, accessToken } = req.body;
+
+    console.log('Google Login Request:', { email, googleUid });
+
+    // Find driver by googleId first, then email
+    let driver = await Driver.findOne({ googleId: googleUid });
+    if (!driver && email) {
+      driver = await Driver.findOne({ email });
+    }
+
+    if (!driver) {
+      console.log('Driver not found for googleUid:', googleUid, 'or email:', email);
+      return res.status(200).json({
+        success: false,
+        status: 'NOT_FOUND',
+      });
+    }
+
+    // If driver exists, update googleId if not present
+    if (!driver.googleId && googleUid) {
+      driver.googleId = googleUid;
+      await driver.save();
+    }
+
+    // Determine approval status
+    let approvalStatus;
+    if (driver.status === 'approved' || driver.approvalStatus === 'approved' || driver.isApproved === true) {
+      approvalStatus = 'APPROVED';
+    } else if (driver.status === 'rejected' || driver.approvalStatus === 'rejected') {
+      approvalStatus = 'REJECTED';
+    } else {
+      approvalStatus = 'PENDING';
+    }
+
+    console.log('Driver approval status:', approvalStatus);
+
+    if (approvalStatus === 'APPROVED') {
+      const token = generateToken(driver._id);
+      return res.status(200).json({
+        success: true,
+        driver,
+        approvalStatus,
+        token,
+      });
+    } else {
+      return res.status(200).json({
+        success: false,
+        status: approvalStatus,
+        rejectionReason: driver.rejectionReason,
+      });
+    }
+  } catch (error) {
+    console.error('Google Login Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
 const registerPendingDriver = async (req, res) => {
   try {
-    const { name, lastName, email, mobile, vehicleType, vehicleNumber, firebaseUid, googleId, countryCode } = req.body;
+    const { name, lastName, email, mobile, vehicleType, vehicleNumber, firebaseUid, googleId, countryCode, photoURL, loginMethod } = req.body;
     let driver = null;
 
     if (firebaseUid) {
       driver = await Driver.findOne({ firebaseUid });
     } else if (googleId) {
       driver = await Driver.findOne({ googleId });
+    } else if (email) {
+      driver = await Driver.findOne({ email });
     } else if (mobile) {
       driver = await Driver.findOne({ mobile });
     }
@@ -30,8 +95,12 @@ const registerPendingDriver = async (req, res) => {
       driver.email = email || driver.email;
       driver.vehicleType = vehicleType || driver.vehicleType;
       driver.vehicleNumber = vehicleNumber || driver.vehicleNumber;
+      if (googleId) driver.googleId = googleId;
+      if (photoURL) driver.profilePic = photoURL;
       driver.status = 'pending';
+      driver.approvalStatus = 'pending';
       driver.accountStatus = 'pending';
+      driver.isApproved = false;
       driver.rejectionReason = null;
       await driver.save();
     } else {
@@ -42,10 +111,13 @@ const registerPendingDriver = async (req, res) => {
         mobile,
         firebaseUid,
         googleId,
+        profilePic: photoURL || 'default-profile.png',
         vehicleType,
         vehicleNumber,
         status: 'pending',
+        approvalStatus: 'pending',
         accountStatus: 'pending',
+        isApproved: false,
       });
     }
 
@@ -106,13 +178,22 @@ const getDriverStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Driver not found' });
     }
 
+    // Determine the correct approval status checking all relevant fields
+    let approvalStatus;
+    if (driver.status === 'approved' || driver.approvalStatus === 'approved' || driver.isApproved === true) {
+      approvalStatus = 'APPROVED';
+    } else if (driver.status === 'rejected' || driver.approvalStatus === 'rejected') {
+      approvalStatus = 'REJECTED';
+    } else {
+      approvalStatus = 'PENDING';
+    }
+
     res.status(200).json({
       success: true,
       data: {
-        status: driver.status,
-        accountStatus: driver.accountStatus,
+        driver: driver,
+        approvalStatus: approvalStatus,
         rejectionReason: driver.rejectionReason,
-        isApproved: driver.status === 'approved',
       },
     });
   } catch (error) {
@@ -418,13 +499,6 @@ const getDriverProfile = async (req, res) => {
           console.log('New driver created:', driver._id);
         }
         
-        if (driver && !driver.isApproved) {
-          return res.status(403).json({
-            success: false,
-            message: 'Driver not approved. Please wait for vendor/admin approval.'
-          });
-        }
-        
         user = await User.findById(req.user._id);
       }
       
@@ -593,6 +667,11 @@ const registerDriver = async (req, res) => {
         if (accountNumber !== undefined) driver.accountNumber = accountNumber;
         if (ifscCode !== undefined) driver.ifscCode = ifscCode;
         if (branchName !== undefined) driver.branchName = branchName;
+        // Ensure driver is in pending state after registration
+        driver.isApproved = false;
+        driver.approvalStatus = 'pending';
+        driver.status = 'pending';
+        driver.accountStatus = 'pending';
         await driver.save();
       }
     } else {
@@ -609,6 +688,11 @@ const registerDriver = async (req, res) => {
         if (accountNumber !== undefined) driver.accountNumber = accountNumber;
         if (ifscCode !== undefined) driver.ifscCode = ifscCode;
         if (branchName !== undefined) driver.branchName = branchName;
+        // Ensure driver is in pending state after registration
+        driver.isApproved = false;
+        driver.approvalStatus = 'pending';
+        driver.status = 'pending';
+        driver.accountStatus = 'pending';
         await driver.save();
       } else {
         driver = await Driver.create({
@@ -622,6 +706,10 @@ const registerDriver = async (req, res) => {
           accountNumber: accountNumber || '',
           ifscCode: ifscCode || '',
           branchName: branchName || '',
+          isApproved: false,
+          approvalStatus: 'pending',
+          status: 'pending',
+          accountStatus: 'pending',
         });
       }
     }
@@ -727,5 +815,6 @@ module.exports = {
   editDocument, 
   deleteDocument,
   registerPendingDriver,
-  getDriverStatus
+  getDriverStatus,
+  googleLogin
 };

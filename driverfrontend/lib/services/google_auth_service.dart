@@ -16,6 +16,9 @@ class GoogleAuthService {
 
   Future<Map<String, dynamic>?> signIn() async {
     try {
+      // Sign out first to allow account selection every time
+      await _googleSignIn.signOut();
+      
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
       if (account == null) return null;
 
