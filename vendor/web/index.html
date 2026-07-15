@@ -32,6 +32,20 @@
   <title>vendorfrontend</title>
   <link rel="manifest" href="manifest.json">
   
+  <style>
+    /* Remove default browser focus outlines */
+    *:focus {
+      outline: none !important;
+    }
+    *:focus-visible {
+      outline: none !important;
+    }
+    /* Ensure Flutter's canvas doesn't show focus rings */
+    flt-glass-pane:focus {
+      outline: none !important;
+    }
+  </style>
+  
   <!-- Google Sign-In Client ID -->
   <meta name="google-signin-client_id" content="1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com">
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAZ0IMMHkEXG6PfafxQpkp38O3AgBRKZRg&libraries=places" async defer></script>
