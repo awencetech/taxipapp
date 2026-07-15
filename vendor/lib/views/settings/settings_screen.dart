@@ -5,6 +5,7 @@ import '../../viewmodels/theme_viewmodel.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../support/support_screen.dart';
+import '../auth/login_screen.dart';
 import 'change_password_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_of_service_screen.dart';
@@ -25,7 +26,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isDark = themeVM.isDarkMode;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0F4FF),
+      backgroundColor: isDark
+          ? const Color(0xFF0F172A)
+          : const Color(0xFFF0F4FF),
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -36,12 +39,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Header Section
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      isDark ? const Color(0xFF0D1B2A) : const Color(0xFF1D2951),
-                      isDark ? const Color(0xFF1B263B) : const Color(0xFF2D4A6D),
+                      isDark
+                          ? const Color(0xFF0D1B2A)
+                          : const Color(0xFF1D2951),
+                      isDark
+                          ? const Color(0xFF1B263B)
+                          : const Color(0xFF2D4A6D),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -58,11 +68,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const DashboardScreen(),
+                          ),
                           (route) => false,
                         );
                       },
-                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 26),
+                      icon: const Icon(
+                        Icons.arrow_back_ios,
+                        color: Colors.white,
+                        size: 26,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -147,7 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileScreen(),
+                          ),
                         );
                       },
                       isDark: isDark,
@@ -261,7 +279,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const SupportScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const SupportScreen(),
+                          ),
                         );
                       },
                       isDark: isDark,
@@ -283,8 +303,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          authVM.logout();
+                        onPressed: () async {
+                          await authVM.logout();
+                          if (mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          }
                         },
                         icon: const Icon(Icons.logout, size: 24),
                         label: const Text(
@@ -339,7 +368,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.transparent : Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.transparent
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -426,7 +457,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle,
                         style: TextStyle(
                           fontSize: 14,
-                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                          color: isDark
+                              ? Colors.grey[400]
+                              : const Color(0xFF64748B),
                         ),
                       ),
                     ),
@@ -468,7 +501,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.transparent : Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.transparent
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -552,7 +587,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                      color: isDark
+                          ? Colors.grey[400]
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -633,9 +670,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Select Language'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -670,4 +705,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-

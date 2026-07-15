@@ -22,6 +22,7 @@ import '../documents/documents_screen.dart';
 import '../cab_performance/cab_performance_screen.dart';
 import '../track_cab/track_cab_screen.dart';
 import '../vendors/vendors_screen.dart';
+import '../auth/login_screen.dart';
 
 // Global key to access the scaffold from DashboardHome
 final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -432,9 +433,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.logout_outlined,
               title: 'Logout',
               isActive: _activeDrawerItem == 'Logout',
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                context.read<AuthViewModel>().logout();
+                await context.read<AuthViewModel>().logout();
+                if (mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                }
               },
             ),
           ],
