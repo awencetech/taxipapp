@@ -363,15 +363,42 @@ class AuthViewModel extends ChangeNotifier {
         if (registerResponse.statusCode == 200 ||
             registerResponse.statusCode == 201) {
           final data = registerResponse.data;
-          final token = data['token'];
-          final vendorId = data['vendor']['_id'];
+          final vendorData = data['vendor'];
 
+          // Check approval status
+          final approvalStatus = vendorData['approvalStatus'];
+          if (approvalStatus == 'pending') {
+            _vendor = Vendor.fromJson(vendorData);
+            _authStatus = AuthStatus.pending;
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewUser': false,
+              'authStatus': AuthStatus.pending,
+            };
+          } else if (approvalStatus == 'declined') {
+            _vendor = Vendor.fromJson(vendorData);
+            _authStatus = AuthStatus.declined;
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewUser': false,
+              'authStatus': AuthStatus.declined,
+            };
+          }
+
+          // If approved, log them in
+          final token = data['token'];
+          final vendorId = vendorData['_id'];
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(AppConstants.tokenKey, token);
           await prefs.setString(AppConstants.vendorIdKey, vendorId);
 
-          _vendor = Vendor.fromJson(data['vendor']);
+          _vendor = Vendor.fromJson(vendorData);
           _isLoggedIn = true;
+          _authStatus = AuthStatus.success;
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'isNewUser': false};
@@ -506,15 +533,42 @@ class AuthViewModel extends ChangeNotifier {
         if (registerResponse.statusCode == 200 ||
             registerResponse.statusCode == 201) {
           final data = registerResponse.data;
-          final token = data['token'];
-          final vendorId = data['vendor']['_id'];
+          final vendorData = data['vendor'];
 
+          // Check approval status
+          final approvalStatus = vendorData['approvalStatus'];
+          if (approvalStatus == 'pending') {
+            _vendor = Vendor.fromJson(vendorData);
+            _authStatus = AuthStatus.pending;
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewUser': false,
+              'authStatus': AuthStatus.pending,
+            };
+          } else if (approvalStatus == 'declined') {
+            _vendor = Vendor.fromJson(vendorData);
+            _authStatus = AuthStatus.declined;
+            _isLoading = false;
+            notifyListeners();
+            return {
+              'success': true,
+              'isNewUser': false,
+              'authStatus': AuthStatus.declined,
+            };
+          }
+
+          // If approved, log them in
+          final token = data['token'];
+          final vendorId = vendorData['_id'];
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(AppConstants.tokenKey, token);
           await prefs.setString(AppConstants.vendorIdKey, vendorId);
 
-          _vendor = Vendor.fromJson(data['vendor']);
+          _vendor = Vendor.fromJson(vendorData);
           _isLoggedIn = true;
+          _authStatus = AuthStatus.success;
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'isNewUser': false};
