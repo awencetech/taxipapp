@@ -41,8 +41,8 @@ class AuthService {
         final driverResponse = await _apiService.post(
           AppConstants.driverRegisterUrl,
           data: {
-            if (vehicleType != null) 'vehicleType': vehicleType,
-            if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
+            'vehicleType': ?vehicleType,
+            'vehicleNumber': ?vehicleNumber,
           },
         );
 

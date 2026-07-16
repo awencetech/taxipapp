@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:driverfrontend/views/home/home_screen.dart';
 import 'package:driverfrontend/viewmodels/auth_viewmodel.dart';
-import 'google_onboarding_screen.dart';
 import 'login_screen.dart';
 
 class PendingApprovalScreen extends StatefulWidget {

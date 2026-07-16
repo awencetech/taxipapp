@@ -1356,6 +1356,98 @@ const getVendorNotifications = async (req, res) => {
   }
 };
 
+const refreshApprovalStatus = async (req, res) => {
+  try {
+    const { email, phone } = req.body;
+
+    if (!email && !phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email or phone',
+      });
+    }
+
+    const query = {};
+    if (email) query.email = email;
+    if (phone) query.phone = phone;
+
+    const vendor = await Vendor.findOne(query);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    const totalDrivers = await Driver.countDocuments();
+    const totalVehicles = await Vehicle.countDocuments();
+
+    // Return appropriate status
+    if (vendor.role === 'main_vendor') {
+      // Main vendor gets token and full access
+      const token = generateToken(vendor._id);
+      res.status(200).json({
+        success: true,
+        message: 'Main vendor access granted',
+        approvalStatus: 'approved',
+        token,
+        vendor: {
+          _id: vendor._id,
+          name: vendor.name,
+          email: vendor.email,
+          phone: vendor.phone,
+          companyName: vendor.companyName,
+          role: vendor.role,
+          approvalStatus: vendor.approvalStatus,
+          isApproved: vendor.isApproved,
+          totalDrivers,
+          totalVehicles,
+          createdAt: vendor.createdAt,
+        },
+      });
+    } else if (vendor.approvalStatus === 'approved') {
+      const token = generateToken(vendor._id);
+      res.status(200).json({
+        success: true,
+        message: 'Vendor approved',
+        approvalStatus: 'approved',
+        token,
+        vendor: {
+          _id: vendor._id,
+          name: vendor.name,
+          email: vendor.email,
+          phone: vendor.phone,
+          companyName: vendor.companyName,
+          role: vendor.role,
+          approvalStatus: vendor.approvalStatus,
+          isApproved: vendor.isApproved,
+          totalDrivers,
+          totalVehicles,
+          createdAt: vendor.createdAt,
+        },
+      });
+    } else if (vendor.approvalStatus === 'pending') {
+      res.status(403).json({
+        success: false,
+        message: 'Your account is pending approval. Please wait for the main vendor to approve.',
+        approvalStatus: 'pending',
+      });
+    } else if (vendor.approvalStatus === 'declined') {
+      res.status(403).json({
+        success: false,
+        message: 'Your vendor registration has been declined. Please contact the Main Vendor or submit a new request.',
+        approvalStatus: 'declined',
+      });
+    }
+  } catch (error) {
+    console.error('Refresh Approval Status Error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const suspendDriver = async (req, res) => {
   try {
     let driver = await Driver.findByIdAndUpdate(
@@ -1494,4 +1586,5 @@ module.exports = {
   deleteVendor,
   getPendingDrivers,
   getVendorNotifications,
+  refreshApprovalStatus,
 };

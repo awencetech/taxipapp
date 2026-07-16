@@ -5,6 +5,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'login_screen.dart';
+import '../dashboard/dashboard_screen.dart';
+import 'registration_declined_screen.dart';
 
 class WaitingForApprovalScreen extends StatefulWidget {
   const WaitingForApprovalScreen({super.key});
@@ -25,23 +27,34 @@ class _WaitingForApprovalScreenState extends State<WaitingForApprovalScreen> {
     });
 
     try {
-      // First, check if we have a token saved
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
-
-      if (token != null) {
-        // We have a token, let's see if we can check status - but for now, just go back to login
-        // TODO: Add endpoint for checking vendor status
-        await authViewModel.logout();
-      }
+      final status = await authViewModel.refreshApprovalStatus();
 
       if (mounted) {
-        // Navigate back to login
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
+        if (status == AuthStatus.success) {
+          // Approved, navigate to dashboard
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            (route) => false,
+          );
+        } else if (status == AuthStatus.declined) {
+          // Declined, navigate to declined screen
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const RegistrationDeclinedScreen(),
+            ),
+            (route) => false,
+          );
+        } else {
+          // Still pending, stay on this screen and show snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Still waiting for approval'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -154,20 +167,24 @@ class _WaitingForApprovalScreenState extends State<WaitingForApprovalScreen> {
               const SizedBox(height: 16),
               // Back to login
               TextButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
+                    onPressed: () async {
+                      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+                      await authViewModel.logout();
+                      if (mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    child: Text(
+                      'Back to Login',
+                      style: TextStyle(fontSize: 14, color: AppTheme.primaryColor),
                     ),
-                    (route) => false,
-                  );
-                },
-                child: Text(
-                  'Back to Login',
-                  style: TextStyle(fontSize: 14, color: AppTheme.primaryColor),
-                ),
-              ),
+                  ),
             ],
           ),
         ),

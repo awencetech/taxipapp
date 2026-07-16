@@ -368,10 +368,12 @@ class _DriversScreenState extends State<DriversScreen> {
                             icon: Icons.email_outlined,
                             keyboardType: TextInputType.emailAddress,
                             validator: (v) {
-                              if (v == null || v.isEmpty)
+                              if (v == null || v.isEmpty) {
                                 return 'Email is required';
-                              if (!v.contains('@'))
+                              }
+                              if (!v.contains('@')) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -423,7 +425,7 @@ class _DriversScreenState extends State<DriversScreen> {
                               ),
                             ),
                             child: DropdownButtonFormField<String>(
-                              value: selectedVehicleType,
+                              initialValue: selectedVehicleType,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 icon: Icon(
@@ -503,8 +505,9 @@ class _DriversScreenState extends State<DriversScreen> {
                             onPressed: vm.isLoading
                                 ? null
                                 : () async {
-                                    if (!formKey.currentState!.validate())
+                                    if (!formKey.currentState!.validate()) {
                                       return;
+                                    }
                                     final success = await vm.addDriver({
                                       'name': nameController.text.trim(),
                                       'email': emailController.text.trim(),

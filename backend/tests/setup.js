@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 beforeAll(async () => {
-  await mongoose.connect('mongodb://localhost:27017/test_db');
+  await mongoose.connect('mongodb://admin:admin123@localhost:27017/test_db?authSource=admin');
 });
 
 afterAll(async () => {

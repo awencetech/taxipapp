@@ -926,8 +926,8 @@ class AuthViewModel extends ChangeNotifier {
           'mobile': mobile,
           'vehicleType': vehicleType,
           'vehicleNumber': vehicleNumber,
-          if (firebaseUid != null) 'firebaseUid': firebaseUid,
-          if (googleId != null) 'googleId': googleId,
+          'firebaseUid': ?firebaseUid,
+          'googleId': ?googleId,
           'countryCode': countryCode,
         },
       );

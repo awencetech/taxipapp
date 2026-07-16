@@ -270,7 +270,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    "G�${ride.fare.toInt()}",
+                    "₹${ride.fare.toInt()}",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 22,
@@ -932,8 +932,8 @@ class _HomeDashboardState extends State<HomeDashboard>
                     return _buildActivityItem(
                       ride.passengerName,
                       time,
-                      "${ride.pickupAddress.split(' ').take(2).join(' ')} G�� ${ride.dropAddress.split(' ').take(2).join(' ')}",
-                      "G�${ride.fare.toInt()}",
+                      "${ride.pickupAddress.split(' ').take(2).join(' ')} → ${ride.dropAddress.split(' ').take(2).join(' ')}",
+                      "₹${ride.fare.toInt()}",
                       "5",
                       avatarColor,
                     );

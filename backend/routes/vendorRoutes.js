@@ -30,6 +30,7 @@ const {
   deleteVendor,
   getPendingDrivers,
   getVendorNotifications,
+  refreshApprovalStatus,
 } = require('../controllers/vendorController');
 
 router.post('/register', registerVendor);
@@ -39,6 +40,7 @@ router.post('/verify-otp', verifyVendorOTP);
 router.post('/forgot-password/send-otp', sendForgotPasswordOTP);
 router.post('/forgot-password/verify-otp', verifyForgotPasswordOTP);
 router.post('/forgot-password/reset', resetPassword);
+router.post('/refresh-approval', refreshApprovalStatus);
 router.get('/dashboard', protect, getDashboard);
 router.get('/drivers', protect, getDrivers);
 router.get('/drivers/pending', protect, getPendingDrivers);

@@ -1,10 +1,10 @@
 const request = require('supertest');
-const app = require('../server');
+const { app } = require('../server');
 const Vendor = require('../models/Vendor');
 
 describe('Vendor Authentication', () => {
   describe('POST /api/v1/vendor/register', () => {
-    it('should register a new vendor', async () => {
+    it('should register a new vendor with pending approval status', async () => {
       const res = await request(app)
         .post('/api/v1/vendor/register')
         .send({
@@ -17,7 +17,8 @@ describe('Vendor Authentication', () => {
 
       expect(res.statusCode).toEqual(201);
       expect(res.body.success).toBe(true);
-      expect(res.body.token).toBeDefined();
+      expect(res.body.vendor).toBeDefined();
+      expect(res.body.vendor.approvalStatus).toEqual('pending');
     });
 
     it('should not register vendor with existing email', async () => {
@@ -44,7 +45,7 @@ describe('Vendor Authentication', () => {
   });
 
   describe('POST /api/v1/vendor/login', () => {
-    it('should login a vendor with valid credentials', async () => {
+    it('should reject login for pending vendor', async () => {
       await Vendor.create({
         name: 'Login Test',
         email: 'login@test.com',
@@ -60,9 +61,52 @@ describe('Vendor Authentication', () => {
           password: 'password123',
         });
 
+      expect(res.statusCode).toEqual(403);
+      expect(res.body.approvalStatus).toEqual('pending');
+    });
+
+    it('should login approved vendor with valid credentials', async () => {
+      await Vendor.create({
+        name: 'Approved Vendor',
+        email: 'approved@test.com',
+        phone: '9999999999',
+        password: 'password123',
+        companyName: 'Approved Company',
+        approvalStatus: 'approved',
+        isApproved: true
+      });
+
+      const res = await request(app)
+        .post('/api/v1/vendor/login')
+        .send({
+          email: 'approved@test.com',
+          password: 'password123',
+        });
+
       expect(res.statusCode).toEqual(200);
       expect(res.body.success).toBe(true);
       expect(res.body.token).toBeDefined();
+    });
+
+    it('should reject login for declined vendor', async () => {
+      await Vendor.create({
+        name: 'Declined Vendor',
+        email: 'declined@test.com',
+        phone: '8888888888',
+        password: 'password123',
+        companyName: 'Declined Company',
+        approvalStatus: 'declined'
+      });
+
+      const res = await request(app)
+        .post('/api/v1/vendor/login')
+        .send({
+          email: 'declined@test.com',
+          password: 'password123',
+        });
+
+      expect(res.statusCode).toEqual(403);
+      expect(res.body.approvalStatus).toEqual('declined');
     });
 
     it('should reject invalid credentials', async () => {

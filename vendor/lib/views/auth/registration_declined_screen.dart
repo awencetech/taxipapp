@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../core/theme/app_theme.dart';
 import 'login_screen.dart';
 
@@ -80,14 +82,21 @@ class RegistrationDeclinedScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
+                  onPressed: () async {
+                    final authViewModel = Provider.of<AuthViewModel>(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                      (route) => false,
+                      listen: false,
                     );
+                    await authViewModel.logout();
+                    if (context.mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    }
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),

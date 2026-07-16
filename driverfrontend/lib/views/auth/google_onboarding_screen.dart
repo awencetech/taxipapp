@@ -550,7 +550,7 @@ class _GoogleOnboardingScreenState extends State<GoogleOnboardingScreen> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<VehicleType>(
-          value: _selectedVehicleType,
+          initialValue: _selectedVehicleType,
           onChanged: (VehicleType? data) {
             setState(() {
               _selectedVehicleType = data;

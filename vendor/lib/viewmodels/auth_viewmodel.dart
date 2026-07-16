@@ -37,7 +37,19 @@ class AuthViewModel extends ChangeNotifier {
     final vendorId = prefs.getString(AppConstants.vendorIdKey);
 
     if (token != null && vendorId != null) {
-      _isLoggedIn = true;
+      // Try to refresh approval status to verify the token/vendor is still approved
+      try {
+        final status = await refreshApprovalStatus();
+        if (status == AuthStatus.success) {
+          _isLoggedIn = true;
+        } else {
+          // Token is no longer valid (approval changed), log out
+          await logout();
+        }
+      } catch (e) {
+        // If refresh fails, log out
+        await logout();
+      }
     }
 
     _isLoading = false;
@@ -65,12 +77,19 @@ class AuthViewModel extends ChangeNotifier {
         data: data,
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      if (email != null) {
+        await prefs.setString(AppConstants.vendorEmailKey, email);
+      }
+      if (phone != null) {
+        await prefs.setString(AppConstants.vendorPhoneKey, phone);
+      }
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
         final token = data['token'];
         final vendorId = data['vendor']['_id'];
 
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConstants.tokenKey, token);
         await prefs.setString(AppConstants.vendorIdKey, vendorId);
 
@@ -143,12 +162,14 @@ class AuthViewModel extends ChangeNotifier {
         data: {'phone': phone, 'otp': otp},
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.vendorPhoneKey, phone);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
         final token = data['token'];
         final vendorId = data['vendor']['_id'];
 
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConstants.tokenKey, token);
         await prefs.setString(AppConstants.vendorIdKey, vendorId);
 
@@ -208,6 +229,10 @@ class AuthViewModel extends ChangeNotifier {
         },
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.vendorEmailKey, email);
+      await prefs.setString(AppConstants.vendorPhoneKey, phone);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
         _vendor = Vendor.fromJson(data['vendor']);
@@ -245,6 +270,7 @@ class AuthViewModel extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _pendingGoogleSignUpData = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -269,37 +295,56 @@ class AuthViewModel extends ChangeNotifier {
 
       await googleUser.authentication;
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.vendorEmailKey, googleUser.email);
+
       // First try to login with Google
-      dynamic loginResponse;
       try {
-        loginResponse = await _apiService.post(
+        final loginResponse = await _apiService.post(
           AppConstants.vendorLoginUrl,
           data: {'email': googleUser.email, 'googleId': googleUser.id},
         );
+
+        if (loginResponse.statusCode == 200 ||
+            loginResponse.statusCode == 201) {
+          // User already exists and is approved, log them in
+          final data = loginResponse.data;
+          final token = data['token'];
+          final vendorId = data['vendor']['_id'];
+
+          await prefs.setString(AppConstants.tokenKey, token);
+          await prefs.setString(AppConstants.vendorIdKey, vendorId);
+
+          _vendor = Vendor.fromJson(data['vendor']);
+          _isLoggedIn = true;
+          _isLoading = false;
+          notifyListeners();
+          return {'success': true, 'isNewUser': false};
+        }
+      } on ApiException catch (e) {
+        if (e.statusCode == 403 && e.data != null) {
+          final approvalStatus = e.data!['approvalStatus'];
+          if (approvalStatus == 'pending') {
+            _authStatus = AuthStatus.pending;
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'authStatus': AuthStatus.pending};
+          } else if (approvalStatus == 'declined') {
+            _authStatus = AuthStatus.declined;
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'authStatus': AuthStatus.declined};
+          }
+        }
+        // If not 403, fall through to auto-registration
       } catch (e) {
         debugPrint('Google login failed, attempting auto-registration: $e');
       }
 
-      if (loginResponse != null && (loginResponse.statusCode == 200 || loginResponse.statusCode == 201)) {
-        // User already exists, log them in
-        final data = loginResponse.data;
-        final token = data['token'];
-        final vendorId = data['vendor']['_id'];
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
-        await prefs.setString(AppConstants.vendorIdKey, vendorId);
-
-        _vendor = Vendor.fromJson(data['vendor']);
-        _isLoggedIn = true;
-        _isLoading = false;
-        notifyListeners();
-        return {'success': true, 'isNewUser': false};
-      }
-
       // If user does not exist (or login fails), automatically register them
       try {
-        final phone = '555${(DateTime.now().millisecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
+        final phone =
+            '555${(DateTime.now().millisecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
         final companyName = '${googleUser.displayName ?? 'Vendor'} Company';
         const password = 'GooglePass123!';
 
@@ -315,7 +360,8 @@ class AuthViewModel extends ChangeNotifier {
           },
         );
 
-        if (registerResponse.statusCode == 200 || registerResponse.statusCode == 201) {
+        if (registerResponse.statusCode == 200 ||
+            registerResponse.statusCode == 201) {
           final data = registerResponse.data;
           final token = data['token'];
           final vendorId = data['vendor']['_id'];
@@ -331,7 +377,9 @@ class AuthViewModel extends ChangeNotifier {
           return {'success': true, 'isNewUser': false};
         }
       } catch (regError) {
-        debugPrint('Auto-registration failed, falling back to manual: $regError');
+        debugPrint(
+          'Auto-registration failed, falling back to manual: $regError',
+        );
       }
     } catch (e) {
       debugPrint('Google login failed: $e');
@@ -365,6 +413,7 @@ class AuthViewModel extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _pendingGoogleSignUpData = null;
+    _authStatus = null;
     notifyListeners();
 
     try {
@@ -389,37 +438,56 @@ class AuthViewModel extends ChangeNotifier {
 
       await googleUser.authentication;
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.vendorEmailKey, googleUser.email);
+
       // First try to login with Google
-      dynamic loginResponse;
       try {
-        loginResponse = await _apiService.post(
+        final loginResponse = await _apiService.post(
           AppConstants.vendorLoginUrl,
           data: {'email': googleUser.email, 'googleId': googleUser.id},
         );
+
+        if (loginResponse.statusCode == 200 ||
+            loginResponse.statusCode == 201) {
+          // User already exists and is approved, log them in
+          final data = loginResponse.data;
+          final token = data['token'];
+          final vendorId = data['vendor']['_id'];
+
+          await prefs.setString(AppConstants.tokenKey, token);
+          await prefs.setString(AppConstants.vendorIdKey, vendorId);
+
+          _vendor = Vendor.fromJson(data['vendor']);
+          _isLoggedIn = true;
+          _isLoading = false;
+          notifyListeners();
+          return {'success': true, 'isNewUser': false};
+        }
+      } on ApiException catch (e) {
+        if (e.statusCode == 403 && e.data != null) {
+          final approvalStatus = e.data!['approvalStatus'];
+          if (approvalStatus == 'pending') {
+            _authStatus = AuthStatus.pending;
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'authStatus': AuthStatus.pending};
+          } else if (approvalStatus == 'declined') {
+            _authStatus = AuthStatus.declined;
+            _isLoading = false;
+            notifyListeners();
+            return {'success': true, 'authStatus': AuthStatus.declined};
+          }
+        }
+        // If not 403, fall through to auto-registration
       } catch (e) {
         debugPrint('Google login failed, proceeding to registration: $e');
       }
 
-      if (loginResponse != null && (loginResponse.statusCode == 200 || loginResponse.statusCode == 201)) {
-        // User already exists, log them in
-        final data = loginResponse.data;
-        final token = data['token'];
-        final vendorId = data['vendor']['_id'];
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
-        await prefs.setString(AppConstants.vendorIdKey, vendorId);
-
-        _vendor = Vendor.fromJson(data['vendor']);
-        _isLoggedIn = true;
-        _isLoading = false;
-        notifyListeners();
-        return {'success': true, 'isNewUser': false};
-      }
-
       // If user does not exist (or login fails), automatically register them
       try {
-        final phone = '555${(DateTime.now().millisecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
+        final phone =
+            '555${(DateTime.now().millisecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
         final companyName = '${googleUser.displayName ?? 'Vendor'} Company';
         const password = 'GooglePass123!';
 
@@ -435,7 +503,8 @@ class AuthViewModel extends ChangeNotifier {
           },
         );
 
-        if (registerResponse.statusCode == 200 || registerResponse.statusCode == 201) {
+        if (registerResponse.statusCode == 200 ||
+            registerResponse.statusCode == 201) {
           final data = registerResponse.data;
           final token = data['token'];
           final vendorId = data['vendor']['_id'];
@@ -451,7 +520,9 @@ class AuthViewModel extends ChangeNotifier {
           return {'success': true, 'isNewUser': false};
         }
       } catch (regError) {
-        debugPrint('Auto-registration failed, falling back to manual: $regError');
+        debugPrint(
+          'Auto-registration failed, falling back to manual: $regError',
+        );
       }
     } catch (e) {
       debugPrint('Google login failed, proceeding to sign up: $e');
@@ -509,7 +580,7 @@ class AuthViewModel extends ChangeNotifier {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
         final vendorData = data['vendor'];
-        
+
         // Check approval status
         final approvalStatus = vendorData['approvalStatus'];
         if (approvalStatus == 'pending') {
@@ -565,10 +636,72 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<AuthStatus?> refreshApprovalStatus() async {
+    _isLoading = true;
+    _errorMessage = null;
+    _authStatus = null;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString(AppConstants.vendorEmailKey);
+      final phone = prefs.getString(AppConstants.vendorPhoneKey);
+
+      final Map<String, dynamic> data = {};
+      if (email != null) data['email'] = email;
+      if (phone != null) data['phone'] = phone;
+
+      final response = await _apiService.post(
+        AppConstants.vendorRefreshApprovalUrl,
+        data: data,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        final token = data['token'];
+        final vendorId = data['vendor']['_id'];
+
+        await prefs.setString(AppConstants.tokenKey, token);
+        await prefs.setString(AppConstants.vendorIdKey, vendorId);
+
+        _vendor = Vendor.fromJson(data['vendor']);
+        _isLoggedIn = true;
+        _authStatus = AuthStatus.success;
+        _isLoading = false;
+        notifyListeners();
+        return AuthStatus.success;
+      }
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 && e.data != null) {
+        final approvalStatus = e.data!['approvalStatus'];
+        if (approvalStatus == 'pending') {
+          _authStatus = AuthStatus.pending;
+        } else if (approvalStatus == 'declined') {
+          _authStatus = AuthStatus.declined;
+        }
+        _isLoading = false;
+        notifyListeners();
+        return _authStatus;
+      }
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.vendorIdKey);
+    await prefs.remove(AppConstants.vendorEmailKey);
+    await prefs.remove(AppConstants.vendorPhoneKey);
 
     // Sign out from Google
     final GoogleSignIn googleSignIn = GoogleSignIn(
@@ -584,6 +717,8 @@ class AuthViewModel extends ChangeNotifier {
 
     _isLoggedIn = false;
     _vendor = null;
+    _authStatus = null;
+    _errorMessage = null;
     notifyListeners();
   }
 }

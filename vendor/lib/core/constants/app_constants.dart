@@ -9,6 +9,7 @@ class AppConstants {
   static const String vendorRegisterUrl = '/vendor/register';
   static const String vendorSendOtpUrl = '/vendor/send-otp';
   static const String vendorVerifyOtpUrl = '/vendor/verify-otp';
+  static const String vendorRefreshApprovalUrl = '/vendor/refresh-approval';
   static const String vendorDashboardUrl = '/vendor/dashboard';
   static const String vendorProfileUrl = '/vendor/profile';
 
@@ -40,4 +41,6 @@ class AppConstants {
 
   static const String tokenKey = 'vendor_jwt_token';
   static const String vendorIdKey = 'vendor_id';
+  static const String vendorEmailKey = 'vendor_email';
+  static const String vendorPhoneKey = 'vendor_phone';
 }
