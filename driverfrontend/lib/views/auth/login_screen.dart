@@ -7,6 +7,7 @@ import '../../viewmodels/auth_viewmodel.dart';
 import 'signup_screen.dart';
 import '../home/home_screen.dart';
 import 'pending_approval_screen.dart';
+import 'rejected_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -472,9 +473,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         (route) => false,
       );
-    } else if (result['status'] == 'NOT_FOUND') {
-      // Show NOT FOUND bottom sheet
-      _showDriverNotFoundBottomSheet();
     } else if (result['error'] != null) {
       // Only show Connection Problem for actual network/500 errors
       _showConnectionErrorDialog();

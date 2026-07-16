@@ -25,11 +25,40 @@ const googleLogin = async (req, res) => {
     }
 
     if (!driver) {
-      console.log('Driver not found for googleUid:', googleUid, 'or email:', email);
-      return res.status(200).json({
-        success: false,
-        status: 'NOT_FOUND',
+      // Auto-create a new pending driver
+      console.log('Driver not found, creating pending driver for:', email);
+      driver = await Driver.create({
+        name: name || email.split('@')[0],
+        email: email,
+        googleId: googleUid,
+        profilePic: photo,
+        status: 'pending',
+        approvalStatus: 'pending',
+        accountStatus: 'pending',
+        isApproved: false,
       });
+
+      // Create notification for driver
+      await Notification.create({
+        driver: driver._id,
+        title: 'Registration Submitted',
+        message: 'Your driver registration has been submitted successfully. Waiting for vendor approval.',
+        type: 'approval',
+        data: { driverId: driver.driverId },
+      });
+
+      // Notify vendors
+      const Vendor = require('../models/Vendor');
+      const vendors = await Vendor.find();
+      for (let vendor of vendors) {
+        await Notification.create({
+          vendor: vendor._id,
+          title: 'New Driver Registration',
+          message: `New driver ${driver.name} has registered for approval.`,
+          type: 'approval',
+          data: { driverId: driver._id },
+        });
+      }
     }
 
     // If driver exists, update googleId if not present
@@ -63,6 +92,12 @@ const googleLogin = async (req, res) => {
         success: false,
         status: approvalStatus,
         rejectionReason: driver.rejectionReason,
+        googleData: {
+          email: email,
+          googleId: googleUid,
+          name: name,
+          photo: photo
+        }
       });
     }
   } catch (error) {
