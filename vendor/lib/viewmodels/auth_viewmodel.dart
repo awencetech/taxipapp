@@ -317,6 +317,7 @@ class AuthViewModel extends ChangeNotifier {
 
           _vendor = Vendor.fromJson(data['vendor']);
           _isLoggedIn = true;
+          _authStatus = AuthStatus.success;
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'isNewUser': false};
@@ -489,6 +490,7 @@ class AuthViewModel extends ChangeNotifier {
 
           _vendor = Vendor.fromJson(data['vendor']);
           _isLoggedIn = true;
+          _authStatus = AuthStatus.success;
           _isLoading = false;
           notifyListeners();
           return {'success': true, 'isNewUser': false};
