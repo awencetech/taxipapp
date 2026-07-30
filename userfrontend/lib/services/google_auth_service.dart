@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 class GoogleAuthService {
   static const String _clientId =
-      "996214358508-qiq5q5lovamh98dio6sj27ps69pm8evk.apps.googleusercontent.com";
+      "1019476576912-mj1gij1eapfqgm2tl27nujd0qh720tjj.apps.googleusercontent.com";
 
   late final GoogleSignIn _googleSignIn;
 
