@@ -14,7 +14,12 @@ const connectDB = async () => {
   mongoConnecting = true;
   
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/taxinanban';
+    const maskedUri = mongoUri.replace(/mongodb(?:\+srv)?:\/\/([^:]+):([^@]+)@/, 'mongodb://***:***@');
+
+    logger.info('MongoDB connect attempt: ' + maskedUri);
+
+    const conn = await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 10000,
@@ -22,7 +27,7 @@ const connectDB = async () => {
 
     mongoConnected = true;
     mongoConnecting = false;
-    logger.info('MongoDB Connected: ' + conn.connection.host);
+    logger.info('MongoDB Connected: host=' + conn.connection.host + ' db=' + conn.connection.name + ' readyState=' + conn.connection.readyState);
   } catch (error) {
     logger.warn('MongoDB unavailable or authentication required: ' + error.message + '. Some features may not work.');
     mongoConnected = false;

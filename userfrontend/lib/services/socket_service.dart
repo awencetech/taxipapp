@@ -1,11 +1,21 @@
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class SocketService {
   late io.Socket socket;
   // Using physical device IP for connectivity
-  static const String serverUrl = 'http://localhost:5000';
+  static String get serverUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5003';
+    } else if (Platform.isAndroid) {
+      return 'http://10.0.2.2:5003';
+    } else {
+      return 'http://localhost:5003';
+    }
+  }
 
   final _rideStatusController =
       StreamController<Map<String, dynamic>>.broadcast();

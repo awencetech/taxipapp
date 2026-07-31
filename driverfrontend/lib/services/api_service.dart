@@ -29,16 +29,24 @@ class ApiService {
           debugPrint('Request Data: ${options.data}');
           debugPrint('Initial Headers: ${options.headers}');
 
-          // Skip Authorization header for login and register endpoints
+          // Skip Authorization header only for actual public routes.
           final path = options.path;
-          final isPublicRoute = path.contains('/login') || 
-                               path.contains('/signup') || 
-                               path.contains('/register') ||
-                               path.contains('/status');
+          final method = options.method?.toUpperCase();
+          final hasLookupQueryParams =
+              (options.queryParameters?.isNotEmpty ?? false);
+          final isPublicAuthRoute = path.contains('/login') ||
+              path.contains('/signup') ||
+              path.contains('/register') ||
+              (path == AppConstants.driverStatusUrl &&
+                  method == 'GET' &&
+                  hasLookupQueryParams);
 
-          debugPrint('Is public route: $isPublicRoute');
+          debugPrint('Request method: $method');
+          debugPrint('Request path: $path');
+          debugPrint('Has lookup query params: $hasLookupQueryParams');
+          debugPrint('Is public route: $isPublicAuthRoute');
 
-          if (!isPublicRoute) {
+          if (!isPublicAuthRoute) {
             final prefs = await SharedPreferences.getInstance();
             final token = prefs.getString(AppConstants.tokenKey);
             debugPrint('Token from prefs: $token');

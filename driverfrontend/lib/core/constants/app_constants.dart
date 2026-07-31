@@ -1,9 +1,27 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
   static const String appName = 'Taxi Nanban Driver';
 
-  // Local network backend URL
-  static const String baseUrl = 'http://192.168.31.100:5003/api/v1';
-  static const String socketUrl = 'http://192.168.31.100:5003';
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5003/api/v1';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5003/api/v1';
+    }
+    return 'http://localhost:5003/api/v1';
+  }
+
+  static String get socketUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5003';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5003';
+    }
+    return 'http://localhost:5003';
+  }
 
   // Authentication APIs
   static const String loginUrl = '/auth/login';
@@ -20,6 +38,9 @@ class AppConstants {
   static const String driverRegisterPendingUrl = '/drivers/register-pending';
   static const String driverStatusUrl = '/drivers/status';
   static const String driverGoogleLoginUrl = '/drivers/google-login';
+  static const String driverForgotPasswordUrl = '/driver/auth/forgot-password';
+  static const String driverVerifyOtpUrl = '/driver/auth/verify-otp';
+  static const String driverResetPasswordUrl = '/driver/auth/reset-password';
   static const String updateLocationUrl = '/drivers/location';
   static const String driverLocationUrl = '/drivers/location';
   static const String driverEarningsUrl = '/drivers/earnings';

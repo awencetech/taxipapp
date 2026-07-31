@@ -8,13 +8,21 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class ApiService {
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:5000/api/v1';
+      // Use the current origin for web builds so the app automatically
+      // targets the same host/port the frontend was served from.
+      // This avoids mismatches between the dev server port and the API port.
+      try {
+        final origin = Uri.base.origin; // e.g. http://localhost:5003
+        return '\$origin/api/v1';
+      } catch (e) {
+        return 'http://localhost:5003/api/v1';
+      }
     } else if (Platform.isAndroid) {
       // 10.0.2.2 is the special IP for Android emulator to access localhost
-      return 'http://10.0.2.2:5000/api/v1';
+      return 'http://10.0.2.2:5003/api/v1';
     } else {
       // iOS simulator or others
-      return 'http://localhost:5000/api/v1';
+      return 'http://localhost:5003/api/v1';
     }
   }
 

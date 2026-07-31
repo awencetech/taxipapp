@@ -55,7 +55,7 @@ class DriverViewModel extends ChangeNotifier {
 
       // Listen for driver status changes
       _socket?.on('driverStatusChanged', (data) {
-        debugPrint('Received driver status change: $data');
+        debugPrint('Received driverStatusChanged event: $data');
         _handleDriverStatusChange(data);
       });
 
@@ -81,12 +81,14 @@ class DriverViewModel extends ChangeNotifier {
   }
 
   // Handle driver status change
-  void _handleDriverStatusChange(dynamic data) {
+  Future<void> _handleDriverStatusChange(dynamic data) async {
     try {
       final String driverId = data['driverId'];
       final bool isOnline = data['isOnline'] ?? false;
       final String status = data['status'] ?? 'offline';
       final bool isBusy = data['isBusy'] ?? false;
+
+      debugPrint('Handling driverStatusChanged: driverId=$driverId, isOnline=$isOnline, status=$status, isBusy=$isBusy');
 
       // Find the driver in our list and update their status
       final index = _drivers.indexWhere((d) => d.id == driverId);
@@ -98,13 +100,58 @@ class DriverViewModel extends ChangeNotifier {
           isBusy: isBusy,
         );
         notifyListeners();
-        debugPrint(
-          'Updated driver $driverId status: online=$isOnline, busy=$isBusy',
-        );
+        debugPrint('Updated driver $driverId status: online=$isOnline, busy=$isBusy');
+        return;
       }
+
+      // Driver not present locally — fetch single driver and insert/update
+      debugPrint('Driver $driverId not found locally. Attempting single-driver fetch.');
+      final fetched = await fetchDriverById(driverId);
+      if (fetched != null) {
+        final updated = fetched.copyWith(
+          isOnline: isOnline,
+          status: status,
+          isBusy: isBusy,
+        );
+        final existingIndex = _drivers.indexWhere((d) => d.id == updated.id);
+        if (existingIndex != -1) {
+          _drivers[existingIndex] = updated;
+        } else {
+          _drivers.insert(0, updated);
+        }
+        notifyListeners();
+        debugPrint('Inserted/updated driver $driverId into local list');
+        return;
+      }
+
+      // If single fetch didn't succeed, fallback to full refresh
+      debugPrint('Single-driver fetch failed for $driverId; falling back to fetchDrivers()');
+      fetchDrivers();
     } catch (e) {
       debugPrint('Error handling driver status change: $e');
     }
+  }
+
+  // Fetch a single driver by id from vendor API
+  Future<Driver?> fetchDriverById(String driverId) async {
+    try {
+      final path = AppConstants.vendorDriverByIdUrl.replaceFirst(':id', driverId);
+      debugPrint('Fetching single driver from $path');
+      final response = await _apiService.get(path);
+      if (response.statusCode == 200) {
+        final data = response.data;
+        // Backend returns the driver object directly or nested — handle both
+        final driverJson = (data is Map && data['driver'] != null) ? data['driver'] : data;
+        if (driverJson != null) {
+          final driver = Driver.fromJson(Map<String, dynamic>.from(driverJson));
+          debugPrint('Fetched driver ${driver.id} successfully');
+          return driver;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching driver by id $driverId: $e');
+    }
+    return null;
   }
 
   bool get isLoading => _isLoading;

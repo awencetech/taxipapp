@@ -114,6 +114,7 @@ class _HomeDashboardState extends State<HomeDashboard>
   bool get wantKeepAlive => true;
 
   bool _forceShowOfflineUI = false;
+  bool _hasNavigatedToCurrentRide = false;
 
   @override
   void initState() {
@@ -155,15 +156,14 @@ class _HomeDashboardState extends State<HomeDashboard>
       );
 
       // If we have a current ride, automatically navigate to RideDetailsScreen
-      if (rideViewModel.currentRide != null) {
-        // Use Future.microtask to navigate to avoid build-time navigation
-        Future.microtask(() {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => RideDetailsScreen()),
-            );
-          }
+      if (rideViewModel.currentRide != null && !_hasNavigatedToCurrentRide) {
+        _hasNavigatedToCurrentRide = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => RideDetailsScreen()),
+          );
         });
       }
 
@@ -1436,63 +1436,6 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildMetricCard(
-    String value,
-    String label,
-    IconData icon,
-    Color bgColor,
-    Color iconColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class MapView extends StatefulWidget {

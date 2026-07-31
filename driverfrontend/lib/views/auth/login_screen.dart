@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 import '../home/home_screen.dart';
 import 'pending_approval_screen.dart';
@@ -492,37 +493,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Show NOT FOUND bottom sheet
-  void _showDriverNotFoundBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => _DriverNotFoundBottomSheet(
-        onRegister: () {
-          Navigator.of(context).pop();
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const SignupScreen()));
-        },
-        onUseAnotherAccount: () async {
-          final authViewModel = Provider.of<AuthViewModel>(
-            context,
-            listen: false,
-          );
-          await authViewModel.logout();
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-        },
-        onClose: () => Navigator.of(context).pop(),
-      ),
-    );
-  }
-
   // Show connection error dialog
   void _showConnectionErrorDialog() {
     showDialog(
@@ -795,6 +765,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: authViewModel.isLoading
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
+                      );
+                    },
+              child: const Text('Forgot Password?'),
             ),
           ),
         ],

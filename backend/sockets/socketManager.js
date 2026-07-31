@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const Driver = require('../models/Driver');
 const Ride = require('../models/Ride');
+const { applyRideStatusTransition } = require('../services/rideLifecycleService');
 
 const formatRideResponse = (ride) => {
   if (!ride) return null;
@@ -78,22 +79,35 @@ const initSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('Driver connected:', socket.id);
 
     // Join user/driver to their own room
-    socket.on('join', async (userId) => {
-      socket.join(userId);
-      console.log(`User ${userId} joined their room ${userId}`);
-      
-      // Update socketId in Driver collection if this user is a driver
+    socket.on('join', async (driverId) => {
+      console.log(`Driver socket join requested: driverId=${driverId} socketId=${socket.id}`);
       try {
-        const driver = await Driver.findOneAndUpdate(
-          { user: userId },
-          { socketId: socket.id },
-          { new: true }
-        );
+        let driver = await Driver.findOne({ user: driverId }).populate('user');
+
+        if (!driver) {
+          driver = await Driver.findById(driverId).populate('user');
+        }
+
         if (driver) {
-          console.log(`Associated driver user ${userId} with socket ID ${socket.id}`);
+          const driverRoom = driver._id.toString();
+          const userRoom = driver.user ? driver.user._id.toString() : driverId;
+
+          socket.join(driverRoom);
+          socket.join(userRoom);
+
+          await Driver.findByIdAndUpdate(
+            driver._id,
+            { socketId: socket.id, lastSeen: new Date() },
+            { new: true }
+          );
+
+          console.log(`Driver room joined: ${driverRoom} | User room joined: ${userRoom} | Socket ID: ${socket.id}`);
+        } else {
+          socket.join(driverId);
+          console.log(`Fallback room joined: ${driverId}`);
         }
       } catch (err) {
         console.error('Error associating driver socket:', err);
@@ -109,18 +123,45 @@ const initSocket = (server) => {
 
     // Driver goes online
     socket.on('goOnline', async (data) => {
-      const { driverId } = data; // driverId here is the user._id (from driver app)
+      const { driverId } = data; // driverId here can be user._id or standalone Driver _id
+      console.log(`goOnline event received for driverId=${driverId} payload=${JSON.stringify(data)}`);
       try {
-        const driver = await Driver.findOneAndUpdate(
+        let driver = await Driver.findOneAndUpdate(
           { user: driverId },
           {
             isOnline: true,
+            isAvailable: true,
             status: 'available',
             lastSeen: new Date(),
-            socketId: socket.id
+            socketId: socket.id,
+            ...(data?.lat && data?.lng ? {
+              currentLocation: { coordinates: [data.lng, data.lat] },
+              currentLatitude: data.lat,
+              currentLongitude: data.lng,
+            } : {})
           },
           { new: true }
         );
+
+        if (!driver) {
+          console.log(`goOnline fallback: driver not found by user=${driverId}, trying by _id`);
+          driver = await Driver.findByIdAndUpdate(
+            driverId,
+            {
+              isOnline: true,
+              isAvailable: true,
+              status: 'available',
+              lastSeen: new Date(),
+              socketId: socket.id,
+              ...(data?.lat && data?.lng ? {
+                currentLocation: { coordinates: [data.lng, data.lat] },
+                currentLatitude: data.lat,
+                currentLongitude: data.lng,
+              } : {})
+            },
+            { new: true }
+          );
+        }
 
         if (driver) {
           console.log(`Driver ${driverId} (${driver._id}) is now online`);
@@ -133,17 +174,33 @@ const initSocket = (server) => {
 
     // Driver goes offline
     socket.on('goOffline', async (data) => {
-      const { driverId } = data; // driverId here is user._id
+      const { driverId } = data; // driverId here can be user._id or standalone Driver _id
+      console.log(`goOffline event received for driverId=${driverId} payload=${JSON.stringify(data)}`);
       try {
-        const driver = await Driver.findOneAndUpdate(
+        let driver = await Driver.findOneAndUpdate(
           { user: driverId },
           {
             isOnline: false,
+            isAvailable: false,
             status: 'offline',
             lastSeen: new Date()
           },
           { new: true }
         );
+
+        if (!driver) {
+          console.log(`goOffline fallback: driver not found by user=${driverId}, trying by _id`);
+          driver = await Driver.findByIdAndUpdate(
+            driverId,
+            {
+              isOnline: false,
+              isAvailable: false,
+              status: 'offline',
+              lastSeen: new Date()
+            },
+            { new: true }
+          );
+        }
 
         if (driver) {
           console.log(`Driver ${driverId} (${driver._id}) is now offline`);
@@ -158,7 +215,7 @@ const initSocket = (server) => {
     socket.on('updateLocation', async (data) => {
       const { driverId, lat, lng } = data;
       try {
-        const driver = await Driver.findOneAndUpdate(
+        let driver = await Driver.findOneAndUpdate(
           { user: driverId },
           { 
             currentLocation: { coordinates: [lng, lat] },
@@ -168,23 +225,51 @@ const initSocket = (server) => {
           },
           { new: true }
         );
+
+        if (!driver) {
+          driver = await Driver.findByIdAndUpdate(
+            driverId,
+            {
+              currentLocation: { coordinates: [lng, lat] },
+              currentLatitude: lat,
+              currentLongitude: lng,
+              lastSeen: new Date()
+            },
+            { new: true }
+          );
+        }
         
         if (driver) {
-          // Broadcast location to all users tracking this driver
-          io.emit(`driverLocation-${driverId}`, { coordinates: [lng, lat] });
-
-          // Send driverLocationUpdated to the active passenger
+          // Track driver path while ride is active
           if (driver.currentRide) {
             const ride = await Ride.findById(driver.currentRide);
-            if (ride && ride.user) {
-              io.to(ride.user.toString()).emit('driverLocationUpdated', {
-                driverId,
+            if (ride) {
+              ride.driverLocation = {
+                type: 'Point',
+                coordinates: [lng, lat],
+              };
+              ride.route = ride.route || [];
+              ride.route.push({
                 latitude: lat,
                 longitude: lng,
-                coordinates: [lng, lat]
+                timestamp: new Date(),
               });
+              await ride.save();
+
+              if (ride.user) {
+                io.to(ride.user.toString()).emit('driverLocationUpdated', {
+                  driverId,
+                  latitude: lat,
+                  longitude: lng,
+                  coordinates: [lng, lat],
+                  rideId: ride._id,
+                });
+              }
             }
           }
+
+          // Broadcast location to all users tracking this driver
+          io.emit(`driverLocation-${driverId}`, { coordinates: [lng, lat] });
         }
       } catch (error) {
         console.error('Socket location update error:', error);
@@ -194,8 +279,20 @@ const initSocket = (server) => {
     // Ride request broadcasting
     socket.on('requestRide', async (rideData) => {
       const { rideId, nearbyDrivers } = rideData;
+      console.log(`Socket requestRide event received for rideId=${rideId} drivers=${nearbyDrivers?.length || 0}`);
       nearbyDrivers.forEach((driver) => {
-        io.to(driver.user.toString()).emit('newRideRequest', rideData);
+        const driverRoom = driver?._id?.toString();
+        const userRoom = driver?.user?._id?.toString() || driver?.user?.toString();
+
+        if (userRoom) {
+          io.to(userRoom).emit('newRideRequest', rideData);
+          io.to(userRoom).emit('ride-request', rideData);
+        }
+
+        if (driverRoom) {
+          io.to(driverRoom).emit('newRideRequest', rideData);
+          io.to(driverRoom).emit('ride-request', rideData);
+        }
       });
     });
 
@@ -211,16 +308,22 @@ const initSocket = (server) => {
           return;
         }
         
-        const ride = await Ride.findByIdAndUpdate(
-          rideId,
-          { driver: driver._id, driverId: driver._id.toString(), status: 'accepted' },
-          { new: true }
-        );
+        const ride = await Ride.findById(rideId);
         
         if (!ride) {
           console.error('Ride not found:', rideId);
           return;
         }
+
+        const transition = applyRideStatusTransition(ride, 'accepted');
+        if (!transition.valid) {
+          console.error('Invalid ride acceptance transition:', transition.reason);
+          return;
+        }
+
+        ride.driver = driver._id;
+        ride.driverId = driver._id.toString();
+        await ride.save();
 
         driver.isBusy = true;
         driver.currentRide = rideId;
@@ -303,19 +406,28 @@ const initSocket = (server) => {
     socket.on('driverArrived', async (data) => {
       const { rideId } = data;
       try {
-        const ride = await Ride.findByIdAndUpdate(
-          rideId,
-          { status: 'arrived' },
-          { new: true }
-        ).populate('user').populate({
-          path: 'driver',
-          populate: { path: 'user' }
-        });
+        const ride = await Ride.findById(rideId);
+        if (!ride) return;
 
-        if (ride && ride.user) {
-          const formattedRide = formatRideResponse(ride);
-          io.to(ride.user._id.toString()).emit('driverArrived', formattedRide);
-          io.to(ride.user._id.toString()).emit('rideUpdated', formattedRide);
+        const transition = applyRideStatusTransition(ride, 'arrived');
+        if (!transition.valid) {
+          console.error('Invalid arrive transition:', transition.reason);
+          return;
+        }
+
+        await ride.save();
+
+        const populatedRide = await Ride.findById(ride._id)
+          .populate('user')
+          .populate({
+            path: 'driver',
+            populate: { path: 'user' }
+          });
+
+        if (populatedRide && populatedRide.user) {
+          const formattedRide = formatRideResponse(populatedRide);
+          io.to(populatedRide.user._id.toString()).emit('driverArrived', formattedRide);
+          io.to(populatedRide.user._id.toString()).emit('rideUpdated', formattedRide);
         }
       } catch (error) {
         console.error('Socket driverArrived error:', error);
@@ -326,19 +438,28 @@ const initSocket = (server) => {
     socket.on('tripStarted', async (data) => {
       const { rideId } = data;
       try {
-        const ride = await Ride.findByIdAndUpdate(
-          rideId,
-          { status: 'trip_started', startTime: Date.now() },
-          { new: true }
-        ).populate('user').populate({
-          path: 'driver',
-          populate: { path: 'user' }
-        });
+        const ride = await Ride.findById(rideId);
+        if (!ride) return;
 
-        if (ride && ride.user) {
-          const formattedRide = formatRideResponse(ride);
-          io.to(ride.user._id.toString()).emit('tripStarted', formattedRide);
-          io.to(ride.user._id.toString()).emit('rideUpdated', formattedRide);
+        const transition = applyRideStatusTransition(ride, 'trip_started');
+        if (!transition.valid) {
+          console.error('Invalid trip start transition:', transition.reason);
+          return;
+        }
+
+        await ride.save();
+
+        const populatedRide = await Ride.findById(ride._id)
+          .populate('user')
+          .populate({
+            path: 'driver',
+            populate: { path: 'user' }
+          });
+
+        if (populatedRide && populatedRide.user) {
+          const formattedRide = formatRideResponse(populatedRide);
+          io.to(populatedRide.user._id.toString()).emit('tripStarted', formattedRide);
+          io.to(populatedRide.user._id.toString()).emit('rideUpdated', formattedRide);
         }
       } catch (error) {
         console.error('Socket tripStarted error:', error);
@@ -349,30 +470,38 @@ const initSocket = (server) => {
     socket.on('tripCompleted', async (data) => {
       const { rideId } = data;
       try {
-        const ride = await Ride.findByIdAndUpdate(
-          rideId,
-          { status: 'completed', endTime: Date.now() },
-          { new: true }
-        ).populate('user').populate({
-          path: 'driver',
-          populate: { path: 'user' }
-        });
+        const ride = await Ride.findById(rideId);
+        if (!ride) return;
 
-        if (ride) {
-          if (ride.driver) {
-            const driver = await Driver.findById(ride.driver);
-            if (driver) {
-              driver.isBusy = false;
-              driver.currentRide = null;
-              driver.status = 'available';
-              await driver.save();
-            }
+        const transition = applyRideStatusTransition(ride, 'completed');
+        if (!transition.valid) {
+          console.error('Invalid trip completion transition:', transition.reason);
+          return;
+        }
+
+        await ride.save();
+
+        if (ride.driver) {
+          const driver = await Driver.findById(ride.driver);
+          if (driver) {
+            driver.isBusy = false;
+            driver.currentRide = null;
+            driver.status = 'available';
+            await driver.save();
           }
-          if (ride.user) {
-            const formattedRide = formatRideResponse(ride);
-            io.to(ride.user._id.toString()).emit('tripCompleted', formattedRide);
-            io.to(ride.user._id.toString()).emit('rideUpdated', formattedRide);
-          }
+        }
+
+        const populatedRide = await Ride.findById(ride._id)
+          .populate('user')
+          .populate({
+            path: 'driver',
+            populate: { path: 'user' }
+          });
+
+        if (populatedRide && populatedRide.user) {
+          const formattedRide = formatRideResponse(populatedRide);
+          io.to(populatedRide.user._id.toString()).emit('tripCompleted', formattedRide);
+          io.to(populatedRide.user._id.toString()).emit('rideUpdated', formattedRide);
         }
       } catch (error) {
         console.error('Socket tripCompleted error:', error);

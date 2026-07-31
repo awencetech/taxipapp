@@ -89,6 +89,10 @@ const driverSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isAvailable: {
+    type: Boolean,
+    default: false,
+  },
   rideStatus: {
     type: String,
     enum: ['available', 'busy', 'offline'],
@@ -238,6 +242,14 @@ const driverSchema = new mongoose.Schema({
   branchName: {
     type: String,
     default: '',
+  },
+  resetOtp: {
+    type: String,
+    select: false,
+  },
+  resetOtpExpiry: {
+    type: Date,
+    select: false,
   },
   // New: Multiple bank accounts (max 3)
   bankAccounts: [

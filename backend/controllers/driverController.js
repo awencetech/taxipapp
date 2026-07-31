@@ -612,19 +612,27 @@ const getDriverProfile = async (req, res) => {
 const updateStatus = async (req, res) => {
   try {
     const { isOnline, status } = req.body;
+    const normalizedStatus = status || (isOnline ? 'available' : 'offline');
+    const updatePayload = {
+      isOnline,
+      isAvailable: Boolean(isOnline),
+      status: normalizedStatus,
+      lastSeen: new Date(),
+    };
+
     let driver;
     if (req.user.role === 'driver' && req.user.driverId) {
       // New standalone Driver
       driver = await Driver.findByIdAndUpdate(
         req.user._id,
-        { isOnline, status },
+        updatePayload,
         { new: true }
       );
     } else {
       // Old user-linked Driver
       driver = await Driver.findOneAndUpdate(
         { user: req.user._id },
-        { isOnline, status },
+        updatePayload,
         { new: true }
       );
     }
@@ -783,10 +791,14 @@ const getDriverRideHistory = async (req, res) => {
 
 const getNotifications = async (req, res) => {
   try {
-    let notifications;
-    if (req.user?.role === 'driver' && req.user?.driverId) {
-      notifications = await Notification.find({ driver: req.user._id })
-        .sort('-createdAt');
+    let notifications = [];
+    if (req.user?.role === 'driver') {
+      notifications = await Notification.find({
+        $or: [
+          { driver: req.user._id },
+          { user: req.user._id },
+        ],
+      }).sort('-createdAt');
     } else {
       notifications = await Notification.find({ user: req.user._id })
         .sort('-createdAt');
@@ -827,7 +839,20 @@ const deleteNotification = async (req, res) => {
 
 const markAllNotificationsAsRead = async (req, res) => {
   try {
-    await Notification.updateMany({ user: req.user._id, isRead: false }, { isRead: true });
+    if (req.user?.role === 'driver') {
+      await Notification.updateMany(
+        {
+          $or: [
+            { driver: req.user._id },
+            { user: req.user._id },
+          ],
+          isRead: false,
+        },
+        { isRead: true }
+      );
+    } else {
+      await Notification.updateMany({ user: req.user._id, isRead: false }, { isRead: true });
+    }
     res.status(200).json({ success: true, message: 'All notifications marked as read' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

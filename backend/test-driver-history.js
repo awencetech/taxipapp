@@ -6,7 +6,7 @@ dotenv.config({ path: './.env.development' });
 async function test() {
   try {
     // First login as driver
-    const loginResponse = await axios.post(`${process.env.API_URL || 'http://localhost:5000'}/api/v1/auth/login`, {
+    const loginResponse = await axios.post(`${process.env.API_URL || `http://localhost:${process.env.PORT || 5003}`}/api/v1/auth/login`, {
       email: 'ravi@taxinanban.com',
       password: 'test123456',
       role: 'driver'
@@ -16,7 +16,7 @@ async function test() {
     console.log('Token:', token);
 
     // Now get driver history
-    const historyResponse = await axios.get(`${process.env.API_URL || 'http://localhost:5000'}/api/v1/rides/driver/history`, {
+    const historyResponse = await axios.get(`${process.env.API_URL || `http://localhost:${process.env.PORT || 5003}`}/api/v1/rides/driver/history`, {
       headers: {
         Authorization: `Bearer ${token}`
       }

@@ -1,9 +1,13 @@
 const Driver = require('../models/Driver');
 
-const findNearbyDrivers = async (lat, lng, radiusInKm = 5) => {
-  const drivers = await Driver.find({
+const findNearbyDrivers = async (lat, lng, radiusInKm = 5, vendorId = null) => {
+  const query = {
     isOnline: true,
+    isBusy: false,
     status: 'available',
+    isApproved: true,
+    approvalStatus: 'approved',
+    accountStatus: 'approved',
     currentLocation: {
       $near: {
         $geometry: {
@@ -13,7 +17,13 @@ const findNearbyDrivers = async (lat, lng, radiusInKm = 5) => {
         $maxDistance: radiusInKm * 1000, // convert to meters
       },
     },
-  }).populate('user').populate('vehicle');
+  };
+
+  if (vendorId) {
+    query.vendor = vendorId;
+  }
+
+  const drivers = await Driver.find(query).populate('user').populate('vehicle');
 
   return drivers;
 };

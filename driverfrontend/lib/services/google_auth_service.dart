@@ -25,6 +25,7 @@ class GoogleAuthService {
       final GoogleSignInAuthentication auth = await account.authentication;
 
       return {
+        'googleToken': auth.idToken ?? auth.accessToken,
         'email': account.email,
         'name': account.displayName,
         'googleId': account.id,

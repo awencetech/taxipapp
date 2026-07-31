@@ -11,7 +11,13 @@ const seedVendor = async () => {
 
     const existingVendor = await Vendor.findOne({ email: 'vendor@taxinanban.com' });
     if (existingVendor) {
-      console.log('Test vendor already exists!');
+      existingVendor.password = 'password123';
+      existingVendor.role = 'main_vendor';
+      existingVendor.approvalStatus = 'approved';
+      existingVendor.isApproved = true;
+      await existingVendor.save();
+
+      console.log('Test vendor already exists and has been updated to active status!');
       console.log('Email: vendor@taxinanban.com');
       console.log('Password: password123');
       process.exit(0);
@@ -23,6 +29,9 @@ const seedVendor = async () => {
       phone: '9876543210',
       password: 'password123',
       companyName: 'Taxi Nanban Fleet',
+      role: 'main_vendor',
+      approvalStatus: 'approved',
+      isApproved: true,
     });
 
     console.log('Test vendor created successfully!');

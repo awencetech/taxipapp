@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../home/home_screen.dart';
 import 'pending_approval_screen.dart';
+import 'rejected_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key, this.googleData});

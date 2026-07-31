@@ -43,6 +43,26 @@ class SocketService {
       _rideRequestController.add(data);
     });
 
+    socket.on('ride-request', (data) {
+      developer.log('Normalized Ride Request Event: $data');
+      _rideRequestController.add(data);
+    });
+
+    socket.on('ride-updated', (data) {
+      developer.log('Ride Updated Event: $data');
+      _rideRequestController.add(data);
+    });
+
+    socket.on('notification', (data) {
+      developer.log('Socket Notification Event: $data');
+      _rideRequestController.add(data);
+    });
+
+    socket.on('driver-status', (data) {
+      developer.log('Driver Status Event: $data');
+      _rideRequestController.add(data);
+    });
+
     socket.onDisconnect((_) => developer.log('Disconnected from Socket.io'));
   }
 

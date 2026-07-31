@@ -43,7 +43,7 @@ const formatRideResponse = (ride) => {
 
 const requestRide = async (req, res) => {
   try {
-    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod } = req.body;
+    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod, vendorId } = req.body;
 
     if (!pickupLocation || !dropLocation || fare === undefined) {
       return res.status(400).json({
@@ -55,6 +55,7 @@ const requestRide = async (req, res) => {
     const ride = await Ride.create({
       user: req.user._id,
       userId: req.user._id.toString(),
+      vendorId: vendorId || null,
       pickupLocation,
       dropLocation,
       fare,
@@ -74,6 +75,9 @@ const requestRide = async (req, res) => {
       isOnline: true,
       isBusy: false,
       status: 'available',
+      isApproved: true,
+      approvalStatus: 'approved',
+      accountStatus: 'approved',
       currentLocation: {
         $near: {
           $geometry: {
@@ -89,11 +93,24 @@ const requestRide = async (req, res) => {
     const populatedRide = await Ride.findById(ride._id).populate('user');
     const rideData = formatRideResponse(populatedRide);
 
+    console.log(`Ride created and dispatched to ${nearbyDrivers.length} nearby drivers`);
+
     // Send ride request to nearby online drivers
     nearbyDrivers.forEach((driver) => {
       if (driver.user) {
-        console.log(`Sending newRideRequest to driver user ${driver.user._id.toString()}`);
-        io.to(driver.user._id.toString()).emit('newRideRequest', rideData);
+        const driverRoom = driver._id.toString();
+        const userRoom = driver.user._id.toString();
+        console.log(`Sending newRideRequest to driver room ${driverRoom} and user room ${userRoom}`);
+        io.to(userRoom).emit('newRideRequest', rideData);
+        io.to(userRoom).emit('ride-request', rideData);
+        io.to(driverRoom).emit('newRideRequest', rideData);
+        io.to(driverRoom).emit('ride-request', rideData);
+        io.to(userRoom).emit('notification', {
+          type: 'ride',
+          title: 'New Ride Request',
+          message: `${req.user.name} requested a ride`,
+          rideId: ride._id.toString(),
+        });
       }
     });
 
@@ -150,7 +167,9 @@ const acceptRide = async (req, res) => {
     if (populatedRide.user) {
       console.log(`Driver accepted. Emitting driverAccepted to user ${populatedRide.user._id.toString()}`);
       io.to(populatedRide.user._id.toString()).emit('driverAccepted', formattedRide);
+      io.to(populatedRide.user._id.toString()).emit('ride-accepted', formattedRide);
       io.to(populatedRide.user._id.toString()).emit('rideAccepted', formattedRide);
+      io.to(populatedRide.user._id.toString()).emit('ride-updated', formattedRide);
       io.to(populatedRide.user._id.toString()).emit('rideUpdated', formattedRide);
     }
 

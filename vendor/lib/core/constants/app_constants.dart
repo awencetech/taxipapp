@@ -1,8 +1,27 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
   static const String appName = 'Taxi Nanban Vendor';
 
-  static const String baseUrl = 'http://10.0.2.2:5003/api/v1';
-  static const String socketUrl = 'http://10.0.2.2:5003';
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5003/api/v1';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5003/api/v1';
+    }
+    return 'http://localhost:5003/api/v1';
+  }
+
+  static String get socketUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5003';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5003';
+    }
+    return 'http://localhost:5003';
+  }
 
   // Vendor APIs
   static const String vendorLoginUrl = '/vendor/login';

@@ -18,7 +18,7 @@ async function testVehiclesAPI() {
     const token = jwt.sign({ id: vendor._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
     console.log('Vendor token generated');
 
-    const response = await axios.get('http://127.0.0.1:5000/api/v1/vendor/vehicles', {
+    const response = await axios.get(`http://127.0.0.1:${process.env.PORT || 5003}/api/v1/vendor/vehicles`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 

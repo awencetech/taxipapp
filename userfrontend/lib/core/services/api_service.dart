@@ -8,13 +8,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class ApiService {
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:5000/api/v1';
+      return 'http://localhost:5003/api/v1';
     } else if (Platform.isAndroid) {
       // 10.0.2.2 is the special IP for Android emulator to access localhost
-      return 'http://10.0.2.2:5000/api/v1';
+      return 'http://10.0.2.2:5003/api/v1';
     } else {
       // iOS simulator or others
-      return 'http://localhost:5000/api/v1';
+      return 'http://localhost:5003/api/v1';
     }
   }
 

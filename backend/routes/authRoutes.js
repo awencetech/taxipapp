@@ -56,7 +56,9 @@ router.post('/register', register);
  */
 router.post('/login', login);
 
-router.post('/forgot-password', forgotPassword);
+const { createRateLimiter } = require('../src/middleware/rateLimiter');
+const forgotLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 5, message: 'Too many requests for forgot password, try again later.' });
+router.post('/forgot-password', forgotLimiter, forgotPassword);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
 router.post('/google-login', googleLogin);

@@ -101,6 +101,14 @@ const protect = async (req, res, next) => {
   }
 };
 
+const protectOptional = async (req, res, next) => {
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer')) {
+    return next();
+  }
+
+  return protect(req, res, next);
+};
+
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -113,4 +121,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, protectOptional, authorize };

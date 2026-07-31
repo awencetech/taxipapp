@@ -17,6 +17,11 @@ const rideSchema = new mongoose.Schema({
   userId: {
     type: String,
   },
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+  },
   driverId: {
     type: String,
   },
@@ -51,6 +56,45 @@ const rideSchema = new mongoose.Schema({
     enum: ['searching', 'accepted', 'driver_arriving', 'arrived', 'trip_started', 'completed', 'cancelled'],
     default: 'searching',
   },
+  acceptedTime: {
+    type: Date,
+    default: null,
+  },
+  arrivedTime: {
+    type: Date,
+    default: null,
+  },
+  startedTime: {
+    type: Date,
+    default: null,
+  },
+  completedTime: {
+    type: Date,
+    default: null,
+  },
+  cancelledTime: {
+    type: Date,
+    default: null,
+  },
+  otpVerified: {
+    type: Boolean,
+    default: false,
+  },
+  driverLocation: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+    coordinates: [Number],
+  },
+  route: [
+    {
+      latitude: Number,
+      longitude: Number,
+      timestamp: Date,
+    },
+  ],
   fare: {
     type: Number,
     required: true,

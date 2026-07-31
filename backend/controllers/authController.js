@@ -96,6 +96,8 @@ const register = async (req, res) => {
         role: role || 'user',
       });
 
+      console.log('User created with id:', user._id);
+
       const token = generateToken(user._id);
       return res.status(201).json({
         success: true,
@@ -204,6 +206,7 @@ const login = async (req, res) => {
 
 const forgotPassword = async (req, res) => {
   try {
+    console.log('forgotPassword request body:', req.body);
     const { email } = req.body;
     if (!email) {
       return res.status(400).json({ success: false, message: 'Please provide an email' });
@@ -230,10 +233,26 @@ const forgotPassword = async (req, res) => {
 
       res.status(200).json({ success: true, message: 'OTP sent to email' });
     } catch (err) {
+      // Clear OTP on failure
       user.resetPasswordOTP = undefined;
       user.resetPasswordExpires = undefined;
       await user.save();
-      return res.status(500).json({ success: false, message: 'Email could not be sent' });
+
+      // Log detailed error for debugging and return informative message
+      console.error('ForgotPassword: email send failed for %s: %o', user.email, err);
+
+      const safeMessage = err && err.message ? String(err.message) : 'Unknown email error';
+      // Map common nodemailer errors to clearer messages
+      let clientMessage = safeMessage;
+      if (/EAUTH|Authentication failed/i.test(safeMessage)) {
+        clientMessage = 'SMTP authentication failed. Check SMTP_USER and SMTP_PASS.';
+      } else if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT/i.test(safeMessage)) {
+        clientMessage = 'SMTP connection failed. Network or SMTP_HOST/PORT may be incorrect.';
+      } else if (/Invalid recipient/i.test(safeMessage) || /Invalid mailbox/i.test(safeMessage)) {
+        clientMessage = 'Invalid recipient address.';
+      }
+
+      return res.status(500).json({ success: false, message: `Email could not be sent: ${clientMessage}` });
     }
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

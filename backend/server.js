@@ -22,9 +22,13 @@ const { createRedisClient } = require('./utils/cache');
 const envPath = path.resolve(__dirname, `.env.${process.env.NODE_ENV || 'development'}`);
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
+  logger.info(`Loaded environment config from ${envPath}`);
 } else {
   dotenv.config();
+  logger.warn(`Environment file not found at ${envPath}; falling back to default dotenv resolution`);
 }
+
+logger.info(`Backend environment: NODE_ENV=${process.env.NODE_ENV || 'development'}, PORT=${process.env.PORT || 5001}`);
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, 'logs');
@@ -108,6 +112,7 @@ app.use('/api/v1/users', require('./routes/userRoutes'));
 app.use('/api/v1/drivers', require('./routes/driverRoutes'));
 app.use('/api/v1/rides', require('./routes/rideRoutes'));
 app.use('/api/v1/ride', require('./routes/rideSingularRoutes'));
+app.use('/api/v1/driver/auth', require('./routes/driverAuthRoutes'));
 app.use('/api/v1/driver', require('./routes/driverSingularRoutes'));
 app.use('/api/v1/admin', require('./routes/adminRoutes'));
 app.use('/api/v1/maps', require('./routes/mapsRoutes'));
@@ -116,6 +121,8 @@ app.use('/api/v1/support-tickets', require('./routes/supportTicketRoutes'));
 app.use('/api/v1/driver-earnings', require('./routes/driverEarningRoutes'));
 app.use('/api/v1/wallets', require('./routes/walletRoutes'));
 app.use('/api/v1/coupons', require('./routes/couponRoutes'));
+// Email routes (handles OTP, verification, forgot password, and generic sends)
+app.use('/api/v1/email', require('./src/routes/email.routes'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -137,8 +144,15 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5001;
 
 if (require.main === module) {
-  server.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "0.0.0.0", async () => {
     logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} (0.0.0.0)`);
+    // Verify SMTP transporter but don't crash the server if email fails to connect.
+    try {
+      const EmailService = require('./src/services/email.service');
+      await EmailService.verifyTransporter();
+    } catch (err) {
+      logger.warn('SMTP verification failed at startup: %s', err.message || err);
+    }
   });
 }
 

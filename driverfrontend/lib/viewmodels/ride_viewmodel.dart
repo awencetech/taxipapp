@@ -72,6 +72,11 @@ class RideViewModel extends ChangeNotifier {
 
   void toggleOnlineOffline() async {
     _isOnline = !_isOnline;
+    final statusPayload = {
+      'isOnline': _isOnline,
+      'status': _isOnline ? 'available' : 'offline',
+    };
+    debugPrint('Driver status toggle: isOnline=$_isOnline, driverId=$_driverId, payload=$statusPayload');
 
     try {
       await _apiService.put(
@@ -81,12 +86,15 @@ class RideViewModel extends ChangeNotifier {
           'status': _isOnline ? 'available' : 'offline',
         },
       );
+      debugPrint('Driver status PUT response sent: $statusPayload');
 
       // Emit socket event for status change
       if (_driverId != null) {
         if (_isOnline) {
+          debugPrint('Emitting goOnline socket event for driverId=$_driverId');
           _socketService.emit('goOnline', {'driverId': _driverId});
         } else {
+          debugPrint('Emitting goOffline socket event for driverId=$_driverId');
           _socketService.emit('goOffline', {'driverId': _driverId});
         }
       }

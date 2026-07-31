@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { updateDriverProfile, getDriverProfile, updateStatus, updateLocation, getEarnings, registerDriver, getDriverRideHistory, getNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead, uploadDocument, editDocument, deleteDocument, registerPendingDriver, getDriverStatus, googleLogin } = require('../controllers/driverController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, protectOptional, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 // Public routes
 router.post('/register-pending', registerPendingDriver);
-router.get('/status', getDriverStatus);
+router.get('/status', protectOptional, getDriverStatus);
 router.post('/google-login', googleLogin);
 
 // Protected routes

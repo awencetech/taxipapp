@@ -2,6 +2,7 @@ const Ride = require('../models/Ride');
 const Notification = require('../models/Notification');
 const { findNearbyDrivers, calculateFare } = require('../services/rideService');
 const { getDistanceMatrix } = require('../services/mapsService');
+const { applyRideStatusTransition } = require('../services/rideLifecycleService');
 
 const estimateFare = async (req, res) => {
   try {
@@ -27,7 +28,7 @@ const createRide = async (req, res) => {
     console.log('createRide - req.user:', req.user);
     console.log('createRide - req.body:', req.body);
     
-    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod } = req.body;
+    const { pickupLocation, dropLocation, fare, distance, duration, vehicleType, paymentMethod, vendorId } = req.body;
     
     // Validate required fields
     if (!pickupLocation || !dropLocation || fare === undefined) {
@@ -40,6 +41,8 @@ const createRide = async (req, res) => {
     
     const ride = await Ride.create({
       user: req.user._id,
+      userId: req.user._id.toString(),
+      vendorId: vendorId || null,
       pickupLocation,
       dropLocation,
       fare,
@@ -47,9 +50,11 @@ const createRide = async (req, res) => {
       duration,
       vehicleType: vehicleType || 'standard',
       paymentMethod: paymentMethod || 'cash',
-      status: 'pending',
+      status: 'searching',
       otp: Math.floor(1000 + Math.random() * 9000).toString(),
     });
+
+    console.log(`Ride created: rideId=${ride._id.toString()} userId=${req.user._id.toString()}`);
 
     // Find nearby drivers and notify them
     const nearbyDrivers = await findNearbyDrivers(
@@ -57,11 +62,13 @@ const createRide = async (req, res) => {
       pickupLocation.coordinates[0]
     );
 
+    console.log(`Nearby drivers found for ride ${ride._id.toString()}: ${nearbyDrivers.length}`);
+
     // Create notifications for all nearby drivers
     const notifications = [];
     for (const driver of nearbyDrivers) {
       const notification = await Notification.create({
-        user: driver.user,
+        driver: driver._id,
         title: 'New Ride Request!',
         message: `${req.user.name} has requested a ride`,
         type: 'ride',
@@ -74,15 +81,40 @@ const createRide = async (req, res) => {
     // Get io instance and emit ride request to nearby drivers
     const io = req.app.get('io');
     const rideData = ride.toObject();
+    rideData._id = ride._id.toString();
+    rideData.rideId = ride._id.toString();
     rideData.user = { _id: req.user._id, name: req.user.name };
 
     // Emit rideCreated event to user
     const populatedRide = await Ride.findById(ride._id).populate('driver');
+    io.to(req.user._id.toString()).emit('ride-created', populatedRide);
     io.to(req.user._id.toString()).emit('rideCreated', populatedRide);
 
     nearbyDrivers.forEach((driver) => {
-      io.to(driver.user.toString()).emit('newRideRequest', rideData);
+      const driverRoom = driver?._id?.toString();
+      const userRoom = driver?.user?._id?.toString() || driver?.user?.toString();
+
+      if (userRoom) {
+        io.to(userRoom).emit('newRideRequest', rideData);
+        io.to(userRoom).emit('ride-request', rideData);
+      }
+
+      if (driverRoom) {
+        io.to(driverRoom).emit('newRideRequest', rideData);
+        io.to(driverRoom).emit('ride-request', rideData);
+      }
+
+      if (driverRoom || userRoom) {
+        io.to(userRoom || driverRoom).emit('notification', {
+          type: 'ride',
+          title: 'New Ride Request',
+          message: `${req.user.name} requested a ride`,
+          rideId: ride._id.toString(),
+        });
+      }
     });
+
+    console.log(`Ride request sent to ${nearbyDrivers.length} nearby eligible drivers`);
 
     res.status(201).json({
       status: 'success',
@@ -305,12 +337,15 @@ const driverAcceptRide = async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Ride not found' });
     }
 
-    if (ride.status !== 'pending') {
+    if (ride.status !== 'searching') {
       return res.status(400).json({ status: 'error', message: 'Ride is not available' });
     }
 
     ride.driver = driver._id;
-    ride.status = 'accepted';
+    const transition = applyRideStatusTransition(ride, 'accepted');
+    if (!transition.valid) {
+      return res.status(400).json({ status: 'error', message: transition.reason });
+    }
     await ride.save();
 
     const io = req.app.get('io');
@@ -381,11 +416,14 @@ const driverArrived = async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Ride not found' });
     }
 
-    if (ride.status !== 'accepted') {
+    if (ride.status !== 'accepted' && ride.status !== 'driver_arriving') {
       return res.status(400).json({ status: 'error', message: 'Ride not in accepted status' });
     }
 
-    ride.status = 'arrived';
+    const transition = applyRideStatusTransition(ride, 'arrived');
+    if (!transition.valid) {
+      return res.status(400).json({ status: 'error', message: transition.reason });
+    }
     await ride.save();
 
     const io = req.app.get('io');
@@ -422,8 +460,10 @@ const driverStartTrip = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Driver not at pickup' });
     }
 
-    ride.status = 'trip_started'; // Use backend's enum
-    ride.startTime = Date.now();
+    const transition = applyRideStatusTransition(ride, 'trip_started');
+    if (!transition.valid) {
+      return res.status(400).json({ status: 'error', message: transition.reason });
+    }
     await ride.save();
 
     const io = req.app.get('io');
@@ -460,8 +500,10 @@ const driverCompleteTrip = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Trip not started' });
     }
 
-    ride.status = 'completed';
-    ride.endTime = Date.now();
+    const transition = applyRideStatusTransition(ride, 'completed');
+    if (!transition.valid) {
+      return res.status(400).json({ status: 'error', message: transition.reason });
+    }
     await ride.save();
 
     // Create notifications for both user and driver

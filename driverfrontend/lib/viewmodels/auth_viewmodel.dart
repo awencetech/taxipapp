@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/driver_models.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/driver_auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/socket_service.dart';
 import '../core/constants/app_constants.dart';
@@ -511,8 +512,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Mocking OTP send for now as backend seems to only have it for forgot password
-      // In a real app, this would call an endpoint like /auth/send-otp
+      // Mocking OTP send for now as backend does not expose driver phone OTP endpoint here.
       await Future.delayed(const Duration(seconds: 1));
       _isLoading = false;
       notifyListeners();
@@ -522,6 +522,63 @@ class AuthViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> sendForgotPasswordOtp(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final driverAuthService = DriverAuthService();
+      final response = await driverAuthService.sendOtp(email);
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error};
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyForgotPasswordOtp(String email, String otp) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final driverAuthService = DriverAuthService();
+      final response = await driverAuthService.verifyOtp(email, otp);
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error};
+    }
+  }
+
+  Future<Map<String, dynamic>> resetForgotPassword(String email, String otp, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final driverAuthService = DriverAuthService();
+      final response = await driverAuthService.resetPassword(email, otp, password);
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error};
     }
   }
 
